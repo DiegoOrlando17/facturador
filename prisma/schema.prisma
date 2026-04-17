@@ -7,11 +7,136 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum SubscriptionStatus {
+  ACTIVE
+  PAST_DUE
+  CANCELED
+}
+
+enum TenantStatus {
+  ACTIVE
+  DISABLED
+}
+
+enum IntegrationProvider {
+  MERCADOPAGO
+  AFIP
+  DRIVE
+  SHEETS
+}
+
+enum PaymentStatus {
+  pending
+  processing
+  afip_pending
+  pdf_pending
+  drive_pending
+  sheets_pending
+  complete
+  failed
+}
+
+model Tenant {
+  id        BigInt       @id @default(autoincrement())
+  name      String
+  slug      String       @unique
+  status    TenantStatus @default(ACTIVE)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  payments      Payment[]
+  sequences     InvoiceSequence[]
+  integrations  TenantIntegration[]
+  checkpoints   IntegrationCheckpoint[]
+  users         TenantUser[]
+  subscriptions Subscription[]
+}
+
+model Plan {
+  id           BigInt  @id @default(autoincrement())
+  code         String  @unique
+  name         String
+  featuresJson String?
+
+  subscriptions Subscription[] // técnico, no de negocio
+}
+
+model Subscription {
+  id       BigInt             @id @default(autoincrement())
+  tenantId BigInt
+  planId   BigInt
+  status   SubscriptionStatus @default(ACTIVE)
+
+  // billing (stripe/mercadopago/etc) si lo implementás
+  billingProvider String?
+  billingRef      String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  plan   Plan   @relation(fields: [planId], references: [id])
+
+  @@index([tenantId])
+}
+
+model TenantIntegration {
+  id       BigInt              @id @default(autoincrement())
+  tenantId BigInt
+  provider IntegrationProvider
+  enabled  Boolean             @default(true)
+
+  // Guardar credenciales cifradas (string JSON cifrado)
+  secretEnc String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, provider])
+  @@index([tenantId])
+}
+
+model IntegrationCheckpoint {
+  id       BigInt              @id @default(autoincrement())
+  tenantId BigInt
+  provider IntegrationProvider
+
+  // ejemplo MP: timestamp + lastPaymentId
+  valueJson String
+
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, provider])
+  @@index([tenantId])
+}
+
+model TenantUser {
+  id        BigInt   @id @default(autoincrement())
+  tenantId  BigInt
+  email     String
+  role      String // owner/admin/viewer/approver
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, email])
+  @@index([tenantId])
+}
+
 model Payment {
-  id                  BigInt    @id @default(autoincrement())
+  id       BigInt @id @default(autoincrement())
+  tenantId BigInt
+
   provider            String
   provider_payment_id String
-  status              String
+
+  status PaymentStatus
+
   payment_method_id   String?
   amount              Float?
   currency            String?
@@ -19,32 +144,48 @@ model Payment {
   customer_doc_type   String?
   customer_doc_number String?
   date_approved       DateTime?
-  cae                 String?
-  cae_vto             String?
-  cbte_nro            String?
-  cbte_tipo           Int?
-  pto_vta             Int?
-  pdf_path            String?
-  drive_file_link     String?
-  sheets_row          String?
-  error               String?
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
 
-  @@unique([provider, provider_payment_id])
+  cae       String?
+  cae_vto   String?
+  cbte_nro  String?
+  cbte_tipo Int?
+  pto_vta   Int?
+
+  pdf_path        String?
+  drive_file_link String?
+  sheets_row      String?
+  error           String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@unique([id, tenantId], name: "id_tenantId")
+  @@unique([tenantId, provider, provider_payment_id])
+  @@index([tenantId, status])
+  @@index([tenantId, createdAt])
 }
 
 model InvoiceSequence {
-  id        BigInt    @id @default(autoincrement())
-  pto_vta   Int       @unique
+  id       BigInt @id @default(autoincrement())
+  tenantId BigInt
+
+  pto_vta   Int
   cbte_tipo Int
   last_nro  BigInt
+
   updatedAt DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, pto_vta, cbte_tipo])
+  @@index([tenantId])
 }
 
 model SystemConfig {
-  id         BigInt      @id @default(autoincrement())
-  key        String   @unique
-  value      String
-  updatedAt  DateTime @updatedAt
+  id        BigInt   @id @default(autoincrement())
+  key       String   @unique
+  value     String
+  updatedAt DateTime @updatedAt
 }

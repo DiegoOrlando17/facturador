@@ -5,13 +5,20 @@ import { google } from "googleapis";
 import { getAccessToken } from "./google-auth.js";
 import { config } from "../config/index.js";
 
-export async function uploadToDrive(pdfPath, filename) {
+/**
+ * @param {string} pdfPath
+ * @param {string} filename
+ * @param {{ accessToken?: string, folderId?: string }} [opts] — si no, token/carpeta globales (.env)
+ */
+export async function uploadToDrive(pdfPath, filename, opts = {}) {
   try {
-    const accessToken = await getAccessToken();
+    const accessToken = opts.accessToken ?? (await getAccessToken());
     if (!accessToken) {
       return null;
     }
-    
+
+    const folderId = opts.folderId ?? config.GOOGLE.DRIVE_FOLDER_ID;
+
     const auth = new google.auth.OAuth2();
     auth.setCredentials({ access_token: accessToken });
 
@@ -20,7 +27,7 @@ export async function uploadToDrive(pdfPath, filename) {
     const res = await drive.files.create({
       requestBody: {
         name: filename,
-        parents: [config.GOOGLE.DRIVE_FOLDER_ID],
+        parents: [folderId],
       },
       media: {
         mimeType: "application/pdf",

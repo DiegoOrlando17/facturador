@@ -3,7 +3,8 @@ import logger from "../utils/logger.js";
 import { getPendingPayments } from "../models/Payment.js";
 import { paymentsQueue } from "../queues/payments.queue.js";
 import { invoicesQueue } from "../queues/invoices.queue.js";
-import { keepTokenAlive } from "../services/drive.service.js";
+import { keepGoogleConnectionsAlive } from "../services/tenantGoogle.service.js";
+import { buildQueueJobId, toQueueId } from "../utils/bigint.js";
 
 const RETRY_INTERVAL_MS = 10 * 60 * 1000; // 10 minutos
 
@@ -18,11 +19,11 @@ async function reenqueuePendingPayments() {
 
     for (const payment of pendings) {
       try {
-        const { id, provider_payment_id, status } = payment;
+        const { id, tenantId, provider_payment_id, status } = payment;
 
         if (status === "afip_pending") {
-          await paymentsQueue.add(`payments-${provider_payment_id.toString()}`, { paymentId: id.toString() }, {
-            jobId: `job-payments-${provider_payment_id.toString()}-${Date.now()}`,
+          await paymentsQueue.add(`payments-${tenantId}-${payment.provider_payment_id.toString()}`, { tenantId: toQueueId(tenantId), paymentId: toQueueId(payment.id) }, {
+            jobId: buildQueueJobId({ tenantId, paymentId: payment.id, step: "afip" }),
             attempts: 5,
             backoff: { type: "exponential", delay: 3000 },
             removeOnComplete: true,
@@ -30,8 +31,8 @@ async function reenqueuePendingPayments() {
           });
         }
         else if (["pdf_pending", "drive_pending", "sheets_pending"].includes(status)) {
-          await invoicesQueue.add(`invoices-${provider_payment_id.toString()}`, { paymentId: id.toString() }, {
-            jobId: `job-invoices-${provider_payment_id.toString()}-${Date.now()}`,
+          await invoicesQueue.add(`invoices-${payment.provider_payment_id.toString()}`, { tenantId: toQueueId(tenantId), paymentId: toQueueId(payment.id) }, {
+            jobId: buildQueueJobId({ tenantId, paymentId: payment.id, step: "post" }),
             attempts: 5,
             backoff: { type: "exponential", delay: 2000 },
             removeOnComplete: true,
@@ -43,7 +44,7 @@ async function reenqueuePendingPayments() {
       }
     }
 
-    await keepTokenAlive();
+    await keepGoogleConnectionsAlive();
 
   } catch (err) {
     logger.error("❌ Error en Retry worker:", err);

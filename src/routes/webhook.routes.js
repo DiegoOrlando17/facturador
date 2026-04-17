@@ -1,6 +1,9 @@
 import { Router } from "express";
 import { upsertPayment } from "../models/Payment.js";
 import { webhooksQueue } from "../queues/webhooks.queue.js";
+import { resolveTenantIdBySlug } from "../services/tenantConfig.service.js";
+import { config } from "../config/index.js";
+import { toQueueId } from "../utils/bigint.js";
 
 const router = Router();
 
@@ -11,9 +14,11 @@ router.post("/mercadopago", async (req, res) => {
 
     if (type === "payment" && data && data.id) {
 
-      const payment = await upsertPayment("mercadopago", String(data.id || ""), { id: Number(data.id), status: "pending" });
+      const tenantId = await resolveTenantIdBySlug(config.DEFAULT_TENANT_SLUG);
 
-      const job = await webhooksQueue.add(`webhooks-${data.id}`, { paymentId: payment.id }, {
+      const payment = await upsertPayment(tenantId, "mercadopago", String(data.id || ""), { status: "pending" });
+
+      const job = await webhooksQueue.add(`webhooks-${data.id}`, { tenantId: toQueueId(tenantId), paymentId: toQueueId(payment.id) }, {
         jobId: `job-webhooks-${data.id}`,
         attempts: 8,
         backoff: { type: "exponential", delay: 2000 },

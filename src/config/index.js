@@ -1,8 +1,12 @@
 import dotenv from "dotenv";
 dotenv.config();
 
+const port = process.env.PORT || 5000;
+const ngrokUrl = process.env.NGROK_URL;
+const googleRedirectBase = process.env.GOOGLE_REDIRECT_BASE_URL || ngrokUrl || `http://localhost:${port}`;
+
 export const config = {
-  PORT: process.env.PORT || 5000,
+  PORT: port,
   CUIT: Number(process.env.CUIT),
 
   MP: {
@@ -46,14 +50,22 @@ export const config = {
     SHEET_NAME: process.env.SHEET_NAME || "Hoja1",
     TOKEN_B64: process.env.GOOGLE_TOKEN_B64,
     TOKEN: process.env.GOOGLE_TOKEN_PATH,
+    REDIRECT_URI: process.env.GOOGLE_REDIRECT_URI || `${googleRedirectBase}/google/oauth/callback`,
+    STATE_SECRET: process.env.GOOGLE_STATE_SECRET || process.env.GOOGLE_CLIENT_SECRET || "google-state-secret",
   },
 
-  NGROK_URL: process.env.NGROK_URL,
+  NGROK_URL: ngrokUrl,
 
   REDIS_URL: process.env.REDIS_URL,
 
   DATABASE_URL: process.env.DATABASE_URL,
 
+  SECRETS: {
+    MASTER_KEY: process.env.APP_MASTER_KEY || process.env.SECRETS_MASTER_KEY || "dev-master-key",
+  },
+
   ENABLE_WORKERS: process.env.ENABLE_WORKERS,
+
+  DEFAULT_TENANT_SLUG: process.env.DEFAULT_TENANT_SLUG || "demo",
 
 };

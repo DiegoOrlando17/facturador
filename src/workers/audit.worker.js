@@ -1,33 +1,31 @@
 import logger from "../utils/logger.js";
+import { buildQueueJobId, toQueueId } from "../utils/bigint.js";
 
 import { DateTime } from "luxon";
 import { upsertPayment, getAllPaymentsIds } from "../models/Payment.js";
 import { paymentsQueue } from "../queues/payments.queue.js";
-import { fetchLast24HsPayments, getPaymentInfoMP } from "../services/mercadopago.service.js"
+import { fetchLast24HsPayments, getPaymentInfoMP } from "../services/mercadopago.service.js";
+import { listEnabledTenantsByIntegration } from "../services/tenantConfig.service.js";
 
-// AUDIT INTERVAL (en minutos)
-const CHECK_INTERVAL_MIN = 1; // el worker despierta cada 1 minuto
-
-// Guardamos el último “slot” ejecutado
+const CHECK_INTERVAL_MIN = 1;
 let lastRunSlot = null;
 
-async function addMissingPayments(payments) {
+async function addMissingPayments(tenantId, payments) {
     if (payments.length === 0) {
-        logger.info("🟢 No hay pagos faltantes en últimas 24h.");
+        logger.info(`[t=${tenantId}] No hay pagos faltantes en ultimas 24h.`);
         return;
     }
 
-    logger.error(`❌ Detectados ${payments.length} pagos faltantes → generando upsert...`);
+    logger.error(`[t=${tenantId}] Detectados ${payments.length} pagos faltantes -> generando upsert...`);
 
     for (const p of payments) {
-
         const data = getPaymentInfoMP(p);
         data.status = "pending";
 
-        const payment = await upsertPayment("mercadopago", String(p.id || ""), data);
+        const payment = await upsertPayment(tenantId, "mercadopago", String(p.id || ""), data);
 
-        const queue = await paymentsQueue.add(`payments-${payment.provider_payment_id.toString()}`, { paymentId: payment.id.toString() }, {
-            jobId: `job-payments-${payment.provider_payment_id.toString()}-${Date.now()}`,
+        await paymentsQueue.add(`payments-${tenantId}-${payment.provider_payment_id.toString()}`, { tenantId: toQueueId(tenantId), paymentId: toQueueId(payment.id) }, {
+            jobId: buildQueueJobId({ tenantId, paymentId: payment.id, step: "afip" }),
             attempts: 10,
             backoff: { type: "exponential", delay: 3000 },
             removeOnComplete: true,
@@ -36,51 +34,45 @@ async function addMissingPayments(payments) {
     }
 }
 
-async function audit() {
-    const mpPayments = await fetchLast24HsPayments();
-    const dbIds = (await getAllPaymentsIds("mercadopago"))
-        .map(r => Number(r.provider_payment_id));
+async function auditTenant(tenantId, mpCfg) {
+    const mpPayments = await fetchLast24HsPayments(mpCfg);
+    const dbIds = (await getAllPaymentsIds(tenantId, "mercadopago"))
+        .map((row) => Number(row.provider_payment_id));
 
     const dbSet = new Set(dbIds);
+    const missing = mpPayments.filter((payment) => !dbSet.has(Number(payment.id)));
 
-    // De todos los pagos MP últimas 24h, nos quedamos con los que NO existen en DB
-    const missing = mpPayments.filter(p => !dbSet.has(Number(p.id)));
-
-    await addMissingPayments(missing);
+    await addMissingPayments(tenantId, missing);
 }
 
-// ----------------------------------------------------------------------
-// LOOP DEL WORKER
-// ----------------------------------------------------------------------
-
 async function startAuditWorker() {
-    console.log("🔧 Audit worker iniciado.");
+    console.log("Audit worker iniciado.");
 
     setInterval(async () => {
         try {
             const now = DateTime.now().setZone("America/Argentina/Buenos_Aires");
             const hour = now.hour;
             const minute = now.minute;
-
             const validMinutes = [0, 10, 20, 30, 40, 50];
 
             if (hour === 9 && validMinutes.includes(minute)) {
                 const slotKey = `${now.toISODate()}-${hour}-${minute}`;
 
-                // Evitar ejecutar dos veces en el mismo minuto
                 if (lastRunSlot !== slotKey) {
                     lastRunSlot = slotKey;
-                    await audit();
+                    const tenants = await listEnabledTenantsByIntegration("MERCADOPAGO");
+                    for (const row of tenants) {
+                        await auditTenant(row.tenantId, row.config);
+                    }
                 }
             }
-
         } catch (err) {
-            logger.error("❌ Error en Audit worker:", err);
+            logger.error("Error en Audit worker:", err);
         }
     }, CHECK_INTERVAL_MIN * 60 * 1000);
 }
 
-startAuditWorker().catch(e => {
-    logger.error("❌ Error fatal en el Audit worker:", e);
+startAuditWorker().catch((error) => {
+    logger.error("Error fatal en el Audit worker:", error);
     process.exit(1);
 });

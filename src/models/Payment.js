@@ -4,14 +4,15 @@ import { db } from "./db.js";
  * Inserta o actualiza un pago (idempotente).
  * Si no existe, lo crea. Si ya existe, actualiza los campos nuevos.
  */
-export async function upsertPayment(provider, provider_payment_id, data = {}) {
+export async function upsertPayment(tenantId, provider, provider_payment_id, data = {}) {
   return db.payment.upsert({
-    where: { provider_provider_payment_id: { provider, provider_payment_id } },
+    where: { tenantId_provider_provider_payment_id: { tenantId, provider, provider_payment_id } },
     update: {
       ...data,
       updatedAt: new Date(),
     },
     create: {
+      tenantId, 
       provider,
       provider_payment_id,
       ...data,
@@ -23,9 +24,9 @@ export async function upsertPayment(provider, provider_payment_id, data = {}) {
 /**
  * Actualiza un pago existente. Si no existe, lanza error.
  */
-export async function updatePayment(id, data = {}) {
+export async function updatePayment(tenantId, id, data = {}) {
   return db.payment.update({
-    where: { id },
+    where: { id_tenantId: { id, tenantId } },
     data: {
       ...data,
       updatedAt: new Date(),
@@ -36,43 +37,55 @@ export async function updatePayment(id, data = {}) {
 /**
  * Actualiza solo el estado (status) de un pago.
  */
-export async function updatePaymentStatus(id, newStatus, error = null) {
+export async function updatePaymentStatus(tenantId, id, newStatus, error = null) {
   return db.payment.update({
-    where: { id },
+    where: { id_tenantId: { id, tenantId} },
     data: {
       status: newStatus,
       error,
       updatedAt: new Date(),
     },
-    select: { id: true, status: true, error: true, updatedAt: true },
+    select: { id: true, tenantId: true, status: true, error: true, updatedAt: true },
   });
 }
 
 /**
- * Obtiene un pago por provider + provider_payment_id.
+ * Obtiene un pago por id.
  */
-export async function getPayment(id) {
+export async function getPayment(tenantId, id) {
+  return db.payment.findFirst({
+    where: { tenantId, id },
+  });
+}
+
+export async function getPaymentByProviderPaymentId(tenantId, provider, provider_payment_id) {
   return db.payment.findUnique({
-    where: { id },
+    where: {
+      tenantId_provider_provider_payment_id: {
+        tenantId,
+        provider,
+        provider_payment_id: String(provider_payment_id),
+      },
+    },
   });
 }
 
 /**
  * Lista los pagos por estado (ej: RECEIVED, AFIP_OK, DONE, etc.)
  */
-export async function getPaymentsByStatus(status) {
+export async function getPaymentsByStatus(tenantId, status) {
   return db.payment.findMany({
-    where: { status },
+    where: { tenantId, status },
     orderBy: { createdAt: "desc" },
   });
 }
 
-export async function getPendingPayments() {
+export async function getPendingPayments(tenantId = null) {
   return db.payment.findMany({
     where: {
+      ...(tenantId ? { tenantId } : {}),
       status: {
         in: [
-          "mercadopago_fetch_pending",
           "afip_pending",
           "pdf_pending",
           "drive_pending",
@@ -82,15 +95,16 @@ export async function getPendingPayments() {
     },
     select: {
       id: true,
+      tenantId: true, 
       provider_payment_id: true,
       status: true,
     },
   });
 }
 
-export async function getAllPaymentsIds(provider) {
+export async function getAllPaymentsIds(tenantId, provider) {
   return db.payment.findMany({
-    where: { provider },
+    where: { tenantId, provider },
     select: { provider_payment_id: true }
   });
 }

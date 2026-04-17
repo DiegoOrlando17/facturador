@@ -6,10 +6,16 @@ import logger from "../utils/logger.js";
 import { config } from "../config/index.js"
 import { getTodaysDate, formatToLocalTime } from "../utils/date.js";
 
-export function createInvoicePDF(payment, cae, nroComprobante, fechaVtoCae) {
+/**
+ * @param {Record<string, unknown>} [afipBranding] — normalizado (normalizeAfipConfig) + opcionales PDF_RAZON_SOCIAL, PDF_CUIT, PDF_DOMICILIO, PDF_LOCALIDAD, PDF_DEPENDENCIA, PDF_LOGO_PATH
+ */
+export function createInvoicePDF(payment, cae, nroComprobante, fechaVtoCae, afipBranding = {}) {
     try {
         return new Promise((resolve, reject) => {
-            const fileName = `${config.CUIT}_${config.AFIP.CBTE_TIPO.toString().padStart(3, "0")}_${config.AFIP.PTO_VTA.toString().padStart(5, "0")}_${nroComprobante.split('-')[1]}_${getTodaysDate()}.pdf`;
+            const cuitFile = String(afipBranding.CUIT ?? config.CUIT ?? "");
+            const cbteTipo = Number(afipBranding.CBTE_TIPO ?? config.AFIP.CBTE_TIPO);
+            const ptoVta = Number(afipBranding.PTO_VTA ?? config.AFIP.PTO_VTA);
+            const fileName = `${cuitFile}_${cbteTipo.toString().padStart(3, "0")}_${ptoVta.toString().padStart(5, "0")}_${nroComprobante.split('-')[1]}_${getTodaysDate()}.pdf`;
             const filePath = `./facturas/${fileName}`;
 
             if (!fs.existsSync("./facturas")) {
@@ -23,7 +29,7 @@ export function createInvoicePDF(payment, cae, nroComprobante, fechaVtoCae) {
             // === ENCABEZADO ===
             // Logo (si tenés un archivo PNG/JPG, ejemplo ./logo.png)
             try {
-                const logoPath = path.resolve("assets/fiebre_flow_logo.png");
+                const logoPath = path.resolve(afipBranding.PDF_LOGO_PATH || "assets/fiebre_flow_logo.png");
                 doc.image(logoPath, 50, 45, { width: 80 });
             } catch (e) {
                 // Si no hay logo, seguimos sin error
@@ -32,13 +38,13 @@ export function createInvoicePDF(payment, cae, nroComprobante, fechaVtoCae) {
             doc.fillColor("#333").fontSize(20).text("Factura - Consumidor Final", 150, 50);
             doc.moveDown(2);
 
-            // Datos del comercio
+            // Datos del comercio (PDF_* opcionales por tenant; defaults compatibles con instalación previa)
             doc.fontSize(10).fillColor("#555");
-            doc.text("RAZON SOCIAL: FEBRIS", 50, 120);
-            doc.text("CUIT: 30-71902252-5", 50, 135);
-            doc.text("DEPENDENCIA: 41 - AGENCIA NRO 41", 50, 150);
-            doc.text("DOMICILIO: JARAMILLO 2364 Dpto:309 CP: 1429", 50, 165);
-            doc.text("LOCALIDAD: CAPITAL FEDERAL", 50, 180);
+            doc.text(`RAZON SOCIAL: ${afipBranding.PDF_RAZON_SOCIAL ?? "FEBRIS"}`, 50, 120);
+            doc.text(`CUIT: ${afipBranding.PDF_CUIT ?? "30-71902252-5"}`, 50, 135);
+            doc.text(`DEPENDENCIA: ${afipBranding.PDF_DEPENDENCIA ?? "41 - AGENCIA NRO 41"}`, 50, 150);
+            doc.text(`DOMICILIO: ${afipBranding.PDF_DOMICILIO ?? "JARAMILLO 2364 Dpto:309 CP: 1429"}`, 50, 165);
+            doc.text(`LOCALIDAD: ${afipBranding.PDF_LOCALIDAD ?? "CAPITAL FEDERAL"}`, 50, 180);
             doc.moveDown(2);
 
             // === DATOS DEL PAGO ===
@@ -46,7 +52,7 @@ export function createInvoicePDF(payment, cae, nroComprobante, fechaVtoCae) {
             doc.text(`Factura N°: ${nroComprobante}`, 50, 250);
             doc.text(`Fecha: ${formatToLocalTime(payment.date_approved)}`, 50, 265);
             doc.text(`Método de pago: ${payment.payment_method_id}`, 50, 280);
-            doc.text(`Comprador: ${payment.payer?.email || "Consumidor Final"}`, 50, 295);
+            doc.text(`Comprador: ${payment.customer || "Consumidor Final"}`, 50, 295);
             doc.text(`CAE: ${cae}   Vto: ${fechaVtoCae}`, 50, 310);
 
             doc.moveDown(3);
