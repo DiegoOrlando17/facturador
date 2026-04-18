@@ -9,6 +9,7 @@
   "scripts": {
     "start": "node src/server.js",
     "start:workers": "node src/workers/index.js",
+    "admin:create-user": "node src/scripts/create-admin-user.js",
     "tenant:bootstrap": "node src/scripts/bootstrap-legacy-tenant.js",
     "tenant:setup-demo": "node src/scripts/setup-demo.js",
     "mp:reset-from-checkpoint": "node src/scripts/reset-mp-from-checkpoint.js"

@@ -64,6 +64,15 @@ export const config = {
     MASTER_KEY: process.env.APP_MASTER_KEY || process.env.SECRETS_MASTER_KEY || "dev-master-key",
   },
 
+  AUTH: {
+    ADMIN_TOKEN_SECRET:
+      process.env.ADMIN_TOKEN_SECRET
+      || process.env.APP_MASTER_KEY
+      || process.env.SECRETS_MASTER_KEY
+      || "dev-admin-token-secret",
+    ADMIN_TOKEN_TTL_HOURS: Number(process.env.ADMIN_TOKEN_TTL_HOURS || 12),
+  },
+
   ENABLE_WORKERS: process.env.ENABLE_WORKERS,
 
   DEFAULT_TENANT_SLUG: process.env.DEFAULT_TENANT_SLUG || "demo",

@@ -42,6 +42,12 @@ export async function getTenantBySlug(slug) {
       users: {
         orderBy: [{ role: "asc" }, { email: "asc" }],
       },
+      subscriptions: {
+        include: {
+          plan: true,
+        },
+        orderBy: [{ createdAt: "desc" }],
+      },
     },
   });
 }
@@ -64,6 +70,12 @@ export async function listTenants() {
       },
       users: {
         orderBy: [{ role: "asc" }, { email: "asc" }],
+      },
+      subscriptions: {
+        include: {
+          plan: true,
+        },
+        orderBy: [{ createdAt: "desc" }],
       },
     },
   });

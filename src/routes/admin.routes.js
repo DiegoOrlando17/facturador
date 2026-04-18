@@ -1,4 +1,12 @@
 import { Router } from "express";
+import { requireAdminAuth } from "../middlewares/adminAuth.middleware.js";
+import { authenticateAdminUser } from "../services/adminUser.service.js";
+import {
+  getAdminDashboardSummary,
+  getAdminPaymentDetail,
+  getAdminTenantSummary,
+  listAdminPayments,
+} from "../services/adminMonitor.service.js";
 import {
   addOrUpdateTenantUser,
   createTenant,
@@ -10,7 +18,14 @@ import {
   resolveTenantIdBySlug,
   updateTenant,
 } from "../services/tenantConfig.service.js";
+import {
+  addTenantNote,
+  listTenantNotes,
+  reprocessPaymentAsAdmin,
+} from "../services/tenantSupport.service.js";
+import { createAdminToken } from "../utils/adminToken.js";
 import { maskSecrets } from "../utils/crypto.js";
+import { toBigIntId } from "../utils/bigint.js";
 
 const router = Router();
 
@@ -102,6 +117,107 @@ function validateIntegrationConfig(provider, config) {
   return current;
 }
 
+router.post("/auth/login", async (req, res) => {
+  try {
+    const email = String(req.body.email || "").trim().toLowerCase();
+    const password = String(req.body.password || "");
+
+    if (!email) throw new Error("email es obligatorio");
+    if (!password) throw new Error("password es obligatoria");
+
+    const adminUser = await authenticateAdminUser(email, password);
+    if (!adminUser) {
+      return res.status(401).json({ error: "Credenciales invalidas" });
+    }
+
+    const token = createAdminToken(adminUser);
+    return res.json({
+      token,
+      adminUser: normalizeJsonBigInts(adminUser),
+    });
+  } catch (error) {
+    return res.status(400).json({ error: error.message || "No se pudo iniciar sesion" });
+  }
+});
+
+router.post("/auth/logout", (_req, res) => {
+  return res.status(204).send();
+});
+
+router.get("/me", requireAdminAuth, (req, res) => {
+  return res.json(normalizeJsonBigInts(req.adminAuth.adminUser));
+});
+
+router.use(requireAdminAuth);
+
+router.get("/dashboard", async (_req, res) => {
+  try {
+    const summary = await getAdminDashboardSummary();
+    return res.json(normalizeJsonBigInts(summary));
+  } catch (error) {
+    return res.status(500).json({ error: error.message || "No se pudo obtener dashboard admin" });
+  }
+});
+
+router.get("/payments", async (req, res) => {
+  try {
+    const payload = await listAdminPayments({
+      page: req.query.page,
+      pageSize: req.query.pageSize,
+      status: req.query.status,
+      provider: req.query.provider,
+      search: req.query.search,
+      dateFrom: req.query.dateFrom,
+      dateTo: req.query.dateTo,
+    });
+
+    return res.json(normalizeJsonBigInts(payload));
+  } catch (error) {
+    return res.status(400).json({ error: error.message || "No se pudieron listar pagos" });
+  }
+});
+
+router.get("/payments/:id", async (req, res) => {
+  try {
+    const paymentId = toBigIntId(req.params.id, "paymentId");
+    const payment = await getAdminPaymentDetail(paymentId);
+
+    if (!payment) {
+      return res.status(404).json({ error: "Pago no encontrado" });
+    }
+
+    return res.json(normalizeJsonBigInts(payment));
+  } catch (error) {
+    return res.status(400).json({ error: error.message || "No se pudo obtener el pago" });
+  }
+});
+
+router.post("/payments/:id/reprocess", async (req, res) => {
+  try {
+    const paymentId = toBigIntId(req.params.id, "paymentId");
+    const payment = await getAdminPaymentDetail(paymentId);
+
+    if (!payment) {
+      return res.status(404).json({ error: "Pago no encontrado" });
+    }
+
+    const result = await reprocessPaymentAsAdmin(
+      payment,
+      req.adminAuth.adminUser,
+      String(req.body.step || "auto").trim().toLowerCase()
+    );
+
+    return res.status(202).json(normalizeJsonBigInts({
+      ok: true,
+      paymentId,
+      tenantId: payment.tenantId,
+      ...result,
+    }));
+  } catch (error) {
+    return res.status(400).json({ error: error.message || "No se pudo solicitar reproceso" });
+  }
+});
+
 router.get("/tenants", async (_req, res) => {
   try {
     const tenants = await listTenants();
@@ -112,6 +228,8 @@ router.get("/tenants", async (_req, res) => {
       status: tenant.status,
       createdAt: tenant.createdAt,
       updatedAt: tenant.updatedAt,
+      subscriptions: tenant.subscriptions,
+      currentSubscription: tenant.subscriptions[0] ?? null,
       users: tenant.users,
       integrations: tenant.integrations.map((integration) => ({
         id: integration.id,
@@ -143,12 +261,63 @@ router.get("/tenants/:slug", async (req, res) => {
     if (!tenant) return res.status(404).json({ error: "Tenant no encontrado" });
 
     const integrations = await listTenantIntegrations(tenant.id);
+    const metrics = await getAdminTenantSummary(tenant.id);
+    const notes = await listTenantNotes(tenant.id);
     return res.json(normalizeJsonBigInts({
       ...tenant,
       integrations,
+      metrics,
+      notes,
     }));
   } catch (error) {
     return res.status(500).json({ error: error.message || "No se pudo obtener tenant" });
+  }
+});
+
+router.get("/tenants/:slug/payments", async (req, res) => {
+  try {
+    const tenantId = await resolveTenantIdBySlug(req.params.slug);
+    const payload = await listAdminPayments({
+      tenantId,
+      page: req.query.page,
+      pageSize: req.query.pageSize,
+      status: req.query.status,
+      provider: req.query.provider,
+      search: req.query.search,
+      dateFrom: req.query.dateFrom,
+      dateTo: req.query.dateTo,
+    });
+
+    return res.json(normalizeJsonBigInts(payload));
+  } catch (error) {
+    return res.status(400).json({ error: error.message || "No se pudieron listar pagos del tenant" });
+  }
+});
+
+router.get("/tenants/:slug/notes", async (req, res) => {
+  try {
+    const tenantId = await resolveTenantIdBySlug(req.params.slug);
+    const notes = await listTenantNotes(tenantId);
+    return res.json(normalizeJsonBigInts(notes));
+  } catch (error) {
+    return res.status(400).json({ error: error.message || "No se pudieron listar notas del tenant" });
+  }
+});
+
+router.post("/tenants/:slug/notes", async (req, res) => {
+  try {
+    const tenantId = await resolveTenantIdBySlug(req.params.slug);
+    const title = String(req.body.title || "").trim();
+    const body = String(req.body.body || "").trim();
+    const pinned = req.body.pinned !== undefined ? Boolean(req.body.pinned) : false;
+
+    if (!title) throw new Error("title es obligatorio");
+    if (!body) throw new Error("body es obligatorio");
+
+    const note = await addTenantNote(tenantId, req.adminAuth.adminUser.id, { title, body, pinned });
+    return res.status(201).json(normalizeJsonBigInts(note));
+  } catch (error) {
+    return res.status(400).json({ error: error.message || "No se pudo crear nota del tenant" });
   }
 });
 

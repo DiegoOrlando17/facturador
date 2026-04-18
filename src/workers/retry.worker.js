@@ -5,6 +5,7 @@ import { paymentsQueue } from "../queues/payments.queue.js";
 import { invoicesQueue } from "../queues/invoices.queue.js";
 import { keepGoogleConnectionsAlive } from "../services/tenantGoogle.service.js";
 import { buildQueueJobId, toQueueId } from "../utils/bigint.js";
+import { logPaymentEvent } from "../services/paymentEvent.service.js";
 
 const RETRY_INTERVAL_MS = 10 * 60 * 1000; // 10 minutos
 
@@ -22,6 +23,9 @@ async function reenqueuePendingPayments() {
         const { id, tenantId, provider_payment_id, status } = payment;
 
         if (status === "afip_pending") {
+          await logPaymentEvent(tenantId, id, "retry_scheduled", "Retry worker reencolo paso AFIP", {
+            status,
+          });
           await paymentsQueue.add(`payments-${tenantId}-${payment.provider_payment_id.toString()}`, { tenantId: toQueueId(tenantId), paymentId: toQueueId(payment.id) }, {
             jobId: buildQueueJobId({ tenantId, paymentId: payment.id, step: "afip" }),
             attempts: 5,
@@ -31,6 +35,9 @@ async function reenqueuePendingPayments() {
           });
         }
         else if (["pdf_pending", "drive_pending", "sheets_pending"].includes(status)) {
+          await logPaymentEvent(tenantId, id, "retry_scheduled", "Retry worker reencolo paso post-AFIP", {
+            status,
+          });
           await invoicesQueue.add(`invoices-${payment.provider_payment_id.toString()}`, { tenantId: toQueueId(tenantId), paymentId: toQueueId(payment.id) }, {
             jobId: buildQueueJobId({ tenantId, paymentId: payment.id, step: "post" }),
             attempts: 5,

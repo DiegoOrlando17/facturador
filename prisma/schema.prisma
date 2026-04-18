@@ -18,6 +18,17 @@ enum TenantStatus {
   DISABLED
 }
 
+enum AdminUserRole {
+  SUPERADMIN
+  OPERATOR
+  VIEWER
+}
+
+enum AdminUserStatus {
+  ACTIVE
+  DISABLED
+}
+
 enum IntegrationProvider {
   MERCADOPAGO
   AFIP
@@ -36,6 +47,20 @@ enum PaymentStatus {
   failed
 }
 
+enum PaymentEventType {
+  payment_detected
+  payment_updated
+  invoice_requested
+  afip_ok
+  pdf_ok
+  drive_ok
+  sheets_ok
+  retry_scheduled
+  retried
+  failed
+  note_added
+}
+
 model Tenant {
   id        BigInt       @id @default(autoincrement())
   name      String
@@ -50,6 +75,9 @@ model Tenant {
   checkpoints   IntegrationCheckpoint[]
   users         TenantUser[]
   subscriptions Subscription[]
+  paymentEvents PaymentEvent[]
+  auditLogs     TenantAuditLog[]
+  notes         TenantNote[]
 }
 
 model Plan {
@@ -128,6 +156,20 @@ model TenantUser {
   @@index([tenantId])
 }
 
+model AdminUser {
+  id           BigInt          @id @default(autoincrement())
+  email        String          @unique
+  passwordHash String
+  role         AdminUserRole
+  status       AdminUserStatus @default(ACTIVE)
+  lastLoginAt  DateTime?
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
+  auditLogs TenantAuditLog[]
+  notes     TenantNote[]
+}
+
 model Payment {
   id       BigInt @id @default(autoincrement())
   tenantId BigInt
@@ -160,11 +202,65 @@ model Payment {
   updatedAt DateTime @updatedAt
 
   tenant Tenant @relation(fields: [tenantId], references: [id])
+  events PaymentEvent[]
 
   @@unique([id, tenantId], name: "id_tenantId")
   @@unique([tenantId, provider, provider_payment_id])
   @@index([tenantId, status])
   @@index([tenantId, createdAt])
+}
+
+model PaymentEvent {
+  id          BigInt           @id @default(autoincrement())
+  tenantId    BigInt
+  paymentId   BigInt
+  type        PaymentEventType
+  message     String?
+  payloadJson String?
+  createdAt   DateTime         @default(now())
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id])
+  payment Payment @relation(fields: [paymentId, tenantId], references: [id, tenantId])
+
+  @@index([tenantId, createdAt])
+  @@index([paymentId, createdAt])
+}
+
+model TenantAuditLog {
+  id          BigInt   @id @default(autoincrement())
+  tenantId    BigInt?
+  actorType   String
+  actorId     String?
+  adminUserId BigInt?
+  action      String
+  entityType  String
+  entityId    String?
+  beforeJson  String?
+  afterJson   String?
+  createdAt   DateTime @default(now())
+
+  tenant    Tenant?    @relation(fields: [tenantId], references: [id])
+  adminUser AdminUser? @relation(fields: [adminUserId], references: [id])
+
+  @@index([tenantId, createdAt])
+  @@index([action, createdAt])
+  @@index([entityType, entityId])
+}
+
+model TenantNote {
+  id                   BigInt   @id @default(autoincrement())
+  tenantId             BigInt
+  createdByAdminUserId BigInt?
+  title                String
+  body                 String
+  pinned               Boolean  @default(false)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  tenant         Tenant     @relation(fields: [tenantId], references: [id])
+  createdByAdmin AdminUser? @relation(fields: [createdByAdminUserId], references: [id])
+
+  @@index([tenantId, pinned, createdAt])
 }
 
 model InvoiceSequence {

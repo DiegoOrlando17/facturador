@@ -11,6 +11,7 @@ import { getTenantIntegrationConfig } from "../services/tenantConfig.service.js"
 import { normalizeAfipConfig } from "../services/afip.service.js";
 import { getGoogleInvoiceContext } from "../services/tenantGoogle.service.js";
 import { getTodaysDate, formatToLocalTime } from "../utils/date.js";
+import { logPaymentEvent } from "../services/paymentEvent.service.js";
 
 const worker = new Worker("invoices", async (job) => {
     try {
@@ -36,11 +37,15 @@ const worker = new Worker("invoices", async (job) => {
             const pdfPath = await createInvoicePDF(payment, payment.cae, payment.cbte_nro, payment.cae_vto, afipBranding);
             if (!pdfPath) {
                 await updatePaymentStatus(tenantId, payment.id, "pdf_pending", "No se pudo generar la factura.");
+                await logPaymentEvent(tenantId, payment.id, "failed", "No se pudo generar el PDF");
                 throw new Error("No se pudo generar la factura.");
             }
 
             payment.pdf_path = pdfPath;
             await updatePayment(tenantId, payment.id, payment);
+            await logPaymentEvent(tenantId, payment.id, "pdf_ok", "PDF generado", {
+                pdfPath,
+            });
         }
 
         if (payment.status === "processing" || payment.status === "pdf_pending" || payment.status === "drive_pending") {
@@ -52,11 +57,15 @@ const worker = new Worker("invoices", async (job) => {
             });
             if (!driveFile) {
                 await updatePaymentStatus(tenantId, payment.id, "drive_pending", "No se pudo subir la factura al drive.");
+                await logPaymentEvent(tenantId, payment.id, "failed", "No se pudo subir la factura a Drive");
                 throw new Error("No se pudo subir la factura al drive.");
             }
 
             payment.drive_file_link = driveFile.webViewLink;
             await updatePayment(tenantId, payment.id, payment);
+            await logPaymentEvent(tenantId, payment.id, "drive_ok", "Factura subida a Drive", {
+                driveFileLink: driveFile.webViewLink,
+            });
         }
 
         if (payment.status === "processing" || payment.status === "pdf_pending" || payment.status === "drive_pending" || payment.status === "sheets_pending") {
@@ -78,14 +87,21 @@ const worker = new Worker("invoices", async (job) => {
 
             if (!sheets) {
                 await updatePaymentStatus(tenantId, payment.id, "sheets_pending", "No se pudo registrar en el sheets.");
+                await logPaymentEvent(tenantId, payment.id, "failed", "No se pudo registrar la factura en Sheets");
                 throw new Error("No se pudo registrar en el sheets.");
             }
 
             payment.sheets_row = sheets.row;
             await updatePayment(tenantId, payment.id, payment);
+            await logPaymentEvent(tenantId, payment.id, "sheets_ok", "Factura registrada en Sheets", {
+                row: sheets.row,
+            });
         }
 
         await updatePaymentStatus(tenantId, payment.id, "complete");
+        await logPaymentEvent(tenantId, payment.id, "payment_updated", "Proceso post-AFIP completado", {
+            finalStatus: "complete",
+        });
 
     } catch (err) {
         logger.error("Error en el invoice worker: " + err);
