@@ -432,12 +432,12 @@ Si queremos arrancar chico pero util, el MVP deberia incluir:
 
 Con eso ya tenes una primera version del monitor que reemplaza bastante del uso operativo de Drive, aunque todavia no el acceso del cliente final.
 
-## Decisiones abiertas
+## Decisiones resueltas
 
-- si el login cliente va a ser password o magic link
-- si el frontend vive dentro de este repo o en repo/app separada
-- si `Plan`/`Subscription` se van a usar de verdad en el portal admin desde la primera version
-- si los PDFs se van a servir desde disco local, object storage o ambos
+- login cliente: password
+- frontend: repo separado
+- `Plan` y `Subscription`: incluidos desde la primera version admin
+- PDFs: estrategia hibrida con preferencia por `on_demand`
 
 ## Siguiente paso sugerido
 

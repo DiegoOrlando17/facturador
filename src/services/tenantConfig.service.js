@@ -1,5 +1,6 @@
 import { PrismaClient } from "@prisma/client";
 import { decryptJson, encryptJson, maskSecrets } from "../utils/crypto.js";
+import { hashPassword } from "../utils/password.js";
 
 const prisma = new PrismaClient();
 
@@ -261,5 +262,60 @@ export async function listTenantUsers(tenantId) {
   return prisma.tenantUser.findMany({
     where: { tenantId },
     orderBy: [{ role: "asc" }, { email: "asc" }],
+  });
+}
+
+export async function findTenantUserByEmail(tenantId, email) {
+  return prisma.tenantUser.findUnique({
+    where: {
+      tenantId_email: {
+        tenantId,
+        email: String(email || "").trim().toLowerCase(),
+      },
+    },
+    include: {
+      tenant: true,
+    },
+  });
+}
+
+export async function findTenantUserById(id) {
+  return prisma.tenantUser.findUnique({
+    where: { id },
+    include: {
+      tenant: true,
+    },
+  });
+}
+
+export async function addOrUpdateTenantUserWithAuth(
+  tenantId,
+  { email, role, password = undefined, status = undefined }
+) {
+  const normalizedEmail = String(email || "").trim().toLowerCase();
+  const data = {
+    role,
+  };
+
+  if (status !== undefined) {
+    data.status = status;
+  }
+
+  if (password !== undefined && String(password).length > 0) {
+    data.passwordHash = await hashPassword(password);
+  }
+
+  return prisma.tenantUser.upsert({
+    where: {
+      tenantId_email: { tenantId, email: normalizedEmail },
+    },
+    update: data,
+    create: {
+      tenantId,
+      email: normalizedEmail,
+      role,
+      status: status ?? "ACTIVE",
+      passwordHash: data.passwordHash ?? null,
+    },
   });
 }

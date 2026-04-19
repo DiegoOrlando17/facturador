@@ -4,11 +4,21 @@ import { authenticateAdminUser } from "../services/adminUser.service.js";
 import {
   getAdminDashboardSummary,
   getAdminPaymentDetail,
+  getAdminReportsSummary,
+  getAdminReportsTimeseries,
   getAdminTenantSummary,
+  listAdminPaymentsForExport,
   listAdminPayments,
 } from "../services/adminMonitor.service.js";
 import {
-  addOrUpdateTenantUser,
+  buildDashboardCards,
+  summarizeTenantDetail,
+  summarizeTenantListItem,
+} from "../services/adminPresenter.service.js";
+import { ensureInvoicePdfForPayment, getInvoicePdfFilename } from "../services/invoicePdf.service.js";
+import { buildPaymentsCsv } from "../services/csvExport.service.js";
+import {
+  addOrUpdateTenantUserWithAuth,
   createTenant,
   getTenantBySlug,
   listTenantIntegrations,
@@ -32,6 +42,7 @@ const router = Router();
 const VALID_PROVIDERS = new Set(["MERCADOPAGO", "AFIP", "DRIVE", "SHEETS"]);
 const VALID_TENANT_STATUS = new Set(["ACTIVE", "DISABLED"]);
 const VALID_ROLES = new Set(["owner", "admin", "viewer", "approver"]);
+const VALID_TENANT_USER_STATUS = new Set(["ACTIVE", "DISABLED"]);
 
 function normalizeJsonBigInts(value) {
   if (typeof value === "bigint") {
@@ -117,6 +128,21 @@ function validateIntegrationConfig(provider, config) {
   return current;
 }
 
+async function buildAnalyticsFilters(query) {
+  const filters = {
+    dateFrom: query.dateFrom,
+    dateTo: query.dateTo,
+    granularity: query.granularity,
+  };
+
+  if (query.tenantSlug) {
+    filters.tenantId = await resolveTenantIdBySlug(String(query.tenantSlug));
+    filters.tenantSlug = String(query.tenantSlug);
+  }
+
+  return filters;
+}
+
 router.post("/auth/login", async (req, res) => {
   try {
     const email = String(req.body.email || "").trim().toLowerCase();
@@ -150,12 +176,36 @@ router.get("/me", requireAdminAuth, (req, res) => {
 
 router.use(requireAdminAuth);
 
-router.get("/dashboard", async (_req, res) => {
+router.get("/dashboard", async (req, res) => {
   try {
-    const summary = await getAdminDashboardSummary();
-    return res.json(normalizeJsonBigInts(summary));
+    const filters = await buildAnalyticsFilters(req.query);
+    const summary = await getAdminDashboardSummary(filters);
+    return res.json(normalizeJsonBigInts({
+      cards: buildDashboardCards(summary),
+      summary,
+    }));
   } catch (error) {
     return res.status(500).json({ error: error.message || "No se pudo obtener dashboard admin" });
+  }
+});
+
+router.get("/reports/summary", async (req, res) => {
+  try {
+    const filters = await buildAnalyticsFilters(req.query);
+    const summary = await getAdminReportsSummary(filters);
+    return res.json(normalizeJsonBigInts(summary));
+  } catch (error) {
+    return res.status(400).json({ error: error.message || "No se pudo obtener resumen de reportes" });
+  }
+});
+
+router.get("/reports/timeseries", async (req, res) => {
+  try {
+    const filters = await buildAnalyticsFilters(req.query);
+    const series = await getAdminReportsTimeseries(filters);
+    return res.json(normalizeJsonBigInts(series));
+  } catch (error) {
+    return res.status(400).json({ error: error.message || "No se pudo obtener serie temporal" });
   }
 });
 
@@ -177,6 +227,28 @@ router.get("/payments", async (req, res) => {
   }
 });
 
+router.get("/payments/export.csv", async (req, res) => {
+  try {
+    const payload = await listAdminPaymentsForExport({
+      status: req.query.status,
+      provider: req.query.provider,
+      search: req.query.search,
+      dateFrom: req.query.dateFrom,
+      dateTo: req.query.dateTo,
+    });
+
+    const csv = buildPaymentsCsv(payload.items, { includeTenant: true });
+
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", 'attachment; filename="payments-admin.csv"');
+    res.setHeader("X-Export-Max-Rows", String(payload.exportInfo.maxRows));
+    res.setHeader("X-Export-Truncated", String(payload.exportInfo.truncated));
+    return res.status(200).send(csv);
+  } catch (error) {
+    return res.status(400).json({ error: error.message || "No se pudo exportar CSV" });
+  }
+});
+
 router.get("/payments/:id", async (req, res) => {
   try {
     const paymentId = toBigIntId(req.params.id, "paymentId");
@@ -189,6 +261,34 @@ router.get("/payments/:id", async (req, res) => {
     return res.json(normalizeJsonBigInts(payment));
   } catch (error) {
     return res.status(400).json({ error: error.message || "No se pudo obtener el pago" });
+  }
+});
+
+router.get("/payments/:id/pdf", async (req, res) => {
+  try {
+    const paymentId = toBigIntId(req.params.id, "paymentId");
+    const payment = await getAdminPaymentDetail(paymentId);
+
+    if (!payment) {
+      return res.status(404).json({ error: "Pago no encontrado" });
+    }
+
+    const { payment: hydratedPayment, filePath } = await ensureInvoicePdfForPayment(payment.tenantId, paymentId);
+    const filename = getInvoicePdfFilename(hydratedPayment);
+    const asDownload = String(req.query.download || "false") === "true";
+
+    if (asDownload) {
+      return res.download(filePath, filename);
+    }
+
+    return res.sendFile(filePath, {
+      headers: {
+        "Content-Type": "application/pdf",
+        "Content-Disposition": `inline; filename="${filename}"`,
+      },
+    });
+  } catch (error) {
+    return res.status(400).json({ error: error.message || "No se pudo obtener el PDF" });
   }
 });
 
@@ -221,26 +321,11 @@ router.post("/payments/:id/reprocess", async (req, res) => {
 router.get("/tenants", async (_req, res) => {
   try {
     const tenants = await listTenants();
-    return res.json(normalizeJsonBigInts(tenants.map((tenant) => ({
-      id: tenant.id,
-      name: tenant.name,
-      slug: tenant.slug,
-      status: tenant.status,
-      createdAt: tenant.createdAt,
-      updatedAt: tenant.updatedAt,
-      subscriptions: tenant.subscriptions,
-      currentSubscription: tenant.subscriptions[0] ?? null,
-      users: tenant.users,
-      integrations: tenant.integrations.map((integration) => ({
-        id: integration.id,
-        tenantId: integration.tenantId,
-        provider: integration.provider,
-        enabled: integration.enabled,
-        createdAt: integration.createdAt,
-        updatedAt: integration.updatedAt,
-        config: integration.secretEnc ? { configured: true } : {},
-      })),
-    }))));
+    const items = tenants.map(summarizeTenantListItem);
+    return res.json(normalizeJsonBigInts({
+      items,
+      total: items.length,
+    }));
   } catch (error) {
     return res.status(500).json({ error: error.message || "No se pudieron listar tenants" });
   }
@@ -263,14 +348,45 @@ router.get("/tenants/:slug", async (req, res) => {
     const integrations = await listTenantIntegrations(tenant.id);
     const metrics = await getAdminTenantSummary(tenant.id);
     const notes = await listTenantNotes(tenant.id);
-    return res.json(normalizeJsonBigInts({
-      ...tenant,
-      integrations,
-      metrics,
-      notes,
-    }));
+    return res.json(normalizeJsonBigInts(
+      summarizeTenantDetail(tenant, integrations, metrics, notes)
+    ));
   } catch (error) {
     return res.status(500).json({ error: error.message || "No se pudo obtener tenant" });
+  }
+});
+
+router.get("/tenants/:slug/dashboard", async (req, res) => {
+  try {
+    const tenant = await getTenantBySlug(req.params.slug);
+    if (!tenant) return res.status(404).json({ error: "Tenant no encontrado" });
+
+    const filters = await buildAnalyticsFilters({
+      ...req.query,
+      tenantSlug: req.params.slug,
+    });
+    const [summary, reportSummary, timeseries] = await Promise.all([
+      getAdminDashboardSummary(filters),
+      getAdminReportsSummary(filters),
+      getAdminReportsTimeseries(filters),
+    ]);
+
+    return res.json(normalizeJsonBigInts({
+      tenant: {
+        id: tenant.id,
+        name: tenant.name,
+        slug: tenant.slug,
+        status: tenant.status,
+      },
+      cards: buildDashboardCards(summary),
+      summary,
+      reports: {
+        summary: reportSummary,
+        timeseries,
+      },
+    }));
+  } catch (error) {
+    return res.status(400).json({ error: error.message || "No se pudo obtener dashboard del tenant" });
   }
 });
 
@@ -291,6 +407,30 @@ router.get("/tenants/:slug/payments", async (req, res) => {
     return res.json(normalizeJsonBigInts(payload));
   } catch (error) {
     return res.status(400).json({ error: error.message || "No se pudieron listar pagos del tenant" });
+  }
+});
+
+router.get("/tenants/:slug/payments/export.csv", async (req, res) => {
+  try {
+    const tenantId = await resolveTenantIdBySlug(req.params.slug);
+    const payload = await listAdminPaymentsForExport({
+      tenantId,
+      status: req.query.status,
+      provider: req.query.provider,
+      search: req.query.search,
+      dateFrom: req.query.dateFrom,
+      dateTo: req.query.dateTo,
+    });
+
+    const csv = buildPaymentsCsv(payload.items, { includeTenant: true });
+
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename="payments-${req.params.slug}.csv"`);
+    res.setHeader("X-Export-Max-Rows", String(payload.exportInfo.maxRows));
+    res.setHeader("X-Export-Truncated", String(payload.exportInfo.truncated));
+    return res.status(200).send(csv);
+  } catch (error) {
+    return res.status(400).json({ error: error.message || "No se pudo exportar CSV del tenant" });
   }
 });
 
@@ -376,11 +516,17 @@ router.put("/tenants/:slug/users", async (req, res) => {
     const tenantId = await resolveTenantIdBySlug(req.params.slug);
     const email = String(req.body.email || "").trim().toLowerCase();
     const role = String(req.body.role || "").trim().toLowerCase();
+    const password = req.body.password !== undefined ? String(req.body.password || "") : undefined;
+    const status = req.body.status !== undefined ? String(req.body.status || "").trim().toUpperCase() : undefined;
 
     if (!email) throw new Error("email es obligatorio");
     if (!VALID_ROLES.has(role)) throw new Error("role invalido");
+    if (status !== undefined && !VALID_TENANT_USER_STATUS.has(status)) throw new Error("status invalido");
+    if (password !== undefined && password.length > 0 && password.length < 8) {
+      throw new Error("password debe tener al menos 8 caracteres");
+    }
 
-    const user = await addOrUpdateTenantUser(tenantId, { email, role });
+    const user = await addOrUpdateTenantUserWithAuth(tenantId, { email, role, password, status });
     return res.json(normalizeJsonBigInts(user));
   } catch (error) {
     return res.status(400).json({ error: error.message || "No se pudo guardar usuario del tenant" });

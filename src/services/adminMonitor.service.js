@@ -1,8 +1,11 @@
+import { Prisma } from "@prisma/client";
 import { db } from "../models/db.js";
 
 const DEFAULT_PAGE = 1;
 const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 100;
+const MAX_EXPORT_ROWS = 10000;
+const VALID_GRANULARITIES = new Set(["day", "week", "month"]);
 
 function normalizePage(value) {
   const current = Number(value || DEFAULT_PAGE);
@@ -86,7 +89,47 @@ function buildAmountSummary(result = []) {
   });
 }
 
-export async function getAdminDashboardSummary() {
+function buildSqlDateFilter(filters = {}) {
+  const parts = [];
+
+  if (filters.tenantId) {
+    parts.push(Prisma.sql`AND p."tenantId" = ${filters.tenantId}`);
+  }
+
+  const from = parseDateOrNull(filters.dateFrom);
+  if (from) {
+    parts.push(Prisma.sql`AND COALESCE(p."date_approved", p."createdAt") >= ${from}`);
+  }
+
+  const to = parseDateOrNull(filters.dateTo, { endOfDay: true });
+  if (to) {
+    parts.push(Prisma.sql`AND COALESCE(p."date_approved", p."createdAt") <= ${to}`);
+  }
+
+  return Prisma.join(parts, Prisma.sql` `);
+}
+
+function normalizeSummaryFilters(filters = {}) {
+  return {
+    tenantId: filters.tenantId || null,
+    tenantSlug: filters.tenantSlug || null,
+    dateFrom: filters.dateFrom || null,
+    dateTo: filters.dateTo || null,
+  };
+}
+
+function normalizeGranularity(value) {
+  const current = String(value || "day").trim().toLowerCase();
+  if (!VALID_GRANULARITIES.has(current)) {
+    throw new Error("granularity invalida");
+  }
+
+  return current;
+}
+
+export async function getAdminDashboardSummary(filters = {}) {
+  const paymentWhere = buildPaymentWhere(filters);
+
   const [
     tenantCount,
     activeTenantCount,
@@ -100,16 +143,17 @@ export async function getAdminDashboardSummary() {
   ] = await Promise.all([
     db.tenant.count(),
     db.tenant.count({ where: { status: "ACTIVE" } }),
-    db.payment.count(),
+    db.payment.count({ where: paymentWhere }),
     db.payment.count({
       where: {
+        ...paymentWhere,
         status: {
           in: ["pending", "processing", "afip_pending", "pdf_pending", "drive_pending", "sheets_pending"],
         },
       },
     }),
-    db.payment.count({ where: { status: "failed" } }),
-    db.payment.count({ where: { status: "complete" } }),
+    db.payment.count({ where: { ...paymentWhere, status: "failed" } }),
+    db.payment.count({ where: { ...paymentWhere, status: "complete" } }),
     db.tenant.count({
       where: {
         payments: {
@@ -121,11 +165,13 @@ export async function getAdminDashboardSummary() {
     }),
     db.payment.groupBy({
       by: ["status"],
+      where: paymentWhere,
       _count: { _all: true },
       _sum: { amount: true },
     }),
     db.payment.findMany({
       take: 10,
+      where: paymentWhere,
       orderBy: [{ createdAt: "desc" }],
       include: {
         tenant: {
@@ -148,6 +194,7 @@ export async function getAdminDashboardSummary() {
       complete: completeCount,
       ...buildAmountSummary(paymentsByStatus),
     },
+    filters: normalizeSummaryFilters(filters),
     recentPayments,
   };
 }
@@ -195,6 +242,41 @@ export async function listAdminPayments(filters = {}) {
   };
 }
 
+export async function listAdminPaymentsForExport(filters = {}) {
+  const where = buildPaymentWhere(filters);
+
+  const items = await db.payment.findMany({
+    where,
+    orderBy: [{ createdAt: "desc" }],
+    take: MAX_EXPORT_ROWS,
+    include: {
+      tenant: {
+        select: {
+          id: true,
+          slug: true,
+          name: true,
+        },
+      },
+    },
+  });
+
+  return {
+    items,
+    exportInfo: {
+      maxRows: MAX_EXPORT_ROWS,
+      truncated: items.length >= MAX_EXPORT_ROWS,
+    },
+    filters: {
+      tenantId: filters.tenantId ? String(filters.tenantId) : null,
+      status: filters.status || null,
+      provider: filters.provider || null,
+      search: filters.search || null,
+      dateFrom: filters.dateFrom || null,
+      dateTo: filters.dateTo || null,
+    },
+  };
+}
+
 export async function getAdminTenantSummary(tenantId) {
   const [
     totalPayments,
@@ -228,6 +310,78 @@ export async function getAdminTenantSummary(tenantId) {
     latestFailedPayment,
     recentPayments,
     ...buildAmountSummary(paymentsByStatus),
+  };
+}
+
+export async function getAdminReportsSummary(filters = {}) {
+  const paymentWhere = buildPaymentWhere(filters);
+  const sqlDateFilter = buildSqlDateFilter(filters);
+
+  const [aggregate, byStatus, topTenants] = await Promise.all([
+    db.payment.aggregate({
+      where: paymentWhere,
+      _count: { _all: true },
+      _sum: { amount: true },
+      _avg: { amount: true },
+    }),
+    db.payment.groupBy({
+      by: ["status"],
+      where: paymentWhere,
+      _count: { _all: true },
+      _sum: { amount: true },
+    }),
+    db.$queryRaw`
+      SELECT
+        t."id",
+        t."slug",
+        t."name",
+        COUNT(*)::int AS "paymentsCount",
+        COALESCE(SUM(p."amount"), 0)::float8 AS "totalAmount"
+      FROM "Payment" p
+      INNER JOIN "Tenant" t ON t."id" = p."tenantId"
+      WHERE 1 = 1
+      ${sqlDateFilter}
+      GROUP BY t."id", t."slug", t."name"
+      ORDER BY "totalAmount" DESC, "paymentsCount" DESC
+      LIMIT 10
+    `,
+  ]);
+
+  return {
+    filters: normalizeSummaryFilters(filters),
+    totals: {
+      paymentsCount: aggregate._count._all,
+      totalAmount: Number(aggregate._sum.amount || 0),
+      avgTicket: Number(aggregate._avg.amount || 0),
+    },
+    byStatus: buildAmountSummary(byStatus).statuses,
+    topTenants,
+  };
+}
+
+export async function getAdminReportsTimeseries(filters = {}) {
+  const granularity = normalizeGranularity(filters.granularity);
+  const sqlDateFilter = buildSqlDateFilter(filters);
+  const bucket = Prisma.raw(`date_trunc('${granularity}', COALESCE(p."date_approved", p."createdAt"))`);
+
+  const rows = await db.$queryRaw`
+    SELECT
+      ${bucket} AS "bucketStart",
+      COUNT(*)::int AS "paymentsCount",
+      COALESCE(SUM(p."amount"), 0)::float8 AS "totalAmount"
+    FROM "Payment" p
+    WHERE 1 = 1
+    ${sqlDateFilter}
+    GROUP BY 1
+    ORDER BY 1 ASC
+  `;
+
+  return {
+    filters: {
+      ...normalizeSummaryFilters(filters),
+      granularity,
+    },
+    series: rows,
   };
 }
 

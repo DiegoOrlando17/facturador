@@ -29,6 +29,11 @@ enum AdminUserStatus {
   DISABLED
 }
 
+enum TenantUserStatus {
+  ACTIVE
+  DISABLED
+}
+
 enum IntegrationProvider {
   MERCADOPAGO
   AFIP
@@ -143,12 +148,15 @@ model IntegrationCheckpoint {
 }
 
 model TenantUser {
-  id        BigInt   @id @default(autoincrement())
-  tenantId  BigInt
-  email     String
-  role      String // owner/admin/viewer/approver
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id           BigInt           @id @default(autoincrement())
+  tenantId     BigInt
+  email        String
+  role         String // owner/admin/viewer/approver
+  passwordHash String?
+  status       TenantUserStatus @default(ACTIVE)
+  lastLoginAt  DateTime?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
 
   tenant Tenant @relation(fields: [tenantId], references: [id])
 

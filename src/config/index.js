@@ -71,6 +71,12 @@ export const config = {
       || process.env.SECRETS_MASTER_KEY
       || "dev-admin-token-secret",
     ADMIN_TOKEN_TTL_HOURS: Number(process.env.ADMIN_TOKEN_TTL_HOURS || 12),
+    TENANT_TOKEN_SECRET:
+      process.env.TENANT_TOKEN_SECRET
+      || process.env.APP_MASTER_KEY
+      || process.env.SECRETS_MASTER_KEY
+      || "dev-tenant-token-secret",
+    TENANT_TOKEN_TTL_HOURS: Number(process.env.TENANT_TOKEN_TTL_HOURS || 12),
   },
 
   ENABLE_WORKERS: process.env.ENABLE_WORKERS,
