@@ -13,6 +13,7 @@ import { clearStoredAuth, readStoredAuth, writeStoredAuth } from "@/lib/authStor
 
 export type AuthUser = {
   id: string;
+  name: string | null;
   email: string;
   role: string;
   status: string;

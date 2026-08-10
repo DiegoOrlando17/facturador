@@ -26,6 +26,10 @@ type RequestOptions = {
   skipAuthHandling?: boolean;
 };
 
+type BlobRequestOptions = {
+  token?: string | null;
+};
+
 export function subscribeToUnauthorized(handler: () => void) {
   unauthorizedListeners.add(handler);
 
@@ -36,6 +40,10 @@ export function subscribeToUnauthorized(handler: () => void) {
 
 function notifyUnauthorized() {
   unauthorizedListeners.forEach((listener) => listener());
+}
+
+export function buildApiUrl(path: string) {
+  return `${API_BASE_URL}${path}`;
 }
 
 export function getApiErrorMessage(error: unknown, fallback = "Ocurrio un error al comunicarse con la API.") {
@@ -93,4 +101,31 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}) 
   }
 
   return payload as T;
+}
+
+export async function apiBlobRequest(path: string, options: BlobRequestOptions = {}) {
+  let response: Response;
+
+  try {
+    response = await fetch(buildApiUrl(path), {
+      headers: {
+        ...(options.token ? { Authorization: `Bearer ${options.token}` } : {}),
+      },
+    });
+  } catch {
+    throw new NetworkError();
+  }
+
+  if (!response.ok) {
+    const payload = (await response.json().catch(() => null)) as { error?: string } | null;
+    const message = payload?.error ?? "Ocurrio un error al comunicarse con la API.";
+
+    if (response.status === 401 && options.token) {
+      notifyUnauthorized();
+    }
+
+    throw new ApiError(message, response.status);
+  }
+
+  return response.blob();
 }

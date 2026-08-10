@@ -1,0 +1,292 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Admin y portal cliente - Facturador</title>
+    <link rel="stylesheet" href="./admin-client-flow.css" />
+  </head>
+  <body>
+    <main class="page">
+      <header class="intro">
+        <div>
+          <span class="eyebrow">Direccion elegida</span>
+          <h1>Admin operativo + portal cliente guiado</h1>
+          <p>
+            La misma identidad visual: simple, profesional y clara. El admin prioriza control y velocidad. El cliente prioriza saber que hacer ahora.
+          </p>
+        </div>
+        <nav aria-label="Pantallas">
+          <a href="#admin">Admin</a>
+          <a href="#cliente">Cliente</a>
+        </nav>
+      </header>
+
+      <section id="admin" class="screen-block">
+        <div class="screen-copy">
+          <span class="eyebrow">Admin interno</span>
+          <h2>Mesa de trabajo diaria</h2>
+          <p>
+            Pensada para operar: revisar alertas, entrar a clientes, ver pagos y resolver problemas sin abrir cinco lugares distintos.
+          </p>
+        </div>
+
+        <div class="product-frame admin-frame">
+          <aside class="sidebar">
+            <div class="brand">
+              <span>F</span>
+              <strong>Facturador</strong>
+            </div>
+
+            <a class="nav-link active" href="#">Inicio</a>
+            <a class="nav-link" href="#">Clientes</a>
+            <a class="nav-link" href="#">Pagos</a>
+            <a class="nav-link" href="#">Integraciones</a>
+            <a class="nav-link" href="#">Usuarios</a>
+
+            <div class="sidebar-note">
+              <small>Rol actual</small>
+              <strong>Administrador</strong>
+            </div>
+          </aside>
+
+          <section class="workspace">
+            <header class="workspace-header">
+              <div>
+                <span class="muted">Inicio</span>
+                <h3>Panel de control</h3>
+              </div>
+              <div class="header-actions">
+                <button>Actualizar</button>
+                <button class="primary">Nuevo cliente</button>
+              </div>
+            </header>
+
+            <section class="metrics">
+              <article>
+                <span>Pagos listos</span>
+                <strong>18</strong>
+                <small>$ 842.000 facturados</small>
+              </article>
+              <article>
+                <span>Necesitan atencion</span>
+                <strong>3</strong>
+                <small>2 pagos y 1 integracion</small>
+              </article>
+              <article>
+                <span>Clientes activos</span>
+                <strong>12</strong>
+                <small>10 completos, 2 en alta</small>
+              </article>
+            </section>
+
+            <section class="admin-grid">
+              <article class="panel priority-panel">
+                <div class="panel-title">
+                  <div>
+                    <span class="eyebrow">Prioridades</span>
+                    <h4>Resolver ahora</h4>
+                  </div>
+                  <button class="link-button">Ver cola</button>
+                </div>
+
+                <div class="task-list">
+                  <div class="task-row">
+                    <span class="status-dot danger"></span>
+                    <div>
+                      <strong>AFIP rechazo un comprobante</strong>
+                      <small>Cliente Norte - pago #1842</small>
+                    </div>
+                    <button>Ver</button>
+                  </div>
+                  <div class="task-row">
+                    <span class="status-dot warning"></span>
+                    <div>
+                      <strong>Mercado Pago necesita reconexion</strong>
+                      <small>Demo Sur - no entran pagos nuevos</small>
+                    </div>
+                    <button>Resolver</button>
+                  </div>
+                  <div class="task-row">
+                    <span class="status-dot neutral"></span>
+                    <div>
+                      <strong>Alta pendiente de aprobacion</strong>
+                      <small>Cliente Oeste completo sus datos</small>
+                    </div>
+                    <button>Aprobar</button>
+                  </div>
+                </div>
+              </article>
+
+              <aside class="panel quick-panel">
+                <span class="eyebrow">Acceso rapido</span>
+                <h4>Crear cliente</h4>
+                <p>Alta guiada para datos basicos, usuario responsable e integraciones iniciales.</p>
+                <button class="primary wide">Empezar</button>
+              </aside>
+            </section>
+
+            <section class="panel">
+              <div class="panel-title">
+                <div>
+                  <span class="eyebrow">Actividad</span>
+                  <h4>Ultimos movimientos</h4>
+                </div>
+                <button class="link-button">Buscar pago</button>
+              </div>
+
+              <div class="data-table">
+                <div class="table-head">
+                  <span>Cliente</span>
+                  <span>Operacion</span>
+                  <span>Estado</span>
+                  <span>Monto</span>
+                </div>
+                <div class="table-row">
+                  <span>Cliente Norte</span>
+                  <span>Pago aprobado</span>
+                  <span><mark class="pill ok">Facturado</mark></span>
+                  <strong>$ 42.000</strong>
+                </div>
+                <div class="table-row">
+                  <span>Demo Sur</span>
+                  <span>Importacion MP</span>
+                  <span><mark class="pill warning">Pendiente</mark></span>
+                  <strong>$ 18.500</strong>
+                </div>
+                <div class="table-row">
+                  <span>Cliente Oeste</span>
+                  <span>Alta de cuenta</span>
+                  <span><mark class="pill neutral">Revisar</mark></span>
+                  <strong>-</strong>
+                </div>
+              </div>
+            </section>
+          </section>
+        </div>
+      </section>
+
+      <section id="cliente" class="screen-block">
+        <div class="screen-copy">
+          <span class="eyebrow">Portal cliente</span>
+          <h2>Acciones primero, movimientos despues</h2>
+          <p>
+            Mismo estilo limpio, pero menos administrativo. El cliente ve primero si debe hacer algo y despues sus ultimos pagos o comprobantes.
+          </p>
+        </div>
+
+        <div class="product-frame client-frame">
+          <header class="client-header">
+            <div class="brand">
+              <span>F</span>
+              <strong>Facturador</strong>
+            </div>
+            <div class="client-user">
+              <small>Cliente Norte</small>
+              <strong>Portal</strong>
+            </div>
+          </header>
+
+          <section class="client-hero">
+            <div>
+              <span class="eyebrow">Hola, Cliente Norte</span>
+              <h3>Tenes 2 acciones pendientes</h3>
+              <p>Resolvelas para que tus cobros se facturen y guarden automaticamente.</p>
+            </div>
+            <button class="primary">Continuar</button>
+          </section>
+
+          <section class="client-grid">
+            <article class="panel action-panel">
+              <div class="panel-title">
+                <div>
+                  <span class="eyebrow">Atencion</span>
+                  <h4>Que hacer ahora</h4>
+                </div>
+                <span class="soft-count">2 pendientes</span>
+              </div>
+
+              <div class="action-list">
+                <div class="client-action current">
+                  <span class="step">1</span>
+                  <div>
+                    <strong>Completar datos fiscales</strong>
+                    <small>Necesitamos CUIT y condicion frente al IVA para emitir facturas.</small>
+                  </div>
+                  <button>Completar</button>
+                </div>
+                <div class="client-action">
+                  <span class="step">2</span>
+                  <div>
+                    <strong>Conectar Google Drive</strong>
+                    <small>Asi guardamos tus comprobantes automaticamente.</small>
+                  </div>
+                  <button>Conectar</button>
+                </div>
+                <div class="client-action done">
+                  <span class="step">✓</span>
+                  <div>
+                    <strong>Mercado Pago conectado</strong>
+                    <small>Los pagos ya se importan al sistema.</small>
+                  </div>
+                  <button>Ver</button>
+                </div>
+              </div>
+            </article>
+
+            <aside class="panel client-summary">
+              <span class="eyebrow">Estado</span>
+              <h4>Tu cuenta esta casi lista</h4>
+              <p>Falta completar 2 pasos para dejar todo automatico.</p>
+              <div class="progress">
+                <span style="width: 66%"></span>
+              </div>
+              <div class="summary-list">
+                <span><strong>8</strong> pagos recibidos</span>
+                <span><strong>6</strong> facturas generadas</span>
+                <span><strong>2</strong> pendientes</span>
+              </div>
+            </aside>
+          </section>
+
+          <section class="panel">
+            <div class="panel-title">
+              <div>
+                <span class="eyebrow">Movimientos</span>
+                <h4>Ultima actividad</h4>
+              </div>
+              <button class="link-button">Ver todos</button>
+            </div>
+
+            <div class="movement-list">
+              <div class="movement-row">
+                <span class="doc-icon">FC</span>
+                <div>
+                  <strong>Factura generada</strong>
+                  <small>Pago de Mercado Pago - hoy 10:24</small>
+                </div>
+                <mark class="pill ok">Lista</mark>
+              </div>
+              <div class="movement-row">
+                <span class="doc-icon">MP</span>
+                <div>
+                  <strong>Pago recibido</strong>
+                  <small>$ 18.500 - ayer 18:10</small>
+                </div>
+                <mark class="pill neutral">En proceso</mark>
+              </div>
+              <div class="movement-row">
+                <span class="doc-icon">AF</span>
+                <div>
+                  <strong>Dato fiscal pendiente</strong>
+                  <small>No pudimos emitir un comprobante</small>
+                </div>
+                <mark class="pill warning">Revisar</mark>
+              </div>
+            </div>
+          </section>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

@@ -1,0 +1,287 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Propuestas de diseño - Facturador</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="prototype-shell">
+      <header class="prototype-intro">
+        <div>
+          <span class="label">Propuestas visuales</span>
+          <h1>Facturador simple, claro y operativo</h1>
+          <p>
+            Tres direcciones posibles para bajar ruido visual, ordenar tareas y hacer que una persona sin experiencia tecnica pueda entrar y avanzar sin miedo.
+          </p>
+        </div>
+        <nav class="prototype-tabs" aria-label="Propuestas">
+          <a href="#concept-a">A</a>
+          <a href="#concept-b">B</a>
+          <a href="#concept-c">C</a>
+        </nav>
+      </header>
+
+      <section id="concept-a" class="concept concept-a">
+        <div class="concept-note">
+          <span class="label">Opcion A</span>
+          <h2>Mesa de trabajo</h2>
+          <p>Ideal si la persona entra todos los dias a revisar pagos, clientes y alertas. Todo importante esta en el primer vistazo.</p>
+        </div>
+
+        <div class="app-frame">
+          <aside class="sidebar">
+            <div class="brand">
+              <span>F</span>
+              <strong>Facturador</strong>
+            </div>
+            <a class="nav-item active" href="#">Inicio</a>
+            <a class="nav-item" href="#">Clientes</a>
+            <a class="nav-item" href="#">Pagos</a>
+            <a class="nav-item" href="#">Integraciones</a>
+            <a class="nav-item" href="#">Usuarios</a>
+          </aside>
+
+          <section class="workspace">
+            <header class="topbar">
+              <div>
+                <span class="breadcrumb">Inicio</span>
+                <h3>Buen dia, Diego</h3>
+              </div>
+              <button class="quiet-button">Actualizar</button>
+            </header>
+
+            <div class="status-strip">
+              <article>
+                <span>Todo listo</span>
+                <strong>18</strong>
+                <small>pagos facturados</small>
+              </article>
+              <article>
+                <span>Para revisar</span>
+                <strong>3</strong>
+                <small>requieren accion</small>
+              </article>
+              <article>
+                <span>Clientes activos</span>
+                <strong>12</strong>
+                <small>sin bloqueos</small>
+              </article>
+            </div>
+
+            <div class="task-layout">
+              <section class="main-card">
+                <div class="section-title">
+                  <div>
+                    <span class="label">Prioridad</span>
+                    <h4>Resolver ahora</h4>
+                  </div>
+                  <button class="text-button">Ver todo</button>
+                </div>
+                <div class="simple-list">
+                  <article>
+                    <span class="dot warning"></span>
+                    <div>
+                      <strong>Mercado Pago necesita reconexion</strong>
+                      <small>Cliente Norte - afecta la importacion de pagos</small>
+                    </div>
+                    <button>Resolver</button>
+                  </article>
+                  <article>
+                    <span class="dot danger"></span>
+                    <div>
+                      <strong>AFIP rechazo un comprobante</strong>
+                      <small>Pago #1842 - revisar datos fiscales</small>
+                    </div>
+                    <button>Ver pago</button>
+                  </article>
+                  <article>
+                    <span class="dot ok"></span>
+                    <div>
+                      <strong>Backfill finalizado</strong>
+                      <small>42 pagos importados correctamente</small>
+                    </div>
+                    <button>Detalle</button>
+                  </article>
+                </div>
+              </section>
+
+              <aside class="helper-card">
+                <span class="label">Siguiente paso</span>
+                <h4>Crear nuevo cliente</h4>
+                <p>Alta guiada con nombre, responsable, fecha de inicio e integraciones necesarias.</p>
+                <button class="primary-action">Empezar alta</button>
+              </aside>
+            </div>
+          </section>
+        </div>
+      </section>
+
+      <section id="concept-b" class="concept concept-b">
+        <div class="concept-note">
+          <span class="label">Opcion B</span>
+          <h2>Flujo guiado</h2>
+          <p>Ideal para usuarios con poca experiencia. La pantalla siempre muestra una accion principal y explica el estado sin lenguaje tecnico.</p>
+        </div>
+
+        <div class="guided-frame">
+          <header class="guided-header">
+            <div class="brand">
+              <span>F</span>
+              <strong>Facturador</strong>
+            </div>
+            <button class="quiet-button">Ayuda</button>
+          </header>
+
+          <section class="guided-hero">
+            <div>
+              <span class="label">Hoy</span>
+              <h3>Hay 3 cosas que necesitan tu atencion</h3>
+              <p>Empeza por la primera. Cuando termines, el sistema te lleva a la siguiente tarea.</p>
+            </div>
+            <button class="primary-action">Continuar</button>
+          </section>
+
+          <div class="step-grid">
+            <article class="step-card current">
+              <span class="step-number">1</span>
+              <div>
+                <strong>Revisar pago rechazado</strong>
+                <p>Falta completar un dato fiscal para emitir la factura.</p>
+              </div>
+              <button>Resolver</button>
+            </article>
+            <article class="step-card">
+              <span class="step-number">2</span>
+              <div>
+                <strong>Conectar Google Drive</strong>
+                <p>Asi los comprobantes se guardan automaticamente.</p>
+              </div>
+              <button>Conectar</button>
+            </article>
+            <article class="step-card">
+              <span class="step-number">3</span>
+              <div>
+                <strong>Confirmar cliente nuevo</strong>
+                <p>El cliente completo el formulario de alta.</p>
+              </div>
+              <button>Revisar</button>
+            </article>
+          </div>
+
+          <section class="calm-table">
+            <div class="section-title">
+              <div>
+                <span class="label">Pagos recientes</span>
+                <h4>Ultimos movimientos</h4>
+              </div>
+              <button class="text-button">Buscar</button>
+            </div>
+            <div class="table-row head">
+              <span>Cliente</span>
+              <span>Estado</span>
+              <span>Monto</span>
+            </div>
+            <div class="table-row">
+              <span>Cliente Norte</span>
+              <span><mark class="pill warning">Revisar</mark></span>
+              <span>$ 42.000</span>
+            </div>
+            <div class="table-row">
+              <span>Demo Sur</span>
+              <span><mark class="pill ok">Listo</mark></span>
+              <span>$ 18.500</span>
+            </div>
+          </section>
+        </div>
+      </section>
+
+      <section id="concept-c" class="concept concept-c">
+        <div class="concept-note">
+          <span class="label">Opcion C</span>
+          <h2>Operacion compacta</h2>
+          <p>Ideal si se busca algo profesional, liviano y muy rapido. Menos explicacion, mas lista clara de trabajo.</p>
+        </div>
+
+        <div class="compact-frame">
+          <header class="compact-header">
+            <div class="brand">
+              <span>F</span>
+              <strong>Facturador</strong>
+            </div>
+            <div class="compact-actions">
+              <input type="search" value="Buscar cliente o pago" aria-label="Buscar" readonly />
+              <button class="primary-action">Nuevo cliente</button>
+            </div>
+          </header>
+
+          <section class="compact-grid">
+            <article class="summary-panel">
+              <span class="label">Resumen</span>
+              <h3>Operacion estable</h3>
+              <p>2 alertas abiertas, 18 pagos listos, 1 integracion pendiente.</p>
+              <div class="mini-metrics">
+                <span><strong>18</strong> listos</span>
+                <span><strong>2</strong> alertas</span>
+                <span><strong>12</strong> clientes</span>
+              </div>
+            </article>
+
+            <article class="queue-panel">
+              <div class="section-title">
+                <div>
+                  <span class="label">Cola de trabajo</span>
+                  <h4>Que hacer ahora</h4>
+                </div>
+                <button class="text-button">Filtrar</button>
+              </div>
+              <div class="queue-item">
+                <strong>Pago pendiente de AFIP</strong>
+                <span>Cliente Norte</span>
+                <button>Resolver</button>
+              </div>
+              <div class="queue-item">
+                <strong>Drive sin permisos</strong>
+                <span>Demo Sur</span>
+                <button>Corregir</button>
+              </div>
+              <div class="queue-item">
+                <strong>Alta lista para aprobar</strong>
+                <span>Cliente Oeste</span>
+                <button>Aprobar</button>
+              </div>
+            </article>
+          </section>
+
+          <section class="client-list">
+            <div class="client-row">
+              <span class="avatar">CN</span>
+              <div>
+                <strong>Cliente Norte</strong>
+                <small>Mercado Pago conectado - AFIP con alerta</small>
+              </div>
+              <mark class="pill warning">Atencion</mark>
+            </div>
+            <div class="client-row">
+              <span class="avatar">DS</span>
+              <div>
+                <strong>Demo Sur</strong>
+                <small>Todo configurado</small>
+              </div>
+              <mark class="pill ok">Activo</mark>
+            </div>
+            <div class="client-row">
+              <span class="avatar">CO</span>
+              <div>
+                <strong>Cliente Oeste</strong>
+                <small>Alta pendiente de aprobacion</small>
+              </div>
+              <mark class="pill neutral">Pendiente</mark>
+            </div>
+          </section>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

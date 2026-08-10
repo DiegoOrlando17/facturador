@@ -5,8 +5,12 @@ const currencyFormatter = new Intl.NumberFormat("es-AR", {
 });
 
 const dateTimeFormatter = new Intl.DateTimeFormat("es-AR", {
-  dateStyle: "short",
-  timeStyle: "short",
+  day: "2-digit",
+  month: "short",
+  year: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+  hourCycle: "h23",
 });
 
 export function formatCurrency(amount: number | null | undefined) {
