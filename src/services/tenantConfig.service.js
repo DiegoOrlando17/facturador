@@ -1,6 +1,9 @@
 import { PrismaClient } from "@prisma/client";
+import fs from "fs/promises";
+import path from "path";
 import { decryptJson, encryptJson, maskSecrets } from "../utils/crypto.js";
 import { hashPassword } from "../utils/password.js";
+import { createTenantAuditLog } from "./tenantSupport.service.js";
 
 const prisma = new PrismaClient();
 
@@ -40,6 +43,7 @@ export async function getTenantBySlug(slug) {
   return prisma.tenant.findUnique({
     where: { slug },
     include: {
+      profile: true,
       users: {
         orderBy: [{ role: "asc" }, { email: "asc" }],
       },
@@ -57,6 +61,7 @@ export async function listTenants() {
   return prisma.tenant.findMany({
     orderBy: [{ createdAt: "asc" }],
     include: {
+      profile: true,
       integrations: {
         orderBy: { provider: "asc" },
         select: {
@@ -97,6 +102,270 @@ export async function updateTenant(slug, data) {
   });
   tenantIdCache.set(tenant.slug, tenant.id);
   return tenant;
+}
+
+function normalizeProfilePayload(body = {}) {
+  return {
+    legalName: String(body.legalName || "").trim() || null,
+    tradeName: String(body.tradeName || "").trim() || null,
+    cuit: String(body.cuit || "").replace(/\D/g, "") || null,
+    ivaCondition: String(body.ivaCondition || "").trim() || null,
+    fiscalAddress: String(body.fiscalAddress || "").trim() || null,
+    contactEmail: String(body.contactEmail || "").trim().toLowerCase() || null,
+    contactPhone: String(body.contactPhone || "").trim() || null,
+    responsibleName: String(body.responsibleName || "").trim() || null,
+    responsibleEmail: String(body.responsibleEmail || "").trim().toLowerCase() || null,
+  };
+}
+
+function isProfileDataComplete(data = {}) {
+  return Boolean(
+    data.legalName
+      && data.cuit
+      && data.ivaCondition
+      && data.fiscalAddress
+      && data.contactEmail
+  );
+}
+
+export async function getTenantProfile(tenantId) {
+  return prisma.tenantProfile.findUnique({
+    where: { tenantId },
+  });
+}
+
+export async function upsertTenantProfile(tenantId, body = {}) {
+  const data = normalizeProfilePayload(body);
+  const approvalStatus = isProfileDataComplete(data) ? "PENDING" : "DRAFT";
+
+  return prisma.tenantProfile.upsert({
+    where: { tenantId },
+    update: {
+      ...data,
+      approvalStatus,
+      reviewedByAdminUserId: null,
+      reviewNotes: null,
+      reviewedAt: null,
+    },
+    create: {
+      tenantId,
+      ...data,
+      approvalStatus,
+    },
+  });
+}
+
+export async function reviewTenantProfile(tenantId, adminUser, { status, reviewNotes = null } = {}) {
+  const normalizedStatus = String(status || "").trim().toUpperCase();
+  if (!["APPROVED", "REJECTED"].includes(normalizedStatus)) {
+    throw new Error("status de revision invalido");
+  }
+
+  const current = await prisma.tenantProfile.findUnique({
+    where: { tenantId },
+  });
+
+  if (!current) {
+    throw new Error("Perfil del tenant no encontrado");
+  }
+
+  if (normalizedStatus === "APPROVED" && !isProfileDataComplete(current)) {
+    throw new Error("No se puede aprobar un perfil incompleto");
+  }
+
+  const updated = await prisma.tenantProfile.update({
+    where: { tenantId },
+    data: {
+      approvalStatus: normalizedStatus,
+      reviewedByAdminUserId: BigInt(adminUser.id),
+      reviewNotes: String(reviewNotes || "").trim() || null,
+      reviewedAt: new Date(),
+    },
+  });
+
+  await createTenantAuditLog({
+    tenantId,
+    adminUserId: BigInt(adminUser.id),
+    actorType: "admin",
+    actorId: String(adminUser.id),
+    action: normalizedStatus === "APPROVED" ? "tenant_profile_approved" : "tenant_profile_rejected",
+    entityType: "TenantProfile",
+    entityId: String(updated.id),
+    before: {
+      approvalStatus: current.approvalStatus,
+      reviewNotes: current.reviewNotes,
+    },
+    after: {
+      approvalStatus: updated.approvalStatus,
+      reviewNotes: updated.reviewNotes,
+    },
+  });
+
+  return updated;
+}
+
+const VALID_SUBSCRIPTION_STATUSES = new Set(["ACTIVE", "PAST_DUE", "CANCELED"]);
+
+function normalizeSubscriptionPayload(body = {}) {
+  let planId;
+  try {
+    planId = BigInt(body.planId);
+  } catch {
+    throw new Error("planId invalido");
+  }
+
+  const status = String(body.status || "ACTIVE").trim().toUpperCase();
+
+  if (!VALID_SUBSCRIPTION_STATUSES.has(status)) {
+    throw new Error("status de suscripcion invalido");
+  }
+
+  return {
+    planId,
+    status,
+    billingProvider: String(body.billingProvider || "").trim() || null,
+    billingRef: String(body.billingRef || "").trim() || null,
+  };
+}
+
+export async function upsertTenantSubscription(tenantId, body = {}) {
+  if (!body.planId) {
+    throw new Error("planId es obligatorio");
+  }
+
+  const data = normalizeSubscriptionPayload(body);
+  const plan = await prisma.plan.findUnique({
+    where: { id: data.planId },
+  });
+
+  if (!plan) {
+    throw new Error("Plan no encontrado");
+  }
+
+  const currentSubscription = await prisma.subscription.findFirst({
+    where: { tenantId },
+    orderBy: [{ createdAt: "desc" }],
+  });
+
+  const subscription = currentSubscription
+    ? await prisma.subscription.update({
+        where: { id: currentSubscription.id },
+        data,
+        include: { plan: true },
+      })
+    : await prisma.subscription.create({
+        data: {
+          tenantId,
+          ...data,
+        },
+        include: { plan: true },
+      });
+
+  return subscription;
+}
+
+function resolveDeletableInvoicePath(pdfPath) {
+  if (!pdfPath) return null;
+
+  const cwd = process.cwd();
+  const invoicesDir = path.resolve(cwd, "facturas");
+  const resolved = path.isAbsolute(pdfPath)
+    ? path.resolve(pdfPath)
+    : path.resolve(cwd, pdfPath);
+  const relative = path.relative(invoicesDir, resolved);
+
+  if (relative.startsWith("..") || path.isAbsolute(relative)) {
+    return null;
+  }
+
+  return resolved;
+}
+
+async function deleteLocalInvoiceFiles(payments) {
+  const files = [
+    ...new Set(
+      payments
+        .map((payment) => resolveDeletableInvoicePath(payment.pdf_path))
+        .filter(Boolean)
+    ),
+  ];
+
+  const result = {
+    requested: files.length,
+    deleted: 0,
+    missing: 0,
+    failed: [],
+  };
+
+  for (const filePath of files) {
+    try {
+      await fs.unlink(filePath);
+      result.deleted += 1;
+    } catch (error) {
+      if (error.code === "ENOENT") {
+        result.missing += 1;
+      } else {
+        result.failed.push({
+          path: filePath,
+          error: error.message,
+        });
+      }
+    }
+  }
+
+  return result;
+}
+
+export async function deleteTenantWithData(slug, { deleteLocalFiles = true } = {}) {
+  const tenant = await prisma.tenant.findUnique({
+    where: { slug },
+    select: { id: true, slug: true, name: true, status: true },
+  });
+
+  if (!tenant) return null;
+
+  const payments = await prisma.payment.findMany({
+    where: { tenantId: tenant.id },
+    select: { id: true, pdf_path: true },
+  });
+  const paymentIds = payments.map((payment) => payment.id);
+
+  const counts = await prisma.$transaction(async (tx) => {
+    const deleted = {};
+
+    deleted.paymentEvents = paymentIds.length > 0
+      ? (await tx.paymentEvent.deleteMany({ where: { tenantId: tenant.id } })).count
+      : 0;
+    deleted.payments = (await tx.payment.deleteMany({ where: { tenantId: tenant.id } })).count;
+    deleted.invoiceSequences = (await tx.invoiceSequence.deleteMany({ where: { tenantId: tenant.id } })).count;
+    deleted.integrationCheckpoints = (await tx.integrationCheckpoint.deleteMany({ where: { tenantId: tenant.id } })).count;
+    deleted.tenantIntegrations = (await tx.tenantIntegration.deleteMany({ where: { tenantId: tenant.id } })).count;
+    deleted.tenantProfiles = (await tx.tenantProfile.deleteMany({ where: { tenantId: tenant.id } })).count;
+    deleted.tenantUsers = (await tx.tenantUser.deleteMany({ where: { tenantId: tenant.id } })).count;
+    deleted.subscriptions = (await tx.subscription.deleteMany({ where: { tenantId: tenant.id } })).count;
+    deleted.tenantNotes = (await tx.tenantNote.deleteMany({ where: { tenantId: tenant.id } })).count;
+    deleted.onboardingSubmissions = (await tx.tenantOnboardingSubmission.deleteMany({ where: { tenantId: tenant.id } })).count;
+    deleted.auditLogs = (await tx.tenantAuditLog.deleteMany({ where: { tenantId: tenant.id } })).count;
+    await tx.tenant.delete({ where: { id: tenant.id } });
+    deleted.tenants = 1;
+
+    return deleted;
+  });
+
+  tenantIdCache.delete(tenant.slug);
+  for (const provider of ["MERCADOPAGO", "AFIP", "DRIVE", "SHEETS"]) {
+    integrationCache.delete(integrationCacheKey(tenant.id, provider));
+  }
+
+  const files = deleteLocalFiles
+    ? await deleteLocalInvoiceFiles(payments)
+    : { requested: 0, deleted: 0, missing: 0, failed: [] };
+
+  return {
+    tenant,
+    deleted: counts,
+    files,
+  };
 }
 
 export async function getTenantIntegrationConfig(tenantId, provider) {

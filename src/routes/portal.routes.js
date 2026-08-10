@@ -10,12 +10,19 @@ import {
   listTenantPortalPaymentsForExport,
   listTenantPortalPayments,
 } from "../services/tenantPortal.service.js";
+import { getTenantIntegrationConfig } from "../services/tenantConfig.service.js";
 import { buildPaymentsCsv } from "../services/csvExport.service.js";
 import { ensureInvoicePdfForPayment, getInvoicePdfFilename } from "../services/invoicePdf.service.js";
+import {
+  createTenantOnboardingSubmission,
+  listTenantOnboardingSubmissions,
+} from "../services/tenantOnboarding.service.js";
+import { testIntegrationConnection } from "../services/integrationTest.service.js";
 import { createTenantToken } from "../utils/tenantToken.js";
 import { toBigIntId } from "../utils/bigint.js";
 
 const router = Router();
+const TESTABLE_PROVIDERS = new Set(["MERCADOPAGO", "AFIP"]);
 
 function normalizeJsonBigInts(value) {
   if (typeof value === "bigint") {
@@ -190,6 +197,62 @@ router.get("/integrations", async (req, res) => {
     return res.json(normalizeJsonBigInts(integrations));
   } catch (error) {
     return res.status(400).json({ error: error.message || "No se pudieron listar integraciones" });
+  }
+});
+
+router.post("/integrations/:provider/test", async (req, res) => {
+  try {
+    const provider = String(req.params.provider || "").trim().toUpperCase();
+    if (!TESTABLE_PROVIDERS.has(provider)) {
+      throw new Error(`Test de conexion no implementado para ${provider}`);
+    }
+
+    const config = await getTenantIntegrationConfig(req.tenantAuth.tenantId, provider);
+    const result = await testIntegrationConnection(provider, config);
+
+    return res.json(normalizeJsonBigInts({
+      tenantId: req.tenantAuth.tenantId,
+      ...result,
+    }));
+  } catch (error) {
+    return res.status(400).json({
+      ok: false,
+      provider: String(req.params.provider || "").toUpperCase(),
+      error: error.message || "No se pudo probar la integracion",
+    });
+  }
+});
+
+router.get("/onboarding", async (req, res) => {
+  try {
+    const items = await listTenantOnboardingSubmissions(req.tenantAuth.tenantId, {
+      status: req.query.status,
+    });
+    return res.json(normalizeJsonBigInts({
+      items,
+      total: items.length,
+    }));
+  } catch (error) {
+    return res.status(400).json({ error: error.message || "No se pudo listar onboarding" });
+  }
+});
+
+router.post("/onboarding", async (req, res) => {
+  try {
+    const submission = await createTenantOnboardingSubmission(
+      req.tenantAuth.tenantId,
+      req.tenantAuth.tenantUser.id,
+      {
+        business: req.body.business,
+        integrations: req.body.integrations,
+        documents: req.body.documents,
+        processingStartDate: req.body.processingStartDate,
+      }
+    );
+
+    return res.status(201).json(normalizeJsonBigInts(submission));
+  } catch (error) {
+    return res.status(400).json({ error: error.message || "No se pudo enviar onboarding" });
   }
 });
 

@@ -60,11 +60,34 @@ export function summarizeSubscription(subscription) {
   return {
     id: subscription.id,
     status: subscription.status,
+    planId: subscription.planId,
     planCode: subscription.plan?.code ?? null,
     planName: subscription.plan?.name ?? null,
     billingProvider: subscription.billingProvider ?? null,
     billingRef: subscription.billingRef ?? null,
     updatedAt: subscription.updatedAt,
+  };
+}
+
+function isTenantProfileComplete(profile) {
+  return Boolean(
+    profile?.legalName
+      && profile.cuit
+      && profile.ivaCondition
+      && profile.fiscalAddress
+      && profile.contactEmail
+  );
+}
+
+function summarizeTenantProfile(profile) {
+  const isComplete = isTenantProfileComplete(profile);
+  const approvalStatus = profile?.approvalStatus ?? "DRAFT";
+
+  return {
+    exists: Boolean(profile),
+    isComplete,
+    approvalStatus,
+    needsAttention: approvalStatus === "PENDING",
   };
 }
 
@@ -85,6 +108,7 @@ export function summarizeTenantListItem(tenant) {
     createdAt: tenant.createdAt,
     updatedAt: tenant.updatedAt,
     usersCount: tenant.users?.length ?? 0,
+    profile: summarizeTenantProfile(tenant.profile),
     currentSubscription: summarizeSubscription(currentSubscription),
     integrations: integrationSummary,
   };
@@ -107,6 +131,7 @@ export function summarizeTenantDetail(tenant, integrations, metrics, notes) {
       total: tenant.users?.length ?? 0,
       items: tenant.users ?? [],
     },
+    profile: tenant.profile ?? null,
     integrations: summarizeTenantIntegrations(integrations),
     metrics,
     notes: {

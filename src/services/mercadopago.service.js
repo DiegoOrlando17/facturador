@@ -151,9 +151,6 @@ export async function fetchLastPayment(mpCfg = {}) {
       limit: 1,
     };
 
-    logger.info(cfg.API_URL);
-    logger.info(cfg.ACCESS_TOKEN);
-
     const res = await axios.get(`${cfg.API_URL}/payments/search`, {
       headers: { Authorization: "Bearer " + cfg.ACCESS_TOKEN },
       params,

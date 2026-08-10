@@ -1,11 +1,29 @@
 import { Prisma } from "@prisma/client";
+import { createClient } from "redis";
+import axios from "axios";
+import { execFile } from "child_process";
+import { promisify } from "util";
+import { config } from "../config/index.js";
 import { db } from "../models/db.js";
+import { normalizeAfipConfig } from "./afip.service.js";
+import { normalizeMpConfig } from "./mercadopago.service.js";
+import { decryptJson } from "../utils/crypto.js";
 
 const DEFAULT_PAGE = 1;
 const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 100;
 const MAX_EXPORT_ROWS = 10000;
 const VALID_GRANULARITIES = new Set(["day", "week", "month"]);
+const HEALTHCHECK_TIMEOUT_MS = 1200;
+const EXTERNAL_HEALTHCHECK_TIMEOUT_MS = 3500;
+const execFileAsync = promisify(execFile);
+const WORKER_FILES = [
+  "payment.worker.js",
+  "invoice.worker.js",
+  "retry.worker.js",
+  "mercadopago.worker.js",
+  "audit.worker.js",
+];
 
 function normalizePage(value) {
   const current = Number(value || DEFAULT_PAGE);
@@ -57,6 +75,8 @@ function buildPaymentWhere(filters = {}) {
         { cbte_nro: { contains: search, mode: "insensitive" } },
         { customer: { contains: search, mode: "insensitive" } },
         { customer_doc_number: { contains: search, mode: "insensitive" } },
+        { tenant: { is: { name: { contains: search, mode: "insensitive" } } } },
+        { tenant: { is: { slug: { contains: search, mode: "insensitive" } } } },
       ];
     }
   }
@@ -127,22 +147,584 @@ function normalizeGranularity(value) {
   return current;
 }
 
+function withTimeout(promise, timeoutMs = HEALTHCHECK_TIMEOUT_MS) {
+  let timer;
+
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => {
+      timer = setTimeout(() => reject(new Error("healthcheck timeout")), timeoutMs);
+    }),
+  ]).finally(() => clearTimeout(timer));
+}
+
+function buildServiceHealth(name, status, detail = "") {
+  return {
+    name,
+    status,
+    detail,
+  };
+}
+
+function receivedHttpResponse(status) {
+  return status >= 100 && status < 600;
+}
+
+function parseSecretEnc(secretEnc) {
+  if (!secretEnc) return {};
+
+  try {
+    return decryptJson(secretEnc);
+  } catch {
+    return {};
+  }
+}
+
+async function getFirstConfiguredIntegration(provider) {
+  const row = await db.tenantIntegration.findFirst({
+    where: {
+      provider,
+      enabled: true,
+      secretEnc: {
+        not: null,
+      },
+    },
+    orderBy: [{ updatedAt: "desc" }],
+    select: { secretEnc: true },
+  });
+
+  return parseSecretEnc(row?.secretEnc);
+}
+
+async function getDatabaseHealth() {
+  try {
+    await withTimeout(db.$queryRaw`SELECT 1`);
+    return buildServiceHealth("Database", "healthy", "Conexion disponible");
+  } catch (error) {
+    return buildServiceHealth("Database", "attention", error.message || "No responde");
+  }
+}
+
+async function getRedisHealth() {
+  if (!config.REDIS_URL) {
+    return buildServiceHealth("Redis", "setup_pending", "REDIS_URL no configurado");
+  }
+
+  const client = createClient({ url: config.REDIS_URL });
+
+  try {
+    await withTimeout(client.connect());
+    await withTimeout(client.ping());
+    return buildServiceHealth("Redis", "healthy", "Conexion disponible");
+  } catch (error) {
+    return buildServiceHealth("Redis", "attention", error.message || "No responde");
+  } finally {
+    await client.disconnect().catch(() => null);
+  }
+}
+
+async function getWorkersHealth() {
+  if (config.ENABLE_WORKERS !== "true") {
+    return buildServiceHealth("Workers", "setup_pending", "Workers deshabilitados");
+  }
+
+  try {
+    const commandLines = await getProcessCommandLines();
+    const runningWorkers = WORKER_FILES.filter((workerFile) =>
+      commandLines.some((commandLine) => commandLine.includes(workerFile))
+    );
+
+    if (runningWorkers.length === WORKER_FILES.length) {
+      return buildServiceHealth("Workers", "healthy", `${runningWorkers.length}/${WORKER_FILES.length} workers corriendo`);
+    }
+
+    return buildServiceHealth(
+      "Workers",
+      runningWorkers.length > 0 ? "attention" : "attention",
+      `${runningWorkers.length}/${WORKER_FILES.length} workers corriendo`,
+    );
+  } catch (error) {
+    return buildServiceHealth("Workers", "attention", error.message || "No se pudieron verificar procesos");
+  }
+}
+
+async function getProcessCommandLines() {
+  if (process.platform === "win32") {
+    const { stdout } = await withTimeout(execFileAsync("powershell.exe", [
+      "-NoProfile",
+      "-Command",
+      "Get-CimInstance Win32_Process | Select-Object -ExpandProperty CommandLine",
+    ], {
+      windowsHide: true,
+      maxBuffer: 1024 * 1024,
+    }), 2500);
+
+    return stdout.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  }
+
+  const { stdout } = await withTimeout(execFileAsync("ps", ["-eo", "args"], {
+    maxBuffer: 1024 * 1024,
+  }), 2500);
+
+  return stdout.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+}
+
+async function getApiHealth() {
+  const url = `http://127.0.0.1:${config.PORT}/health`;
+
+  try {
+    const response = await axios.get(url, {
+      timeout: HEALTHCHECK_TIMEOUT_MS,
+      validateStatus: () => true,
+    });
+
+    return buildServiceHealth(
+      "Backend",
+      response.status >= 200 && response.status < 300 ? "healthy" : "attention",
+      `HTTP ${response.status}`,
+    );
+  } catch (error) {
+    return buildServiceHealth("Backend", "attention", error.message || "No responde");
+  }
+}
+
+async function getMercadoPagoApiHealth() {
+  const tenantConfig = await getFirstConfiguredIntegration("MERCADOPAGO");
+  const mpConfig = normalizeMpConfig(tenantConfig);
+  const baseUrl = mpConfig.API_URL;
+
+  if (!baseUrl) {
+    return buildServiceHealth("Mercado Pago", "setup_pending", "API_URL no configurada");
+  }
+
+  const url = mpConfig.ACCESS_TOKEN ? `${baseUrl}/users/me` : baseUrl;
+
+  try {
+    const response = await axios.get(url, {
+      headers: mpConfig.ACCESS_TOKEN ? { Authorization: `Bearer ${mpConfig.ACCESS_TOKEN}` } : undefined,
+      timeout: EXTERNAL_HEALTHCHECK_TIMEOUT_MS,
+      validateStatus: () => true,
+    });
+
+    return buildServiceHealth(
+      "Mercado Pago",
+      receivedHttpResponse(response.status) ? "healthy" : "attention",
+      `HTTP ${response.status}`,
+    );
+  } catch (error) {
+    return buildServiceHealth("Mercado Pago", "attention", error.message || "No responde");
+  }
+}
+
+async function getAfipWebServiceHealth() {
+  const tenantConfig = await getFirstConfiguredIntegration("AFIP");
+  const afipConfig = normalizeAfipConfig(tenantConfig);
+  const url = afipConfig.WSFE_URL || afipConfig.WSAA_URL;
+
+  if (!url) {
+    return buildServiceHealth("ARCA", "setup_pending", "WSFE_URL no configurada");
+  }
+
+  try {
+    const response = await axios.get(url, {
+      timeout: EXTERNAL_HEALTHCHECK_TIMEOUT_MS,
+      validateStatus: () => true,
+    });
+
+    return buildServiceHealth(
+      "ARCA",
+      receivedHttpResponse(response.status) ? "healthy" : "attention",
+      `HTTP ${response.status}`,
+    );
+  } catch (error) {
+    return buildServiceHealth("ARCA", "attention", error.message || "No responde");
+  }
+}
+
+async function buildOperationalServices() {
+  const [workers, redis, database, api, mercadopago, afip] = await Promise.all([
+    getWorkersHealth(),
+    getRedisHealth(),
+    getDatabaseHealth(),
+    getApiHealth(),
+    getMercadoPagoApiHealth(),
+    getAfipWebServiceHealth(),
+  ]);
+
+  return [
+    workers,
+    redis,
+    database,
+    api,
+    mercadopago,
+    afip,
+  ];
+}
+
+function getPaymentEventPresentation(event) {
+  const provider = event.payment?.provider || "";
+  const cbte = event.payment?.cbte_nro ? ` ${event.payment.cbte_nro}` : "";
+
+  switch (event.type) {
+    case "payment_detected":
+    case "payment_updated":
+      return {
+        icon: provider.toUpperCase() === "MERCADOPAGO" ? "mp" : "payway",
+        title: `Pago detectado por ${provider || "proveedor"}`,
+      };
+    case "afip_ok":
+      return {
+        icon: "afip",
+        title: `Factura${cbte} emitida`,
+      };
+    case "pdf_ok":
+      return {
+        icon: "invoice",
+        title: "PDF generado correctamente",
+      };
+    case "drive_ok":
+      return {
+        icon: "drive",
+        title: "Comprobante subido a Google Drive",
+      };
+    case "sheets_ok":
+      return {
+        icon: "sheets",
+        title: "Registro agregado a Google Sheets",
+      };
+    case "failed":
+      return {
+        icon: "alert",
+        title: event.message || "Error operativo registrado",
+      };
+    default:
+      return {
+        icon: "invoice",
+        title: event.message || "Actividad registrada",
+      };
+  }
+}
+
+async function listRecentActivity() {
+  const [paymentEvents, payments, auditLogs, tenants] = await Promise.all([
+    db.paymentEvent.findMany({
+      orderBy: [{ createdAt: "desc" }],
+      take: 8,
+      include: {
+        tenant: {
+          select: { id: true, slug: true, name: true },
+        },
+        payment: {
+          select: {
+            id: true,
+            provider: true,
+            cbte_nro: true,
+          },
+        },
+      },
+    }),
+    db.payment.findMany({
+      orderBy: [{ updatedAt: "desc" }],
+      take: 8,
+      include: {
+        tenant: {
+          select: { id: true, slug: true, name: true },
+        },
+      },
+    }),
+    db.tenantAuditLog.findMany({
+      where: {
+        tenantId: {
+          not: null,
+        },
+      },
+      orderBy: [{ createdAt: "desc" }],
+      take: 8,
+      include: {
+        tenant: {
+          select: { id: true, slug: true, name: true },
+        },
+      },
+    }),
+    db.tenant.findMany({
+      orderBy: [{ createdAt: "desc" }],
+      take: 8,
+      select: { id: true, slug: true, name: true, createdAt: true },
+    }),
+  ]);
+
+  const activity = [
+    ...paymentEvents.map((event) => {
+      const presentation = getPaymentEventPresentation(event);
+
+      return {
+        id: `payment-event-${event.id}`,
+        type: event.type,
+        ...presentation,
+        tenant: event.tenant,
+        paymentId: event.paymentId,
+        createdAt: event.createdAt,
+      };
+    }),
+    ...payments.map((payment) => ({
+      id: `payment-${payment.id}`,
+      type: payment.status,
+      icon: payment.status === "failed" ? "alert" : payment.provider === "MERCADOPAGO" ? "mp" : "payway",
+      title: payment.status === "failed"
+        ? payment.error || "Pago con error"
+        : `Pago ${payment.status} por ${payment.provider}`,
+      tenant: payment.tenant,
+      paymentId: payment.id,
+      createdAt: payment.updatedAt || payment.createdAt,
+    })),
+    ...auditLogs.map((log) => ({
+      id: `audit-${log.id}`,
+      type: log.action,
+      icon: "clients",
+      title: log.action === "tenant_profile_approved"
+        ? "Datos del cliente aprobados"
+        : log.action === "tenant_profile_rejected"
+          ? "Datos del cliente rechazados"
+          : "Actividad administrativa del cliente",
+      tenant: log.tenant,
+      createdAt: log.createdAt,
+    })),
+    ...tenants.map((tenant) => ({
+      id: `tenant-created-${tenant.id}`,
+      type: "tenant_created",
+      icon: "clients",
+      title: "Cliente creado",
+      tenant,
+      createdAt: tenant.createdAt,
+    })),
+  ];
+
+  return activity
+    .filter((item) => item.createdAt)
+    .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())
+    .slice(0, 8);
+}
+
+async function buildProviderOperationalHealth(provider, totalTenants) {
+  const [enabledCount, configuredCount, needsAttentionCount] = await Promise.all([
+    db.tenantIntegration.count({
+      where: {
+        provider,
+        enabled: true,
+      },
+    }),
+    db.tenantIntegration.count({
+      where: {
+        provider,
+        enabled: true,
+        secretEnc: {
+          not: null,
+        },
+      },
+    }),
+    db.tenantIntegration.count({
+      where: {
+        provider,
+        enabled: true,
+        secretEnc: null,
+      },
+    }),
+  ]);
+
+  const missingCount = Math.max(totalTenants - enabledCount, 0);
+  const status = needsAttentionCount > 0
+    ? "attention"
+    : configuredCount > 0
+      ? "healthy"
+      : "setup_pending";
+
+  return {
+    provider,
+    status,
+    enabledCount,
+    configuredCount,
+    needsAttentionCount,
+    missingCount,
+  };
+}
+
+function buildAttentionItem(type, tenant, detail = {}) {
+  const base = {
+    id: `${type}-${tenant.id}${detail.id ? `-${detail.id}` : ""}`,
+    type,
+    tenant: {
+      id: tenant.id,
+      slug: tenant.slug,
+      name: tenant.name,
+    },
+  };
+
+  if (type === "onboarding_pending") {
+    return {
+      ...base,
+      title: "Alta pendiente de aprobacion",
+      detail: "El cliente envio datos para revisar antes de operar.",
+      priority: "warning",
+      actionLabel: "Revisar alta",
+      actionPath: `/tenants/${tenant.slug}#tenant-onboarding`,
+      createdAt: detail.createdAt,
+    };
+  }
+
+  if (type === "integration_attention") {
+    return {
+      ...base,
+      title: `${detail.provider} necesita configuracion`,
+      detail: "Hay una integracion habilitada sin credenciales completas.",
+      priority: "warning",
+      actionLabel: "Configurar",
+      actionPath: `/tenants/${tenant.slug}#tenant-integrations`,
+      createdAt: detail.updatedAt,
+    };
+  }
+
+  if (type === "profile_incomplete") {
+    return {
+      ...base,
+      title: "Datos del cliente incompletos",
+      detail: "Faltan datos fiscales o de contacto necesarios para operar.",
+      priority: "warning",
+      actionLabel: "Completar datos",
+      actionPath: `/tenants/${tenant.slug}#tenant-profile`,
+      createdAt: tenant.updatedAt,
+    };
+  }
+
+  if (type === "profile_pending") {
+    return {
+      ...base,
+      title: "Datos del cliente pendientes de aprobacion",
+      detail: "El perfil fiscal esta completo y espera revision interna.",
+      priority: "warning",
+      actionLabel: "Aprobar datos",
+      actionPath: `/tenants/${tenant.slug}#tenant-profile`,
+      createdAt: detail.updatedAt || tenant.updatedAt,
+    };
+  }
+
+  return {
+    ...base,
+    title: "Pago fallido",
+    detail: detail.error || "Un pago requiere revision manual.",
+    priority: "danger",
+    actionLabel: "Ver pago",
+    actionPath: `/payments/${detail.id}`,
+    createdAt: detail.updatedAt,
+  };
+}
+
+async function listAttentionItems() {
+  const [pendingOnboarding, pendingProfiles, integrationsWithAttention, failedPayments] = await Promise.all([
+    db.tenantOnboardingSubmission.findMany({
+      where: { status: "pending" },
+      orderBy: [{ createdAt: "desc" }],
+      take: 5,
+      include: {
+        tenant: {
+          select: { id: true, slug: true, name: true },
+        },
+      },
+    }),
+    db.tenantProfile.findMany({
+      where: {
+        approvalStatus: "PENDING",
+      },
+      orderBy: [{ updatedAt: "desc" }],
+      take: 5,
+      include: {
+        tenant: {
+          select: { id: true, slug: true, name: true, updatedAt: true },
+        },
+      },
+    }),
+    db.tenantIntegration.findMany({
+      where: {
+        enabled: true,
+        secretEnc: null,
+      },
+      orderBy: [{ updatedAt: "desc" }],
+      take: 5,
+      include: {
+        tenant: {
+          select: { id: true, slug: true, name: true },
+        },
+      },
+    }),
+    db.payment.findMany({
+      where: { status: "failed" },
+      orderBy: [{ updatedAt: "desc" }],
+      take: 5,
+      include: {
+        tenant: {
+          select: { id: true, slug: true, name: true },
+        },
+      },
+    }),
+  ]);
+
+  return [
+    ...pendingOnboarding.map((item) =>
+      buildAttentionItem("onboarding_pending", item.tenant, {
+        id: item.id,
+        createdAt: item.createdAt,
+      })
+    ),
+    ...pendingProfiles.map((profile) =>
+      buildAttentionItem("profile_pending", profile.tenant, {
+        id: profile.id,
+        updatedAt: profile.updatedAt,
+      })
+    ),
+    ...integrationsWithAttention.map((item) =>
+      buildAttentionItem("integration_attention", item.tenant, {
+        id: item.id,
+        provider: item.provider,
+        updatedAt: item.updatedAt,
+      })
+    ),
+    ...failedPayments.map((item) =>
+      buildAttentionItem("payment_failed", item.tenant, {
+        id: item.id,
+        error: item.error,
+        updatedAt: item.updatedAt,
+      })
+    ),
+  ]
+    .sort((left, right) => new Date(right.createdAt || 0).getTime() - new Date(left.createdAt || 0).getTime())
+    .slice(0, 8);
+}
+
 export async function getAdminDashboardSummary(filters = {}) {
   const paymentWhere = buildPaymentWhere(filters);
+  const [tenantCount, activeTenantCount] = await Promise.all([
+    db.tenant.count(),
+    db.tenant.count({ where: { status: "ACTIVE" } }),
+  ]);
 
   const [
-    tenantCount,
-    activeTenantCount,
+    pendingApprovalTenants,
     paymentCount,
     pendingCount,
     failedCount,
     completeCount,
-    tenantsWithErrors,
+    tenantsWithAlerts,
     paymentsByStatus,
-    recentPayments,
+    mercadopagoHealth,
+    afipHealth,
+    attentionItems,
+    recentActivity,
   ] = await Promise.all([
-    db.tenant.count(),
-    db.tenant.count({ where: { status: "ACTIVE" } }),
+    db.tenantOnboardingSubmission.groupBy({
+      by: ["tenantId"],
+      where: {
+        status: "pending",
+      },
+    }),
     db.payment.count({ where: paymentWhere }),
     db.payment.count({
       where: {
@@ -156,11 +738,35 @@ export async function getAdminDashboardSummary(filters = {}) {
     db.payment.count({ where: { ...paymentWhere, status: "complete" } }),
     db.tenant.count({
       where: {
-        payments: {
-          some: {
-            status: "failed",
+        OR: [
+          {
+            onboardingSubmissions: {
+              some: {
+                status: "pending",
+              },
+            },
           },
-        },
+          {
+            payments: {
+              some: {
+                status: "failed",
+              },
+            },
+          },
+          {
+            profile: {
+              is: { approvalStatus: "PENDING" },
+            },
+          },
+          {
+            integrations: {
+              some: {
+                enabled: true,
+                secretEnc: null,
+              },
+            },
+          },
+        ],
       },
     }),
     db.payment.groupBy({
@@ -169,23 +775,21 @@ export async function getAdminDashboardSummary(filters = {}) {
       _count: { _all: true },
       _sum: { amount: true },
     }),
-    db.payment.findMany({
-      take: 10,
-      where: paymentWhere,
-      orderBy: [{ createdAt: "desc" }],
-      include: {
-        tenant: {
-          select: { id: true, slug: true, name: true },
-        },
-      },
-    }),
+    buildProviderOperationalHealth("MERCADOPAGO", tenantCount),
+    buildProviderOperationalHealth("AFIP", tenantCount),
+    listAttentionItems(),
+    listRecentActivity(),
   ]);
+
+  const operationalServices = await buildOperationalServices();
 
   return {
     tenants: {
       total: tenantCount,
       active: activeTenantCount,
-      withErrors: tenantsWithErrors,
+      pendingApproval: pendingApprovalTenants.length,
+      withErrors: tenantsWithAlerts,
+      withAlerts: tenantsWithAlerts,
     },
     payments: {
       total: paymentCount,
@@ -194,8 +798,20 @@ export async function getAdminDashboardSummary(filters = {}) {
       complete: completeCount,
       ...buildAmountSummary(paymentsByStatus),
     },
+    systemHealth: {
+      internal: {
+        provider: "FACTURADOR",
+        status: "healthy",
+        detail: "API interna disponible",
+      },
+      mercadopago: mercadopagoHealth,
+      afip: afipHealth,
+    },
+    operationalServices,
+    attentionItems,
     filters: normalizeSummaryFilters(filters),
-    recentPayments,
+    recentActivity,
+    recentPayments: [],
   };
 }
 

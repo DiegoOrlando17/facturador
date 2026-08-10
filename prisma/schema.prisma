@@ -83,12 +83,44 @@ model Tenant {
   paymentEvents PaymentEvent[]
   auditLogs     TenantAuditLog[]
   notes         TenantNote[]
+  onboardingSubmissions TenantOnboardingSubmission[]
+  profile       TenantProfile?
+}
+
+model TenantProfile {
+  id               BigInt   @id @default(autoincrement())
+  tenantId         BigInt   @unique
+  legalName        String?
+  tradeName        String?
+  cuit             String?
+  ivaCondition     String?
+  fiscalAddress    String?
+  contactEmail     String?
+  contactPhone     String?
+  responsibleName  String?
+  responsibleEmail String?
+  approvalStatus   String   @default("DRAFT")
+  reviewedByAdminUserId BigInt?
+  reviewNotes      String?
+  reviewedAt       DateTime?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([cuit])
+  @@index([approvalStatus])
 }
 
 model Plan {
   id           BigInt  @id @default(autoincrement())
   code         String  @unique
   name         String
+  price        Float?
+  currency     String  @default("ARS")
+  billingCycle String  @default("monthly")
+  status       String  @default("ACTIVE")
+  description  String?
   featuresJson String?
 
   subscriptions Subscription[] // técnico, no de negocio
@@ -166,6 +198,7 @@ model TenantUser {
 
 model AdminUser {
   id           BigInt          @id @default(autoincrement())
+  name         String?
   email        String          @unique
   passwordHash String
   role         AdminUserRole
@@ -269,6 +302,24 @@ model TenantNote {
   createdByAdmin AdminUser? @relation(fields: [createdByAdminUserId], references: [id])
 
   @@index([tenantId, pinned, createdAt])
+}
+
+model TenantOnboardingSubmission {
+  id                 BigInt   @id @default(autoincrement())
+  tenantId           BigInt
+  status             String   @default("pending") // pending/approved/rejected
+  submittedByUserId  BigInt?
+  reviewedByAdminUserId BigInt?
+  dataJson           String
+  documentsJson      String?
+  reviewNotes        String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  reviewedAt         DateTime?
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId, status, createdAt])
 }
 
 model InvoiceSequence {

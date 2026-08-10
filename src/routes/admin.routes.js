@@ -1,6 +1,12 @@
 import { Router } from "express";
 import { requireAdminAuth } from "../middlewares/adminAuth.middleware.js";
-import { authenticateAdminUser } from "../services/adminUser.service.js";
+import {
+  authenticateAdminUser,
+  createManagedAdminUser,
+  listAdminUsers,
+  updateManagedAdminUser,
+  updateOwnAdminProfile,
+} from "../services/adminUser.service.js";
 import {
   getAdminDashboardSummary,
   getAdminPaymentDetail,
@@ -20,12 +26,17 @@ import { buildPaymentsCsv } from "../services/csvExport.service.js";
 import {
   addOrUpdateTenantUserWithAuth,
   createTenant,
+  deleteTenantWithData,
   getTenantBySlug,
+  getTenantIntegrationConfig,
   listTenantIntegrations,
   listTenantUsers,
   listTenants,
   replaceTenantIntegrationConfig,
   resolveTenantIdBySlug,
+  reviewTenantProfile,
+  upsertTenantProfile,
+  upsertTenantSubscription,
   updateTenant,
 } from "../services/tenantConfig.service.js";
 import {
@@ -33,6 +44,15 @@ import {
   listTenantNotes,
   reprocessPaymentAsAdmin,
 } from "../services/tenantSupport.service.js";
+import {
+  approveTenantOnboardingSubmission,
+  getTenantOnboardingSubmission,
+  listTenantOnboardingSubmissions,
+  rejectTenantOnboardingSubmission,
+} from "../services/tenantOnboarding.service.js";
+import { startMercadopagoProcessingFromDate } from "../services/mercadopagoBackfill.service.js";
+import { testIntegrationConnection } from "../services/integrationTest.service.js";
+import { createPlan, listPlans, updatePlan } from "../services/settings.service.js";
 import { createAdminToken } from "../utils/adminToken.js";
 import { maskSecrets } from "../utils/crypto.js";
 import { toBigIntId } from "../utils/bigint.js";
@@ -47,6 +67,10 @@ const VALID_TENANT_USER_STATUS = new Set(["ACTIVE", "DISABLED"]);
 function normalizeJsonBigInts(value) {
   if (typeof value === "bigint") {
     return value.toString();
+  }
+
+  if (value instanceof Date) {
+    return value.toISOString();
   }
 
   if (Array.isArray(value)) {
@@ -69,6 +93,14 @@ function normalizeSlug(value) {
     .replace(/[^a-z0-9-]/g, "-")
     .replace(/-+/g, "-")
     .replace(/^-|-$/g, "");
+}
+
+function requireSuperadmin(req) {
+  if (req.adminAuth?.adminUser?.role !== "SUPERADMIN") {
+    const error = new Error("Solo SUPERADMIN puede realizar esta accion");
+    error.statusCode = 403;
+    throw error;
+  }
 }
 
 function validateTenantPayload(body, { partial = false } = {}) {
@@ -175,6 +207,99 @@ router.get("/me", requireAdminAuth, (req, res) => {
 });
 
 router.use(requireAdminAuth);
+
+router.patch("/me", async (req, res) => {
+  try {
+    const adminUser = await updateOwnAdminProfile(req.adminAuth.adminUser.id, {
+      name: req.body.name,
+      email: req.body.email,
+    });
+
+    return res.json(normalizeJsonBigInts(adminUser));
+  } catch (error) {
+    return res.status(400).json({ error: error.message || "No se pudo actualizar tu perfil" });
+  }
+});
+
+router.get("/users", async (req, res) => {
+  try {
+    requireSuperadmin(req);
+    const users = await listAdminUsers();
+    return res.json(normalizeJsonBigInts({
+      items: users,
+      total: users.length,
+    }));
+  } catch (error) {
+    return res.status(error.statusCode || 500).json({ error: error.message || "No se pudieron listar usuarios internos" });
+  }
+});
+
+router.post("/users", async (req, res) => {
+  try {
+    requireSuperadmin(req);
+    const user = await createManagedAdminUser({
+      name: req.body.name,
+      email: req.body.email,
+      password: req.body.password,
+      role: req.body.role,
+      status: req.body.status,
+    });
+
+    return res.status(201).json(normalizeJsonBigInts(user));
+  } catch (error) {
+    return res.status(error.statusCode || 400).json({ error: error.message || "No se pudo crear usuario interno" });
+  }
+});
+
+router.patch("/users/:id", async (req, res) => {
+  try {
+    requireSuperadmin(req);
+    const user = await updateManagedAdminUser(req.params.id, {
+      name: req.body.name,
+      email: req.body.email,
+      password: req.body.password,
+      role: req.body.role,
+      status: req.body.status,
+    });
+
+    return res.json(normalizeJsonBigInts(user));
+  } catch (error) {
+    return res.status(error.statusCode || 400).json({ error: error.message || "No se pudo actualizar usuario interno" });
+  }
+});
+
+router.get("/settings/plans", async (req, res) => {
+  try {
+    requireSuperadmin(req);
+    const plans = await listPlans();
+    return res.json(normalizeJsonBigInts({
+      items: plans,
+      total: plans.length,
+    }));
+  } catch (error) {
+    return res.status(error.statusCode || 500).json({ error: error.message || "No se pudieron listar planes" });
+  }
+});
+
+router.post("/settings/plans", async (req, res) => {
+  try {
+    requireSuperadmin(req);
+    const plan = await createPlan(req.body);
+    return res.status(201).json(normalizeJsonBigInts(plan));
+  } catch (error) {
+    return res.status(error.statusCode || 400).json({ error: error.message || "No se pudo crear plan" });
+  }
+});
+
+router.patch("/settings/plans/:id", async (req, res) => {
+  try {
+    requireSuperadmin(req);
+    const plan = await updatePlan(req.params.id, req.body);
+    return res.json(normalizeJsonBigInts(plan));
+  } catch (error) {
+    return res.status(error.statusCode || 400).json({ error: error.message || "No se pudo actualizar plan" });
+  }
+});
 
 router.get("/dashboard", async (req, res) => {
   try {
@@ -333,8 +458,73 @@ router.get("/tenants", async (_req, res) => {
 
 router.post("/tenants", async (req, res) => {
   try {
+    const integrations = req.body.integrations && typeof req.body.integrations === "object"
+      ? req.body.integrations
+      : {};
+    const normalizedIntegrations = Object.entries(integrations).map(([providerKey, rawConfig]) => {
+      const provider = validateProvider(providerKey);
+      return [provider, validateIntegrationConfig(provider, rawConfig)];
+    });
+
     const tenant = await createTenant(validateTenantPayload(req.body));
-    return res.status(201).json(normalizeJsonBigInts(tenant));
+    const configuredIntegrations = [];
+    let ownerUser = null;
+    let mercadopagoStart = null;
+
+    for (const [provider, config] of normalizedIntegrations) {
+      const row = await replaceTenantIntegrationConfig(tenant.id, provider, config, { enabled: true });
+      configuredIntegrations.push({
+        id: row.id,
+        provider,
+        enabled: row.enabled,
+        config: maskSecrets(config),
+      });
+    }
+
+    if (req.body.ownerUser) {
+      const email = String(req.body.ownerUser.email || "").trim().toLowerCase();
+      const password = req.body.ownerUser.password !== undefined
+        ? String(req.body.ownerUser.password || "")
+        : undefined;
+
+      if (!email) throw new Error("ownerUser.email es obligatorio");
+      if (password !== undefined && password.length > 0 && password.length < 8) {
+        throw new Error("ownerUser.password debe tener al menos 8 caracteres");
+      }
+
+      ownerUser = await addOrUpdateTenantUserWithAuth(tenant.id, {
+        email,
+        role: "owner",
+        password,
+        status: "ACTIVE",
+      });
+    }
+
+    const mpEntry = normalizedIntegrations.find(([provider]) => provider === "MERCADOPAGO");
+    if (mpEntry && req.body.processingStartDate) {
+      const [, mpConfig] = mpEntry;
+      mercadopagoStart = await startMercadopagoProcessingFromDate(
+        tenant.id,
+        req.body.processingStartDate,
+        mpConfig
+      );
+      await replaceTenantIntegrationConfig(
+        tenant.id,
+        "MERCADOPAGO",
+        {
+          ...mpConfig,
+          PROCESSING_START_DATE: req.body.processingStartDate,
+        },
+        { enabled: true }
+      );
+    }
+
+    return res.status(201).json(normalizeJsonBigInts({
+      tenant,
+      ownerUser,
+      integrations: configuredIntegrations,
+      mercadopagoStart,
+    }));
   } catch (error) {
     return res.status(400).json({ error: error.message || "No se pudo crear tenant" });
   }
@@ -470,6 +660,58 @@ router.patch("/tenants/:slug", async (req, res) => {
   }
 });
 
+router.put("/tenants/:slug/profile", async (req, res) => {
+  try {
+    const tenantId = await resolveTenantIdBySlug(req.params.slug);
+    const profile = await upsertTenantProfile(tenantId, req.body);
+    return res.json(normalizeJsonBigInts(profile));
+  } catch (error) {
+    return res.status(400).json({ error: error.message || "No se pudo guardar perfil del tenant" });
+  }
+});
+
+router.post("/tenants/:slug/profile/review", async (req, res) => {
+  try {
+    const tenantId = await resolveTenantIdBySlug(req.params.slug);
+    const profile = await reviewTenantProfile(tenantId, req.adminAuth.adminUser, {
+      status: req.body.status,
+      reviewNotes: req.body.reviewNotes,
+    });
+    return res.json(normalizeJsonBigInts(profile));
+  } catch (error) {
+    return res.status(400).json({ error: error.message || "No se pudo revisar perfil del tenant" });
+  }
+});
+
+router.put("/tenants/:slug/subscription", async (req, res) => {
+  try {
+    requireSuperadmin(req);
+    const tenantId = await resolveTenantIdBySlug(req.params.slug);
+    const subscription = await upsertTenantSubscription(tenantId, req.body);
+    return res.json(normalizeJsonBigInts(subscription));
+  } catch (error) {
+    return res.status(error.statusCode || 400).json({ error: error.message || "No se pudo guardar suscripcion del tenant" });
+  }
+});
+
+router.delete("/tenants/:slug", async (req, res) => {
+  try {
+    const deleteLocalFiles = String(req.query.deleteLocalFiles || "true") !== "false";
+    const result = await deleteTenantWithData(req.params.slug, { deleteLocalFiles });
+
+    if (!result) {
+      return res.status(404).json({ error: "Tenant no encontrado" });
+    }
+
+    return res.json(normalizeJsonBigInts({
+      ok: true,
+      ...result,
+    }));
+  } catch (error) {
+    return res.status(400).json({ error: error.message || "No se pudo eliminar tenant" });
+  }
+});
+
 router.get("/tenants/:slug/integrations", async (req, res) => {
   try {
     const tenantId = await resolveTenantIdBySlug(req.params.slug);
@@ -478,6 +720,22 @@ router.get("/tenants/:slug/integrations", async (req, res) => {
     return res.json(normalizeJsonBigInts(integrations));
   } catch (error) {
     return res.status(400).json({ error: error.message || "No se pudieron listar integraciones" });
+  }
+});
+
+router.post("/tenants/:slug/integrations/mercadopago/start", async (req, res) => {
+  try {
+    const tenantId = await resolveTenantIdBySlug(req.params.slug);
+    const processingStartDate = req.body.processingStartDate || req.body.startDate;
+    const mpCfg = await getTenantIntegrationConfig(tenantId, "MERCADOPAGO");
+    const result = await startMercadopagoProcessingFromDate(tenantId, processingStartDate, mpCfg);
+    return res.status(202).json(normalizeJsonBigInts({
+      ok: true,
+      tenantId,
+      ...result,
+    }));
+  } catch (error) {
+    return res.status(400).json({ error: error.message || "No se pudo iniciar procesamiento MP" });
   }
 });
 
@@ -498,6 +756,98 @@ router.put("/tenants/:slug/integrations/:provider", async (req, res) => {
     }));
   } catch (error) {
     return res.status(400).json({ error: error.message || "No se pudo guardar integracion" });
+  }
+});
+
+router.post("/tenants/:slug/integrations/:provider/test", async (req, res) => {
+  try {
+    const tenantId = await resolveTenantIdBySlug(req.params.slug);
+    const provider = validateProvider(req.params.provider);
+    const config = req.body?.config !== undefined
+      ? validateIntegrationConfig(provider, req.body.config)
+      : await getTenantIntegrationConfig(tenantId, provider);
+    const result = await testIntegrationConnection(provider, config);
+
+    return res.json(normalizeJsonBigInts({
+      tenantId,
+      testedUnsavedConfig: req.body?.config !== undefined,
+      ...result,
+    }));
+  } catch (error) {
+    return res.status(400).json({
+      ok: false,
+      provider: String(req.params.provider || "").toUpperCase(),
+      error: error.message || "No se pudo probar la integracion",
+    });
+  }
+});
+
+router.get("/tenants/:slug/onboarding", async (req, res) => {
+  try {
+    const tenantId = await resolveTenantIdBySlug(req.params.slug);
+    const revealSecrets = String(req.query.revealSecrets || "false") === "true";
+    const items = await listTenantOnboardingSubmissions(tenantId, {
+      status: req.query.status,
+      revealSecrets,
+    });
+    return res.json(normalizeJsonBigInts({
+      items,
+      total: items.length,
+    }));
+  } catch (error) {
+    return res.status(400).json({ error: error.message || "No se pudo listar onboarding" });
+  }
+});
+
+router.get("/tenants/:slug/onboarding/:submissionId", async (req, res) => {
+  try {
+    const tenantId = await resolveTenantIdBySlug(req.params.slug);
+    const submissionId = toBigIntId(req.params.submissionId, "submissionId");
+    const revealSecrets = String(req.query.revealSecrets || "false") === "true";
+    const item = await getTenantOnboardingSubmission(tenantId, submissionId, { revealSecrets });
+
+    if (!item) return res.status(404).json({ error: "Onboarding no encontrado" });
+    return res.json(normalizeJsonBigInts(item));
+  } catch (error) {
+    return res.status(400).json({ error: error.message || "No se pudo obtener onboarding" });
+  }
+});
+
+router.post("/tenants/:slug/onboarding/:submissionId/approve", async (req, res) => {
+  try {
+    const tenantId = await resolveTenantIdBySlug(req.params.slug);
+    const submissionId = toBigIntId(req.params.submissionId, "submissionId");
+    const result = await approveTenantOnboardingSubmission(tenantId, submissionId, req.adminAuth.adminUser, {
+      reviewNotes: req.body.reviewNotes,
+      processingStartDate: req.body.processingStartDate,
+      enableProcessing: req.body.enableProcessing !== undefined ? Boolean(req.body.enableProcessing) : true,
+    });
+
+    return res.status(202).json(normalizeJsonBigInts({
+      ok: true,
+      tenantId,
+      ...result,
+    }));
+  } catch (error) {
+    return res.status(400).json({ error: error.message || "No se pudo aprobar onboarding" });
+  }
+});
+
+router.post("/tenants/:slug/onboarding/:submissionId/reject", async (req, res) => {
+  try {
+    const tenantId = await resolveTenantIdBySlug(req.params.slug);
+    const submissionId = toBigIntId(req.params.submissionId, "submissionId");
+    const submission = await rejectTenantOnboardingSubmission(tenantId, submissionId, req.adminAuth.adminUser, {
+      reviewNotes: req.body.reviewNotes,
+    });
+
+    return res.json(normalizeJsonBigInts({
+      ok: true,
+      tenantId,
+      submission,
+    }));
+  } catch (error) {
+    return res.status(400).json({ error: error.message || "No se pudo rechazar onboarding" });
   }
 });
 
