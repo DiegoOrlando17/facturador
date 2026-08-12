@@ -12,7 +12,7 @@ import {
 } from "../services/tenantPortal.service.js";
 import { getTenantIntegrationConfig } from "../services/tenantConfig.service.js";
 import { buildPaymentsCsv } from "../services/csvExport.service.js";
-import { ensureInvoicePdfForPayment, getInvoicePdfFilename } from "../services/invoicePdf.service.js";
+import { generateInvoicePdfForPayment, getInvoicePdfFilename } from "../services/invoicePdf.service.js";
 import {
   createTenantOnboardingSubmission,
   listTenantOnboardingSubmissions,
@@ -145,20 +145,13 @@ router.get("/payments/:id", async (req, res) => {
 router.get("/payments/:id/pdf", async (req, res) => {
   try {
     const paymentId = toBigIntId(req.params.id, "paymentId");
-    const { payment, filePath } = await ensureInvoicePdfForPayment(req.tenantAuth.tenantId, paymentId);
+    const { payment, pdfBuffer } = await generateInvoicePdfForPayment(req.tenantAuth.tenantId, paymentId);
     const filename = getInvoicePdfFilename(payment);
     const asDownload = String(req.query.download || "false") === "true";
 
-    if (asDownload) {
-      return res.download(filePath, filename);
-    }
-
-    return res.sendFile(filePath, {
-      headers: {
-        "Content-Type": "application/pdf",
-        "Content-Disposition": `inline; filename="${filename}"`,
-      },
-    });
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `${asDownload ? "attachment" : "inline"}; filename="${filename}"`);
+    return res.send(pdfBuffer);
   } catch (error) {
     return res.status(400).json({ error: error.message || "No se pudo obtener el PDF" });
   }

@@ -1,30 +1,23 @@
 import fs from "fs";
-import logger from "../utils/logger.js";
-
 import { google } from "googleapis";
+import logger from "../utils/logger.js";
 import { getAccessToken } from "./google-auth.js";
-import { config } from "../config/index.js";
 
 /**
  * @param {string} pdfPath
  * @param {string} filename
- * @param {{ accessToken?: string, folderId?: string }} [opts] — si no, token/carpeta globales (.env)
+ * @param {{ accessToken: string, folderId: string }} opts
  */
 export async function uploadToDrive(pdfPath, filename, opts = {}) {
   try {
-    const accessToken = opts.accessToken ?? (await getAccessToken());
-    if (!accessToken) {
-      return null;
-    }
-
-    const folderId = opts.folderId ?? config.GOOGLE.DRIVE_FOLDER_ID;
+    const { accessToken, folderId } = opts;
+    if (!accessToken || !folderId) return null;
 
     const auth = new google.auth.OAuth2();
     auth.setCredentials({ access_token: accessToken });
 
     const drive = google.drive({ version: "v3", auth });
-
-    const res = await drive.files.create({
+    const response = await drive.files.create({
       requestBody: {
         name: filename,
         parents: [folderId],
@@ -36,14 +29,9 @@ export async function uploadToDrive(pdfPath, filename, opts = {}) {
       fields: "id, webViewLink",
     });
 
-    fs.unlink(pdfPath, (err) => {
-      if (err) console.error(`❌ Error al eliminar ${pdfPath}:`, err);
-    });
-
-    return res.data;
-  }
-  catch (err) {
-    logger.error("Error en el uploadToDrive: " + err);
+    return response.data;
+  } catch (error) {
+    logger.error("Error en el uploadToDrive: " + error);
     return null;
   }
 }
@@ -56,8 +44,7 @@ export async function keepTokenAlive() {
 
     const drive = google.drive({ version: "v3", auth });
     await drive.files.list({ pageSize: 1 });
-  } catch (err) {
-    console.error("❌ Error manteniendo sesión Google:", err.message);
+  } catch (error) {
+    console.error("Error manteniendo sesion Google:", error.message);
   }
-
 }

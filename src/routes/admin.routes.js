@@ -21,7 +21,7 @@ import {
   summarizeTenantDetail,
   summarizeTenantListItem,
 } from "../services/adminPresenter.service.js";
-import { ensureInvoicePdfForPayment, getInvoicePdfFilename } from "../services/invoicePdf.service.js";
+import { generateInvoicePdfForPayment, getInvoicePdfFilename } from "../services/invoicePdf.service.js";
 import { buildPaymentsCsv } from "../services/csvExport.service.js";
 import {
   addOrUpdateTenantUserWithAuth,
@@ -398,20 +398,13 @@ router.get("/payments/:id/pdf", async (req, res) => {
       return res.status(404).json({ error: "Pago no encontrado" });
     }
 
-    const { payment: hydratedPayment, filePath } = await ensureInvoicePdfForPayment(payment.tenantId, paymentId);
+    const { payment: hydratedPayment, pdfBuffer } = await generateInvoicePdfForPayment(payment.tenantId, paymentId);
     const filename = getInvoicePdfFilename(hydratedPayment);
     const asDownload = String(req.query.download || "false") === "true";
 
-    if (asDownload) {
-      return res.download(filePath, filename);
-    }
-
-    return res.sendFile(filePath, {
-      headers: {
-        "Content-Type": "application/pdf",
-        "Content-Disposition": `inline; filename="${filename}"`,
-      },
-    });
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `${asDownload ? "attachment" : "inline"}; filename="${filename}"`);
+    return res.send(pdfBuffer);
   } catch (error) {
     return res.status(400).json({ error: error.message || "No se pudo obtener el PDF" });
   }

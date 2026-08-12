@@ -1,30 +1,21 @@
-import fs from "fs";
 import PDFDocument from "pdfkit";
 import path from "path";
 import logger from "../utils/logger.js";
 
-import { config } from "../config/index.js"
-import { getTodaysDate, formatToLocalTime } from "../utils/date.js";
+import { formatToLocalTime } from "../utils/date.js";
 
 /**
  * @param {Record<string, unknown>} [afipBranding] — normalizado (normalizeAfipConfig) + opcionales PDF_RAZON_SOCIAL, PDF_CUIT, PDF_DOMICILIO, PDF_LOCALIDAD, PDF_DEPENDENCIA, PDF_LOGO_PATH
  */
-export function createInvoicePDF(payment, cae, nroComprobante, fechaVtoCae, afipBranding = {}) {
+export function createInvoicePdfBuffer(payment, cae, nroComprobante, fechaVtoCae, afipBranding = {}) {
     try {
         return new Promise((resolve, reject) => {
-            const cuitFile = String(afipBranding.CUIT ?? config.CUIT ?? "");
-            const cbteTipo = Number(afipBranding.CBTE_TIPO ?? config.AFIP.CBTE_TIPO);
-            const ptoVta = Number(afipBranding.PTO_VTA ?? config.AFIP.PTO_VTA);
-            const fileName = `${cuitFile}_${cbteTipo.toString().padStart(3, "0")}_${ptoVta.toString().padStart(5, "0")}_${nroComprobante.split('-')[1]}_${getTodaysDate()}.pdf`;
-            const filePath = `./facturas/${fileName}`;
-
-            if (!fs.existsSync("./facturas")) {
-                fs.mkdirSync("./facturas");
-            }
-
             const doc = new PDFDocument({ margin: 50 });
-            const stream = fs.createWriteStream(filePath);
-            doc.pipe(stream);
+            const chunks = [];
+
+            doc.on("data", (chunk) => chunks.push(chunk));
+            doc.on("end", () => resolve(Buffer.concat(chunks)));
+            doc.on("error", reject);
 
             // === ENCABEZADO ===
             // Logo (si tenés un archivo PNG/JPG, ejemplo ./logo.png)
@@ -116,13 +107,10 @@ export function createInvoicePDF(payment, cae, nroComprobante, fechaVtoCae, afip
             });
 
             doc.end();
-
-            stream.on("finish", () => resolve(filePath));
-            stream.on("error", reject);
         });
     }
     catch (err) {
-        logger.error("Error en el createInvoicePDF: " + err);
+        logger.error("Error en el createInvoicePdfBuffer: " + err);
         return null;
     }
 }
