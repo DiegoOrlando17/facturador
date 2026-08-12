@@ -31,8 +31,6 @@ const worker = new Worker("invoices", async (job) => {
         const afipRaw = await getTenantIntegrationConfig(tenantId, "AFIP");
         const afipBranding = normalizeAfipConfig(afipRaw);
 
-        const googleCtx = await getGoogleInvoiceContext(tenantId);
-
         if (payment.status === "processing" || payment.status === "pdf_pending") {
             const pdfPath = await createInvoicePDF(payment, payment.cae, payment.cbte_nro, payment.cae_vto, afipBranding);
             if (!pdfPath) {
@@ -46,6 +44,23 @@ const worker = new Worker("invoices", async (job) => {
             await logPaymentEvent(tenantId, payment.id, "pdf_ok", "PDF generado", {
                 pdfPath,
             });
+        }
+
+        if (!payment.pdf_path) {
+            await updatePaymentStatus(tenantId, payment.id, "pdf_pending", "El comprobante no tiene un PDF generado.");
+            await logPaymentEvent(tenantId, payment.id, "failed", "Falta el PDF para completar el proceso post-AFIP");
+            throw new Error("El comprobante no tiene un PDF generado.");
+        }
+
+        const googleCtx = await getGoogleInvoiceContext(tenantId);
+
+        if (!googleCtx) {
+            await updatePaymentStatus(tenantId, payment.id, "complete");
+            await logPaymentEvent(tenantId, payment.id, "payment_updated", "Proceso post-AFIP completado sin entrega Google", {
+                finalStatus: "complete",
+                googleDelivery: "not_enabled_or_incomplete",
+            });
+            return;
         }
 
         if (payment.status === "processing" || payment.status === "pdf_pending" || payment.status === "drive_pending") {

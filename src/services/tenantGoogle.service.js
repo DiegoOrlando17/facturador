@@ -2,8 +2,8 @@ import axios from "axios";
 import crypto from "crypto";
 import { google } from "googleapis";
 import { config } from "../config/index.js";
-import { getAccessToken } from "./google-auth.js";
 import {
+  getTenantActivePlan,
   resolveTenantIdBySlug,
   tryGetTenantIntegrationConfig,
   upsertTenantIntegrationConfig,
@@ -45,6 +45,21 @@ function parseScopes(value) {
   if (Array.isArray(value)) return value;
   if (typeof value === "string") return value.split(" ").filter(Boolean);
   return GOOGLE_SCOPES;
+}
+
+function planHasGoogleDelivery(plan) {
+  if (!plan?.featuresJson) return false;
+
+  try {
+    const features = JSON.parse(plan.featuresJson);
+    if (Array.isArray(features)) {
+      return features.includes("googleDriveSheets");
+    }
+
+    return features?.googleDriveSheets === true;
+  } catch {
+    return false;
+  }
 }
 
 export function buildGoogleOAuthState({
@@ -148,7 +163,6 @@ export async function connectTenantGoogleFromCallback({ code, state }) {
     DRIVE_FOLDER_ID:
       payload.driveFolderId
       ?? driveExisting?.DRIVE_FOLDER_ID
-      ?? config.GOOGLE.DRIVE_FOLDER_ID
       ?? null,
   });
 
@@ -157,12 +171,10 @@ export async function connectTenantGoogleFromCallback({ code, state }) {
     SHEETS_ID:
       payload.sheetsId
       ?? sheetsExisting?.SHEETS_ID
-      ?? config.GOOGLE.SHEETS_ID
       ?? null,
     SHEET_NAME:
       payload.sheetName
       ?? sheetsExisting?.SHEET_NAME
-      ?? config.GOOGLE.SHEET_NAME
       ?? "Hoja1",
   });
 
@@ -175,31 +187,29 @@ export async function connectTenantGoogleFromCallback({ code, state }) {
   };
 }
 
-/**
- * Drive + Sheets: usa integración DRIVE/SHEETS del tenant si hay REFRESH_TOKEN;
- * si no, el token/archivo global del proceso (.env) como hasta ahora.
- */
 export async function getGoogleInvoiceContext(tenantId) {
+  const plan = await getTenantActivePlan(tenantId);
+  if (!planHasGoogleDelivery(plan)) return null;
+
   const drive = await tryGetTenantIntegrationConfig(tenantId, "DRIVE");
   const sheets = await tryGetTenantIntegrationConfig(tenantId, "SHEETS");
 
+  if (!drive || !sheets) return null;
+
   const refreshToken =
     drive?.REFRESH_TOKEN ?? sheets?.REFRESH_TOKEN ?? drive?.refresh_token ?? sheets?.refresh_token;
-  const clientId = drive?.CLIENT_ID ?? sheets?.CLIENT_ID ?? config.GOOGLE.CLIENT_ID;
-  const clientSecret = drive?.CLIENT_SECRET ?? sheets?.CLIENT_SECRET ?? config.GOOGLE.CLIENT_SECRET;
+  const clientId = config.GOOGLE.CLIENT_ID;
+  const clientSecret = config.GOOGLE.CLIENT_SECRET;
 
   const driveFolderId =
-    drive?.DRIVE_FOLDER_ID ?? drive?.driveFolderId ?? config.GOOGLE.DRIVE_FOLDER_ID;
+    drive?.DRIVE_FOLDER_ID ?? drive?.driveFolderId;
   const sheetsId =
-    sheets?.SHEETS_ID ?? sheets?.spreadsheetId ?? drive?.SHEETS_ID ?? config.GOOGLE.SHEETS_ID;
+    sheets?.SHEETS_ID ?? sheets?.spreadsheetId;
   const sheetName =
-    sheets?.SHEET_NAME ?? sheets?.sheetName ?? drive?.SHEET_NAME ?? config.GOOGLE.SHEET_NAME ?? "Hoja1";
+    sheets?.SHEET_NAME ?? sheets?.sheetName ?? "Hoja1";
   const scopes = parseScopes(drive?.SCOPES ?? sheets?.SCOPES);
 
-  if (!refreshToken) {
-    const accessToken = await getAccessToken();
-    return { accessToken, driveFolderId, sheetsId, sheetName, scopes };
-  }
+  if (!refreshToken || !clientId || !clientSecret || !driveFolderId || !sheetsId) return null;
 
   const accessToken = await getAccessTokenFromRefreshCached(tenantId, {
     clientId,

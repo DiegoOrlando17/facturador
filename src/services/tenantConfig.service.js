@@ -401,6 +401,21 @@ export async function tryGetTenantIntegrationConfig(tenantId, provider) {
   return parsed;
 }
 
+export async function getTenantActivePlan(tenantId) {
+  const subscription = await prisma.subscription.findFirst({
+    where: {
+      tenantId,
+      status: "ACTIVE",
+    },
+    include: {
+      plan: true,
+    },
+    orderBy: [{ createdAt: "desc" }],
+  });
+
+  return subscription?.plan ?? null;
+}
+
 export async function listTenantIntegrations(tenantId, { revealSecrets = false } = {}) {
   const rows = await prisma.tenantIntegration.findMany({
     where: { tenantId },
