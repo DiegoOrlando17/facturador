@@ -33,11 +33,17 @@ const emptyPlanForm = {
 };
 
 const planFeatureOptions = [
-  ["automaticBilling", "Facturacion automatica"],
   ["clientPortal", "Portal cliente"],
-  ["emailSupport", "Soporte por email"],
-  ["advancedMonitoring", "Monitoreo avanzado"],
-  ["realtimeBatch", "Procesamiento realtime"],
+  ["automaticInvoicing", "Facturacion automatica"],
+  ["realtimeProcessing", "Procesamiento realtime"],
+  ["scheduledProcessing", "Procesamiento programado"],
+  ["pdfDownload", "Descarga PDF"],
+  ["clientApproval", "Confirmacion del cliente"],
+  ["deferredAutomaticInvoicing", "Emision diferida"],
+  ["creditNotes", "Notas de credito"],
+  ["manualInvoicing", "Facturacion manual"],
+  ["googleDriveSheets", "Google Drive y Sheets"],
+  ["ocrImport", "Importacion OCR"],
 ] as const;
 
 function parsePlanFeatures(value: string) {
