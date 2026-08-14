@@ -1,6 +1,7 @@
 import { PrismaClient } from "@prisma/client";
 import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
+import { PLAN_CATALOG } from "../src/config/planCatalog.js";
 
 const prisma = new PrismaClient();
 
@@ -95,7 +96,19 @@ async function main() {
         .strict()
         .parseAsync();
         
-    // Plans
+    // Plans vigentes. Los upserts A/B de abajo se conservan temporalmente por
+    // compatibilidad con instalaciones heredadas.
+    const currentPlans = [];
+    for (const { features: _features, ...plan } of PLAN_CATALOG) {
+        currentPlans.push(await prisma.plan.upsert({
+            where: { code: plan.code },
+            update: plan,
+            create: plan,
+        }));
+    }
+    const tier1Plan = currentPlans.find((plan) => plan.code === "TIER_1");
+
+    // Plans heredados
     const planA = await prisma.plan.upsert({
         where: { code: "A" },
         update: {},
@@ -124,7 +137,7 @@ async function main() {
         await prisma.subscription.create({
             data: {
                 tenantId: tenant.id,
-                planId: planA.id,
+                planId: tier1Plan.id,
                 status: "ACTIVE",
             },
         });
