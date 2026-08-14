@@ -369,7 +369,7 @@ function getPaymentEventPresentation(event) {
     case "payment_detected":
     case "payment_updated":
       return {
-        icon: provider.toUpperCase() === "MERCADOPAGO" ? "mp" : "payway",
+        icon: provider.toUpperCase() === "MERCADOPAGO" ? "mp" : "invoice",
         title: `Pago detectado por ${provider || "proveedor"}`,
       };
     case "afip_ok":
@@ -469,7 +469,7 @@ async function listRecentActivity() {
     ...payments.map((payment) => ({
       id: `payment-${payment.id}`,
       type: payment.status,
-      icon: payment.status === "failed" ? "alert" : payment.provider === "MERCADOPAGO" ? "mp" : "payway",
+      icon: payment.status === "failed" ? "alert" : payment.provider === "MERCADOPAGO" ? "mp" : "invoice",
       title: payment.status === "failed"
         ? payment.error || "Pago con error"
         : `Pago ${payment.status} por ${payment.provider}`,

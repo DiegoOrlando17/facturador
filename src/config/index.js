@@ -16,13 +16,7 @@ export const config = {
     POLLING_INTERVAL: process.env.MP_POLLING_INTERVAL,
     POS_ID: process.env.MP_POS_ID
   },
-  
-  PAYWAY: {
-    API_URL: process.env.PAYWAY_API_URL,
-    API_TOKEN: process.env.PAYWAY_API_TOKEN,
-    POLLING_INTERVAL: process.env.PAYWAY_POLLING_INTERVAL
-  },
-  
+
   AFIP: {
     TRA_B64: process.env.AFIP_TRA_B64,
     TRACMS_B64: process.env.AFIP_TRACMS_B64,

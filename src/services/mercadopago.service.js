@@ -37,7 +37,7 @@ export function getPaymentInfoMP(payment) {
   }
 }
 
-/** Una sola orden de pago por id (p. ej. webhook). */
+/** Consulta puntual de una orden de pago por id. */
 export async function fetchPaymentById(paymentId, mpCfg = {}) {
   const cfg = normalizeMpConfig(mpCfg);
 

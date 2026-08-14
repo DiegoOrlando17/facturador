@@ -14,7 +14,7 @@
 | Tema | Decision |
 |------|----------|
 | Despliegue | Un tenant por cliente, misma base y misma instancia |
-| Ingreso de pagos MP | **Polling** es el mecanismo real: los webhooks de MP **no** se usan para este caso (terminales fisicas standalone POS no se cubren bien con webhooks para consultar pagos). Puede existir codigo/ruta de webhook historico; no es el camino de produccion. |
+| Ingreso de pagos MP | **Polling** es el unico mecanismo soportado; los webhooks de MP no se usan para este flujo. |
 | Polling MP | Depende del tenant: tiempo real vs N veces por dia; credenciales MP **por tenant** |
 | Programacion MP | `POLLING_MODE`: `realtime` o `scheduled`; en `scheduled` se admite `RUN_AT_TIMES` y, como fallback, `RUNS_PER_DAY` |
 | AFIP | TA por CUIT; cert/key recomendado: hibrido (base64 en DB en prod, paths opcionales en dev) |
@@ -36,7 +36,7 @@
 
 Asi el "enrutado" es: **iteracion explicita por tenant**, no resolucion desde una URL externa.
 
-**Webhooks:** baja prioridad para este producto; si en el futuro se mantuviera una ruta de prueba u otro flujo, el `tenantId` se podria pasar por query (`?tenant=slug`) o deprecar la ruta. **No bloquea** el diseno multitenant del polling.
+Las rutas y workers historicos de webhooks fueron retirados. El ingreso depende exclusivamente del polling multitenant.
 
 ---
 
@@ -50,7 +50,6 @@ Asi el "enrutado" es: **iteracion explicita por tenant**, no resolucion desde un
 
 - [x] **A1** - Unificar `payment.worker` con datos solo del tenant (`afipCfg`); alinear `createInvoiceAFIP` con la llamada real
 - [x] **A2** - Refactor AFIP: TA por CUIT (cache en memoria), emision y ultimo comprobante con config del tenant; cert/key desde `.env` o `CERT_B64`/`KEY_B64` en JSON
-- [x] **A3** - Webhook: `upsertPayment(tenantId, ...)` + jobs con `tenantId`; worker webhook alineado (token MP global hasta fase B)
 - [x] **A4** - Invoice worker: `tenantId` desde el job; PDF / Drive / Sheets con `getGoogleInvoiceContext` + opcionales `PDF_*` en AFIP
 
 ### Fase B - Mercado Pago por tenant

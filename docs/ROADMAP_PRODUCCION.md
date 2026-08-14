@@ -328,7 +328,6 @@ Objetivo: que el servicio principal sea confiable.
   - transferencias;
   - POS;
   - busqueda por fecha;
-  - webhooks;
   - checkpoints.
 - [ ] Definir modo por cliente/plan:
   - tiempo real;
