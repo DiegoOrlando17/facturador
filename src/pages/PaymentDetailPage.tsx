@@ -70,6 +70,7 @@ export function PaymentDetailPage() {
   const { id } = useParams();
   const { token } = useAuth();
   const [isReprocessing, setIsReprocessing] = useState(false);
+  const [isDeliveringGoogle, setIsDeliveringGoogle] = useState(false);
   const [isLoadingPdf, setIsLoadingPdf] = useState(false);
   const [reprocessErrorMessage, setReprocessErrorMessage] = useState<string | null>(null);
   const [reprocessSuccessMessage, setReprocessSuccessMessage] = useState<string | null>(null);
@@ -141,6 +142,34 @@ export function PaymentDetailPage() {
       setPdfErrorMessage(getApiErrorMessage(error, "No se pudo obtener el PDF del pago."));
     } finally {
       setIsLoadingPdf(false);
+    }
+  }
+
+  async function handleGoogleDelivery() {
+    if (!id || !token) {
+      setReprocessErrorMessage("No tenemos una sesion o pago valido para entregar a Google.");
+      return;
+    }
+
+    setIsDeliveringGoogle(true);
+    setReprocessErrorMessage(null);
+    setReprocessSuccessMessage(null);
+
+    try {
+      const result = await apiRequest<{ queued: boolean; reason?: string }>(`/admin/payments/${id}/deliver-google`, {
+        method: "POST",
+        token,
+      });
+      setReprocessSuccessMessage(
+        result.queued
+          ? "Entrega a Drive y Sheets solicitada correctamente."
+          : "El comprobante ya estaba entregado en Drive y Sheets."
+      );
+      await reload();
+    } catch (error) {
+      setReprocessErrorMessage(getApiErrorMessage(error, "No se pudo solicitar la entrega a Google."));
+    } finally {
+      setIsDeliveringGoogle(false);
     }
   }
 
@@ -275,6 +304,18 @@ export function PaymentDetailPage() {
                     onClick={() => void handleReprocess("post")}
                   >
                     Postproceso
+                  </button>
+                  <button
+                    type="button"
+                    className="secondary-button"
+                    disabled={isReprocessing || isDeliveringGoogle}
+                    onClick={() => void handleGoogleDelivery()}
+                  >
+                    {isDeliveringGoogle
+                      ? "Encolando..."
+                      : payment.cae
+                        ? "Subir a Drive y Sheets"
+                        : "Registrar error en Sheets"}
                   </button>
                 </div>
                 {reprocessErrorMessage ? <p className="form-error">{reprocessErrorMessage}</p> : null}
