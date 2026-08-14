@@ -41,6 +41,7 @@ import {
 } from "../services/tenantConfig.service.js";
 import {
   addTenantNote,
+  deliverPaymentToGoogleAsAdmin,
   listTenantNotes,
   reprocessPaymentAsAdmin,
 } from "../services/tenantSupport.service.js";
@@ -433,6 +434,27 @@ router.post("/payments/:id/reprocess", async (req, res) => {
     }));
   } catch (error) {
     return res.status(400).json({ error: error.message || "No se pudo solicitar reproceso" });
+  }
+});
+
+router.post("/payments/:id/deliver-google", async (req, res) => {
+  try {
+    const paymentId = toBigIntId(req.params.id, "paymentId");
+    const payment = await getAdminPaymentDetail(paymentId);
+
+    if (!payment) {
+      return res.status(404).json({ error: "Pago no encontrado" });
+    }
+
+    const result = await deliverPaymentToGoogleAsAdmin(payment, req.adminAuth.adminUser);
+    return res.status(result.queued ? 202 : 200).json(normalizeJsonBigInts({
+      ok: true,
+      paymentId,
+      tenantId: payment.tenantId,
+      ...result,
+    }));
+  } catch (error) {
+    return res.status(400).json({ error: error.message || "No se pudo solicitar la entrega Google" });
   }
 });
 

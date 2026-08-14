@@ -2049,3 +2049,18 @@ Response `201`:
   "documents": []
 }
 ```
+## `POST /admin/payments/:id/deliver-google`
+
+Solicita la entrega opcional a Drive y Sheets de un comprobante ya emitido en ARCA.
+
+Auth:
+
+- Admin bearer token con permiso para gestionar pagos.
+
+Comportamiento:
+
+- valida CAE, numero y vencimiento del comprobante;
+- exige suscripcion activa, entitlement `googleDriveSheets` e integraciones completas;
+- no vuelve a consultar Mercado Pago ni emitir en ARCA;
+- omite Drive o Sheets cuando su checkpoint local ya existe;
+- responde `202` si encolo trabajo y `200` si la entrega ya estaba completa.
