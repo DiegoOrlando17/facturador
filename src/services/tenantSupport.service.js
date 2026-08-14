@@ -3,7 +3,7 @@ import { buildQueueJobId, toQueueId } from "../utils/bigint.js";
 import { paymentsQueue } from "../queues/payments.queue.js";
 import { invoicesQueue } from "../queues/invoices.queue.js";
 import { logPaymentEvent } from "./paymentEvent.service.js";
-import { getGoogleInvoiceContext } from "./tenantGoogle.service.js";
+import { getGoogleInvoiceContext, getTenantSheetsContext } from "./tenantGoogle.service.js";
 
 function serializeJson(value) {
   return value ? JSON.stringify(value) : null;
@@ -159,17 +159,17 @@ export async function reprocessPaymentAsAdmin(payment, adminUser, step = "auto")
 }
 
 export async function deliverPaymentToGoogleAsAdmin(payment, adminUser) {
-  if (!payment.cae || !payment.cbte_nro || !payment.cae_vto) {
-    throw new Error("El pago todavia no tiene un comprobante emitido en ARCA");
-  }
-
-  if (payment.drive_file_link && payment.sheets_row) {
+  const hasIssuedInvoice = Boolean(payment.cae && payment.cbte_nro && payment.cae_vto);
+  if (hasIssuedInvoice && payment.drive_file_link && payment.sheets_row) {
     return { queued: false, reason: "already_delivered" };
   }
 
-  const googleContext = await getGoogleInvoiceContext(payment.tenantId);
-  if (!googleContext) {
-    throw new Error("El tenant no tiene un plan Google elegible o las integraciones Drive/Sheets estan incompletas");
+  const [googleContext, sheetsContext] = await Promise.all([
+    hasIssuedInvoice ? getGoogleInvoiceContext(payment.tenantId) : Promise.resolve(null),
+    getTenantSheetsContext(payment.tenantId),
+  ]);
+  if (!googleContext && !sheetsContext) {
+    throw new Error("El tenant no tiene un plan Google elegible ni una integracion Drive/Sheets utilizable");
   }
 
   await invoicesQueue.add(

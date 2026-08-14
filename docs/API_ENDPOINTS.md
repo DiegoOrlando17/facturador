@@ -2063,4 +2063,5 @@ Comportamiento:
 - exige suscripcion activa, entitlement `googleDriveSheets` e integraciones completas;
 - no vuelve a consultar Mercado Pago ni emitir en ARCA;
 - omite Drive o Sheets cuando su checkpoint local ya existe;
+- si ARCA fallo, permite registrar/actualizar solamente el estado `ERROR` en Sheets;
 - responde `202` si encolo trabajo y `200` si la entrega ya estaba completa.

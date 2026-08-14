@@ -220,6 +220,30 @@ export async function getGoogleInvoiceContext(tenantId) {
   return { accessToken, driveFolderId, sheetsId, sheetName, scopes };
 }
 
+export async function getTenantSheetsContext(tenantId) {
+  const plan = await getTenantActivePlan(tenantId);
+  if (!planHasGoogleDelivery(plan)) return null;
+
+  const sheets = await tryGetTenantIntegrationConfig(tenantId, "SHEETS");
+  if (!sheets) return null;
+
+  const refreshToken = sheets.REFRESH_TOKEN ?? sheets.refresh_token;
+  const clientId = config.GOOGLE.CLIENT_ID;
+  const clientSecret = config.GOOGLE.CLIENT_SECRET;
+  const sheetsId = sheets.SHEETS_ID ?? sheets.spreadsheetId;
+  const sheetName = sheets.SHEET_NAME ?? sheets.sheetName ?? "Hoja1";
+
+  if (!refreshToken || !clientId || !clientSecret || !sheetsId) return null;
+
+  const accessToken = await getAccessTokenFromRefreshCached(tenantId, {
+    clientId,
+    clientSecret,
+    refreshToken,
+  });
+
+  return { accessToken, sheetsId, sheetName };
+}
+
 export async function keepGoogleConnectionsAlive() {
   const rows = [
     ...(await listEnabledTenantsByIntegration("DRIVE")),

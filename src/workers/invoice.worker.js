@@ -9,10 +9,10 @@ import { uploadToDrive } from "../services/drive.service.js";
 import { getGoogleInvoiceContext } from "../services/tenantGoogle.service.js";
 import { createInvoicePdfBuffer } from "../services/pdf.service.js";
 import { logPaymentEvent } from "../services/paymentEvent.service.js";
-import { appendRow } from "../services/sheets.service.js";
+import { syncPaymentToSheets } from "../services/paymentSheets.service.js";
 import { getTenantIntegrationConfig } from "../services/tenantConfig.service.js";
 import { toBigIntId } from "../utils/bigint.js";
-import { formatToLocalTime, getTodaysDate } from "../utils/date.js";
+import { getTodaysDate } from "../utils/date.js";
 import logger from "../utils/logger.js";
 
 const POST_AFIP_STATUSES = new Set([
@@ -56,25 +56,18 @@ const worker = new Worker("invoices", async (job) => {
 
     const payment = await getPayment(tenantId, paymentId);
     if (!payment) return;
-    if (!POST_AFIP_STATUSES.has(payment.status) && !(googleRedelivery && payment.status === "complete")) return;
+    if (!POST_AFIP_STATUSES.has(payment.status) && !googleRedelivery) return;
 
-    const googleCtx = await getGoogleInvoiceContext(tenantId);
-    if (!googleCtx) {
-      if (googleRedelivery) {
-        throw new Error("El tenant no tiene Google habilitado o configurado completamente");
+    const hasIssuedInvoice = Boolean(payment.cae && payment.cbte_nro && payment.cae_vto);
+    const googleCtx = hasIssuedInvoice ? await getGoogleInvoiceContext(tenantId) : null;
+    if (!hasIssuedInvoice) {
+      const sheetsResult = await syncPaymentToSheets(tenantId, payment, {
+        status: "ERROR",
+        error: payment.error || "La facturacion en ARCA no fue completada",
+      });
+      if (googleRedelivery && !sheetsResult.synced) {
+        throw new Error("El tenant no tiene Sheets habilitado/configurado o no se pudo escribir");
       }
-
-      await updatePaymentStatus(tenantId, payment.id, "complete");
-      await logPaymentEvent(
-        tenantId,
-        payment.id,
-        "payment_updated",
-        "Proceso post-AFIP completado sin entrega Google",
-        {
-          finalStatus: "complete",
-          googleDelivery: "not_enabled_or_incomplete",
-        }
-      );
       return;
     }
 
@@ -85,7 +78,7 @@ const worker = new Worker("invoices", async (job) => {
       return;
     }
 
-    const needsDrive = !payment.drive_file_link;
+    const needsDrive = Boolean(googleCtx && !payment.drive_file_link);
     if (needsDrive) {
       const afipRaw = await getTenantIntegrationConfig(tenantId, "AFIP");
       const afipBranding = normalizeAfipConfig(afipRaw);
@@ -94,6 +87,8 @@ const worker = new Worker("invoices", async (job) => {
       if (!temporaryPdf) {
         await updatePaymentStatus(tenantId, payment.id, "drive_pending", "No se pudo generar el PDF temporal.");
         await logPaymentEvent(tenantId, payment.id, "failed", "No se pudo generar el PDF temporal para Drive");
+        payment.error = "No se pudo generar el PDF temporal.";
+        await syncPaymentToSheets(tenantId, payment, { status: "ERROR", error: payment.error });
         throw new Error("No se pudo generar el PDF temporal.");
       }
 
@@ -109,6 +104,8 @@ const worker = new Worker("invoices", async (job) => {
         if (!driveFile) {
           await updatePaymentStatus(tenantId, payment.id, "drive_pending", "No se pudo subir la factura al drive.");
           await logPaymentEvent(tenantId, payment.id, "failed", "No se pudo subir la factura a Drive");
+          payment.error = "No se pudo subir la factura al drive.";
+          await syncPaymentToSheets(tenantId, payment, { status: "ERROR", error: payment.error });
           throw new Error("No se pudo subir la factura al drive.");
         }
 
@@ -122,39 +119,25 @@ const worker = new Worker("invoices", async (job) => {
       }
     }
 
-    if (!payment.sheets_row) {
-      const sheets = await appendRow([
-        payment.provider_payment_id.toString(),
-        payment.cbte_nro,
-        formatToLocalTime(payment.date_approved),
-        payment.amount,
-        payment.customer || "Consumidor Final",
-        payment.cae,
-        payment.cae_vto,
-        "OK",
-        payment.drive_file_link,
-      ], {
-        accessToken: googleCtx.accessToken,
-        spreadsheetId: googleCtx.sheetsId,
-        sheetName: googleCtx.sheetName,
-      });
+    const sheetsResult = await syncPaymentToSheets(tenantId, payment, {
+      status: "OK",
+      error: null,
+    });
+    if (!sheetsResult.synced && sheetsResult.reason === "write_failed") {
+      await updatePaymentStatus(tenantId, payment.id, "sheets_pending", "No se pudo registrar en el sheets.");
+      await logPaymentEvent(tenantId, payment.id, "failed", "No se pudo registrar la factura en Sheets");
+      throw new Error("No se pudo registrar en el sheets.");
+    }
 
-      if (!sheets) {
-        await updatePaymentStatus(tenantId, payment.id, "sheets_pending", "No se pudo registrar en el sheets.");
-        await logPaymentEvent(tenantId, payment.id, "failed", "No se pudo registrar la factura en Sheets");
-        throw new Error("No se pudo registrar en el sheets.");
-      }
-
-      payment.sheets_row = sheets.row;
-      await updatePayment(tenantId, payment.id, payment);
-      await logPaymentEvent(tenantId, payment.id, "sheets_ok", "Factura registrada en Sheets", {
-        row: sheets.row,
-      });
+    if (googleRedelivery && !googleCtx && !sheetsResult.synced) {
+      throw new Error("El tenant no tiene Drive ni Sheets habilitados/configurados completamente");
     }
 
     await updatePaymentStatus(tenantId, payment.id, "complete");
     await logPaymentEvent(tenantId, payment.id, "payment_updated", "Proceso post-AFIP completado", {
       finalStatus: "complete",
+      driveDelivery: googleCtx ? "processed_or_existing" : "not_enabled_or_incomplete",
+      sheetsDelivery: sheetsResult.synced ? "synced" : "not_enabled_or_incomplete",
     });
   } catch (error) {
     logger.error("Error en el invoice worker: " + error);
