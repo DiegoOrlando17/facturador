@@ -19,6 +19,12 @@ npm run plans:sync
 ```
 
 El catalogo `TIER_1` a `TIER_4` y sus entitlements acumulativos se define en `src/config/planCatalog.js`. Los precios permanecen sin definir hasta su aprobacion comercial.
+
+El dominio fiscal separado se crea mediante las migraciones Prisma. Despues de aplicar `20260814120000_invoice_domain`, validar el backfill de pagos existentes con:
+
+```powershell
+npm run invoice:verify-backfill
+```
 - Mercado Pago, ARCA y los destinos Google se configuran por tenant; no se usan destinos o tokens Google globales como fallback.
 
 ## Documentacion

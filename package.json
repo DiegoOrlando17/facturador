@@ -13,6 +13,7 @@
     "tenant:bootstrap": "node src/scripts/bootstrap-legacy-tenant.js",
     "tenant:setup-demo": "node src/scripts/setup-demo.js",
     "plans:sync": "node src/scripts/sync-plans.js",
+    "invoice:verify-backfill": "node src/scripts/verify-invoice-backfill.js",
     "mp:reset-from-checkpoint": "node src/scripts/reset-mp-from-checkpoint.js"
   },
   "keywords": [],
