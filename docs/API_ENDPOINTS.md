@@ -111,11 +111,9 @@ Granularidades de reportes:
 | Metodo | Path | Auth | Descripcion |
 | --- | --- | --- | --- |
 | GET | `/health` | No | Healthcheck basico |
-| POST | `/webhook/mercadopago` | No | Webhook entrante de Mercado Pago |
 | GET | `/google/oauth/start` | No | Inicia OAuth Google para un tenant |
 | GET | `/google/oauth/callback` | No | Callback OAuth Google |
 | POST | `/api/crear-pago-mp` | No | Crea pago de prueba en Mercado Pago |
-| POST | `/api/crear-pago-pwy` | No | Crea pago de prueba en Payway |
 | POST | `/admin/auth/login` | No | Login admin |
 | POST | `/admin/auth/logout` | No | Logout admin del lado cliente |
 | GET | `/admin/me` | Admin | Usuario admin autenticado |
@@ -176,35 +174,6 @@ Response `200`:
 }
 ```
 
-## Webhooks
-
-### `POST /webhook/mercadopago`
-
-Webhook publico para notificaciones de Mercado Pago.
-
-Body esperado:
-
-```json
-{
-  "type": "payment",
-  "data": {
-    "id": "123456789"
-  }
-}
-```
-
-Comportamiento:
-
-- Si `type` es `payment` y existe `data.id`, resuelve el tenant por `DEFAULT_TENANT_SLUG`.
-- Crea o actualiza un pago `mercadopago` con estado `pending`.
-- Encola un job en `webhooksQueue`.
-- Siempre responde `200` si el request pudo procesarse, incluso si el body no era de tipo `payment`.
-
-Response:
-
-- `200 OK` sin body.
-- `500 Internal Server Error` sin body si falla el procesamiento.
-
 ## Google OAuth
 
 ### `GET /google/oauth/start`
@@ -253,7 +222,7 @@ La respuesta puede incluir campos adicionales devueltos por el servicio de conex
 
 ## Endpoints de prueba de pagos
 
-Estos endpoints estan montados bajo `/api` y sirven para simular/crear pagos contra los proveedores configurados.
+Este endpoint esta montado bajo `/api` y sirve para simular/crear pagos contra Mercado Pago.
 
 ### `POST /api/crear-pago-mp`
 
@@ -265,24 +234,6 @@ Response `200`:
 {
   "id": "123456789",
   "provider": "mercadopago",
-  "raw": {}
-}
-```
-
-Errores:
-
-- `500` si no se pudo simular el pago.
-
-### `POST /api/crear-pago-pwy`
-
-Crea un pago de prueba en Payway usando la configuracion global.
-
-Response `200`:
-
-```json
-{
-  "id": "123456789",
-  "provider": "payway",
   "raw": {}
 }
 ```

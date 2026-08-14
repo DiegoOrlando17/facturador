@@ -88,7 +88,6 @@ type IconName =
   | "invoice"
   | "clock"
   | "mp"
-  | "payway"
   | "afip"
   | "drive"
   | "sheets";
@@ -98,9 +97,7 @@ function DashboardIcon({ name }: { name: IconName }) {
     return <IntegrationLogo name={name} />;
   }
 
-  const iconName = name === "payway" ? "credit-card" : name;
-
-  return <AppIcon name={iconName as AppIconName} />;
+  return <AppIcon name={name as AppIconName} />;
 }
 
 function getServiceLogoName(name: string): IntegrationLogoName | null {
