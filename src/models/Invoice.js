@@ -33,6 +33,23 @@ export function buildInvoicePaymentView(payment, invoice) {
   };
 }
 
+export function hydratePaymentWithInvoice(payment) {
+  if (!payment?.invoice) return payment;
+
+  const hydrated = buildInvoicePaymentView(payment, payment.invoice);
+  const driveDocument = payment.invoice.documents?.find((document) => (
+    document.type === "PDF"
+    && document.storageProvider === "GOOGLE_DRIVE"
+    && document.status === "AVAILABLE"
+    && document.externalUrl
+  ));
+
+  return {
+    ...hydrated,
+    drive_file_link: driveDocument?.externalUrl ?? payment.drive_file_link,
+  };
+}
+
 export async function ensureAutomaticInvoiceForPayment(tenantId, payment) {
   return db.invoice.upsert({
     where: {

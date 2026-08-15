@@ -5,6 +5,7 @@ import { execFile } from "child_process";
 import { promisify } from "util";
 import { config } from "../config/index.js";
 import { db } from "../models/db.js";
+import { hydratePaymentWithInvoice } from "../models/Invoice.js";
 import { normalizeAfipConfig } from "./afip.service.js";
 import { normalizeMpConfig } from "./mercadopago.service.js";
 import { decryptJson } from "../utils/crypto.js";
@@ -24,6 +25,22 @@ const WORKER_FILES = [
   "mercadopago.worker.js",
   "audit.worker.js",
 ];
+
+const invoiceListInclude = {
+  include: {
+    documents: true,
+  },
+};
+
+const invoiceDetailInclude = {
+  include: {
+    documents: true,
+    events: {
+      orderBy: [{ createdAt: "desc" }],
+      take: 50,
+    },
+  },
+};
 
 function normalizePage(value) {
   const current = Number(value || DEFAULT_PAGE);
@@ -834,13 +851,14 @@ export async function listAdminPayments(filters = {}) {
             name: true,
           },
         },
+        invoice: invoiceListInclude,
       },
     }),
     db.payment.count({ where }),
   ]);
 
   return {
-    items,
+    items: items.map(hydratePaymentWithInvoice),
     pagination: {
       page,
       pageSize,
@@ -873,11 +891,12 @@ export async function listAdminPaymentsForExport(filters = {}) {
           name: true,
         },
       },
+      invoice: invoiceListInclude,
     },
   });
 
   return {
-    items,
+    items: items.map(hydratePaymentWithInvoice),
     exportInfo: {
       maxRows: MAX_EXPORT_ROWS,
       truncated: items.length >= MAX_EXPORT_ROWS,
@@ -911,6 +930,9 @@ export async function getAdminTenantSummary(tenantId) {
       where: { tenantId },
       orderBy: [{ createdAt: "desc" }],
       take: 10,
+      include: {
+        invoice: invoiceListInclude,
+      },
     }),
     db.payment.findFirst({
       where: {
@@ -918,13 +940,16 @@ export async function getAdminTenantSummary(tenantId) {
         status: "failed",
       },
       orderBy: [{ updatedAt: "desc" }],
+      include: {
+        invoice: invoiceListInclude,
+      },
     }),
   ]);
 
   return {
     totalPayments,
-    latestFailedPayment,
-    recentPayments,
+    latestFailedPayment: hydratePaymentWithInvoice(latestFailedPayment),
+    recentPayments: recentPayments.map(hydratePaymentWithInvoice),
     ...buildAmountSummary(paymentsByStatus),
   };
 }
@@ -1022,17 +1047,21 @@ export async function getAdminPaymentDetail(paymentId, tenantId = null) {
       orderBy: [{ createdAt: "desc" }],
       take: 50,
     },
+    invoice: invoiceDetailInclude,
   };
 
-  if (tenantId) {
-    return db.payment.findUnique({
+  let payment;
+  if (tenantId !== null && tenantId !== undefined) {
+    payment = await db.payment.findUnique({
       where: { id_tenantId: { id: paymentId, tenantId } },
+      include,
+    });
+  } else {
+    payment = await db.payment.findFirst({
+      where: { id: paymentId },
       include,
     });
   }
 
-  return db.payment.findFirst({
-    where: { id: paymentId },
-    include,
-  });
+  return hydratePaymentWithInvoice(payment);
 }

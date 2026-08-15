@@ -25,6 +25,12 @@ El dominio fiscal separado se crea mediante las migraciones Prisma. Despues de a
 ```powershell
 npm run invoice:verify-backfill
 ```
+
+Validar tambien el modelo de lectura compatible utilizado por admin, portal y CSV:
+
+```powershell
+npm run invoice:verify-read-model
+```
 - Mercado Pago, ARCA y los destinos Google se configuran por tenant; no se usan destinos o tokens Google globales como fallback.
 
 ## Documentacion
