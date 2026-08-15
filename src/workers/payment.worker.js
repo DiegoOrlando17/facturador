@@ -6,6 +6,12 @@ import { connection } from "../config/redis.js";
 import { invoicesQueue } from "../queues/invoices.queue.js";
 
 import { getPayment, updatePaymentStatus, updatePayment } from "../models/Payment.js";
+import {
+    ensureAutomaticInvoiceForPayment,
+    markInvoiceFailed,
+    markInvoiceIssued,
+    markInvoiceIssuing,
+} from "../models/Invoice.js";
 import { getNextCbteNro, setLastCbteNro, resyncCbteNro } from "../models/InvoiceSequence.js";
 import { createInvoiceAFIP } from "../services/afip.service.js";
 
@@ -24,9 +30,23 @@ async function recordAfipFailureInSheets(tenantId, payment, errorMessage) {
     }
 }
 
+async function enqueueInvoicePostProcess(tenantId, payment) {
+    await invoicesQueue.add(`invoices-${payment.provider_payment_id.toString()}`, {
+        tenantId: toQueueId(tenantId),
+        paymentId: toQueueId(payment.id),
+    }, {
+        jobId: buildQueueJobId({ tenantId, paymentId: payment.id, step: "post" }),
+        attempts: 5,
+        backoff: { type: "exponential", delay: 2000 },
+        removeOnComplete: true,
+        removeOnFail: 50,
+    });
+}
+
 const worker = new Worker("payments", async (job) => {
     let tenantId;
     let payment;
+    let invoice;
     try {
         tenantId = toBigIntId(job.data.tenantId, "tenantId");
         const paymentId = toBigIntId(job.data.paymentId, "paymentId");
@@ -39,7 +59,27 @@ const worker = new Worker("payments", async (job) => {
 
         if (!["pending", "processing", "afip_pending"].includes(payment.status)) return;
 
+        invoice = await ensureAutomaticInvoiceForPayment(tenantId, payment);
+
+        if (invoice.status === "ISSUED" && invoice.cae && invoice.cbteNro && invoice.caeVto) {
+            await updatePayment(tenantId, payment.id, {
+                status: "processing",
+                cae: invoice.cae,
+                cae_vto: invoice.caeVto,
+                cbte_nro: invoice.cbteNro,
+                cbte_tipo: invoice.cbteTipo,
+                pto_vta: invoice.ptoVta,
+                error: null,
+            });
+            await logPaymentEvent(tenantId, payment.id, "payment_updated", "Emision ARCA omitida: factura ya emitida", {
+                invoiceId: invoice.id.toString(),
+            });
+            await enqueueInvoicePostProcess(tenantId, payment);
+            return;
+        }
+
         await updatePaymentStatus(tenantId, payment.id, "processing");
+        await markInvoiceIssuing(tenantId, invoice.id, invoice.status);
         await logPaymentEvent(tenantId, payment.id, "invoice_requested", "Inicio de emision AFIP", {
             previousStatus: payment.status,
         });
@@ -52,6 +92,10 @@ const worker = new Worker("payments", async (job) => {
         const cbteTipo = Number(afipCfg.CBTE_TIPO);
 
         if (!ptoVta || !cbteTipo) {
+            await markInvoiceFailed(tenantId, invoice.id, "AFIP config incompleta (PTO_VTA/CBTE_TIPO).", {
+                ptoVta,
+                cbteTipo,
+            });
             await updatePaymentStatus(tenantId, payment.id, "afip_pending", "AFIP config incompleta (PTO_VTA/CBTE_TIPO).");
             await logPaymentEvent(tenantId, payment.id, "failed", "AFIP config incompleta", {
                 ptoVta,
@@ -65,6 +109,7 @@ const worker = new Worker("payments", async (job) => {
 
         const seq = await getNextCbteNro(tenantId, ptoVta, cbteTipo, afipCfg);
         if (!seq) {
+            await markInvoiceFailed(tenantId, invoice.id, "No se pudo obtener el ultimo comprobante.");
             await updatePaymentStatus(tenantId, payment.id, "afip_pending", "No se pudo obtener el ultimo comprobante.");
             await logPaymentEvent(tenantId, payment.id, "failed", "No se pudo obtener el ultimo comprobante.");
             payment.status = "afip_pending";
@@ -77,6 +122,9 @@ const worker = new Worker("payments", async (job) => {
 
         const response = await createInvoiceAFIP(nextCbteNro, payment.amount, afipCfg);
         if (response.error) {
+            await markInvoiceFailed(tenantId, invoice.id, "Error al emitir en ARCA", {
+                error: String(response.error),
+            });
             await updatePaymentStatus(tenantId, payment.id, "afip_pending", "No se pudo obtener el cae de AFIP.");
             await logPaymentEvent(tenantId, payment.id, "failed", "Error al emitir en AFIP", {
                 error: String(response.error),
@@ -95,6 +143,14 @@ const worker = new Worker("payments", async (job) => {
 
         const { cae, nroComprobante, fechaVtoCae } = response;
 
+        invoice = await markInvoiceIssued(tenantId, invoice.id, {
+            cae,
+            caeVto: fechaVtoCae,
+            cbteNro: nroComprobante,
+            cbteTipo,
+            ptoVta,
+        });
+
         await setLastCbteNro(seq.id, nextCbteNro);
 
         payment.cae = cae;
@@ -110,16 +166,13 @@ const worker = new Worker("payments", async (job) => {
             fechaVtoCae,
         });
 
-        await invoicesQueue.add(`invoices-${payment.provider_payment_id.toString()}`, { tenantId: toQueueId(tenantId), paymentId: toQueueId(payment.id) }, {
-            jobId: buildQueueJobId({ tenantId, paymentId: payment.id, step: "post" }),
-            attempts: 5,
-            backoff: { type: "exponential", delay: 2000 },
-            removeOnComplete: true,
-            removeOnFail: 50,
-        });
+        await enqueueInvoicePostProcess(tenantId, payment);
     } catch (err) {
         if (tenantId && payment && payment.status === "processing") {
             const errorMessage = err?.message || String(err);
+            if (invoice && invoice.status !== "ISSUED") {
+                await markInvoiceFailed(tenantId, invoice.id, errorMessage, { source: "worker_catch" });
+            }
             await updatePaymentStatus(tenantId, payment.id, "afip_pending", errorMessage);
             payment.status = "afip_pending";
             payment.error = errorMessage;
