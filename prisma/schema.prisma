@@ -374,6 +374,7 @@ model InvoiceDocument {
   tenant  Tenant  @relation(fields: [tenantId], references: [id])
   invoice Invoice @relation(fields: [invoiceId, tenantId], references: [id, tenantId])
 
+  @@unique([invoiceId, type, storageProvider], name: "invoice_document_delivery")
   @@index([tenantId, type, createdAt])
   @@index([invoiceId, createdAt])
 }

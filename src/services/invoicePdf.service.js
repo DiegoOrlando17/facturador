@@ -1,4 +1,5 @@
 import { getPayment } from "../models/Payment.js";
+import { buildInvoicePaymentView, getInvoiceByPaymentId } from "../models/Invoice.js";
 import { normalizeAfipConfig } from "./afip.service.js";
 import { createInvoicePdfBuffer } from "./pdf.service.js";
 import { getTenantIntegrationConfig } from "./tenantConfig.service.js";
@@ -9,17 +10,20 @@ export async function generateInvoicePdfForPayment(tenantId, paymentId) {
     throw new Error("Pago no encontrado");
   }
 
-  if (!payment.cae || !payment.cbte_nro || !payment.cae_vto) {
+  const invoice = await getInvoiceByPaymentId(tenantId, paymentId);
+  if (!invoice || invoice.status !== "ISSUED" || !invoice.cae || !invoice.cbteNro || !invoice.caeVto) {
     throw new Error("La factura todavia no tiene datos suficientes para generar PDF");
   }
+
+  const invoiceView = buildInvoicePaymentView(payment, invoice);
 
   const afipRaw = await getTenantIntegrationConfig(tenantId, "AFIP");
   const afipBranding = normalizeAfipConfig(afipRaw);
   const pdfBuffer = await createInvoicePdfBuffer(
-    payment,
-    payment.cae,
-    payment.cbte_nro,
-    payment.cae_vto,
+    invoiceView,
+    invoice.cae,
+    invoice.cbteNro,
+    invoice.caeVto,
     afipBranding
   );
 
@@ -28,7 +32,8 @@ export async function generateInvoicePdfForPayment(tenantId, paymentId) {
   }
 
   return {
-    payment,
+    payment: invoiceView,
+    invoice,
     pdfBuffer,
   };
 }

@@ -1,6 +1,7 @@
 import logger from "../utils/logger.js";
 
 import { getPendingPayments } from "../models/Payment.js";
+import { getInvoiceByPaymentId, logInvoiceEvent } from "../models/Invoice.js";
 import { paymentsQueue } from "../queues/payments.queue.js";
 import { invoicesQueue } from "../queues/invoices.queue.js";
 import { keepGoogleConnectionsAlive } from "../services/tenantGoogle.service.js";
@@ -21,15 +22,26 @@ async function reenqueuePendingPayments() {
     for (const payment of pendings) {
       try {
         const { id, tenantId, provider_payment_id, status } = payment;
+        const invoice = await getInvoiceByPaymentId(tenantId, id);
 
         if (status === "afip_pending") {
-          await logPaymentEvent(tenantId, id, "retry_scheduled", "Retry worker reencolo paso AFIP", {
+          const step = invoice?.status === "ISSUED" ? "post" : "afip";
+          await logPaymentEvent(tenantId, id, "retry_scheduled", `Retry worker reencolo paso ${step}`, {
             status,
+            invoiceStatus: invoice?.status ?? null,
+            resolvedStep: step,
           });
-          await paymentsQueue.add(`payments-${tenantId}-${payment.provider_payment_id.toString()}`, { tenantId: toQueueId(tenantId), paymentId: toQueueId(payment.id) }, {
-            jobId: buildQueueJobId({ tenantId, paymentId: payment.id, step: "afip" }),
+          if (invoice) {
+            await logInvoiceEvent(tenantId, invoice.id, "RETRY_SCHEDULED", `Retry worker reencolo paso ${step}`, {
+              paymentStatus: status,
+              invoiceStatus: invoice.status,
+            });
+          }
+          const queue = step === "afip" ? paymentsQueue : invoicesQueue;
+          await queue.add(`${step}-${tenantId}-${payment.provider_payment_id.toString()}`, { tenantId: toQueueId(tenantId), paymentId: toQueueId(payment.id) }, {
+            jobId: buildQueueJobId({ tenantId, paymentId: payment.id, step }),
             attempts: 5,
-            backoff: { type: "exponential", delay: 3000 },
+            backoff: { type: "exponential", delay: step === "afip" ? 3000 : 2000 },
             removeOnComplete: true,
             removeOnFail: 50,
           });

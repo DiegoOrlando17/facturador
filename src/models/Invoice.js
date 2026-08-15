@@ -17,6 +17,22 @@ function paymentSnapshot(payment) {
   };
 }
 
+export function buildInvoicePaymentView(payment, invoice) {
+  return {
+    ...payment,
+    amount: invoice.amount ?? payment.amount,
+    currency: invoice.currency ?? payment.currency,
+    customer: invoice.customer ?? payment.customer,
+    customer_doc_type: invoice.customerDocType ?? payment.customer_doc_type,
+    customer_doc_number: invoice.customerDocNumber ?? payment.customer_doc_number,
+    cae: invoice.cae,
+    cae_vto: invoice.caeVto,
+    cbte_nro: invoice.cbteNro,
+    cbte_tipo: invoice.cbteTipo,
+    pto_vta: invoice.ptoVta,
+  };
+}
+
 export async function ensureAutomaticInvoiceForPayment(tenantId, payment) {
   return db.invoice.upsert({
     where: {
@@ -36,6 +52,83 @@ export async function ensureAutomaticInvoiceForPayment(tenantId, payment) {
       ...paymentSnapshot(payment),
     },
   });
+}
+
+export async function getInvoiceByPaymentId(tenantId, paymentId, { includeDocuments = false } = {}) {
+  return db.invoice.findUnique({
+    where: {
+      invoice_paymentId_tenantId: {
+        paymentId,
+        tenantId,
+      },
+    },
+    include: includeDocuments ? { documents: true } : undefined,
+  });
+}
+
+export async function logInvoiceEvent(tenantId, invoiceId, type, message = null, payload = null) {
+  return db.invoiceEvent.create({
+    data: {
+      tenantId,
+      invoiceId,
+      type,
+      message,
+      payloadJson: serializePayload(payload),
+    },
+  });
+}
+
+export async function recordAvailableInvoiceDocument(tenantId, invoiceId, {
+  type,
+  storageProvider,
+  externalId = null,
+  externalUrl = null,
+  fileName = null,
+  mimeType = null,
+  checksum = null,
+}) {
+  const document = await db.invoiceDocument.upsert({
+    where: {
+      invoice_document_delivery: {
+        invoiceId,
+        type,
+        storageProvider,
+      },
+    },
+    update: {
+      status: "AVAILABLE",
+      externalId,
+      externalUrl,
+      fileName,
+      mimeType,
+      checksum,
+      error: null,
+    },
+    create: {
+      tenantId,
+      invoiceId,
+      type,
+      status: "AVAILABLE",
+      storageProvider,
+      externalId,
+      externalUrl,
+      fileName,
+      mimeType,
+      checksum,
+    },
+  });
+
+  await db.invoiceEvent.create({
+    data: {
+      tenantId,
+      invoiceId,
+      type: "DOCUMENT_CREATED",
+      message: `${type} disponible en ${storageProvider}`,
+      payloadJson: serializePayload({ documentId: document.id, externalId, externalUrl }),
+    },
+  });
+
+  return document;
 }
 
 export async function markInvoiceIssuing(tenantId, invoiceId, previousStatus) {

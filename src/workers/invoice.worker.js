@@ -4,6 +4,11 @@ import path from "path";
 import { Worker } from "bullmq";
 import { connection } from "../config/redis.js";
 import { getPayment, updatePayment, updatePaymentStatus } from "../models/Payment.js";
+import {
+  buildInvoicePaymentView,
+  getInvoiceByPaymentId,
+  recordAvailableInvoiceDocument,
+} from "../models/Invoice.js";
 import { normalizeAfipConfig } from "../services/afip.service.js";
 import { uploadToDrive } from "../services/drive.service.js";
 import { getGoogleInvoiceContext } from "../services/tenantGoogle.service.js";
@@ -22,12 +27,13 @@ const POST_AFIP_STATUSES = new Set([
   "sheets_pending",
 ]);
 
-async function createTemporaryInvoicePdf(payment, afipBranding) {
+async function createTemporaryInvoicePdf(payment, invoice, afipBranding) {
+  const invoiceView = buildInvoicePaymentView(payment, invoice);
   const pdfBuffer = await createInvoicePdfBuffer(
-    payment,
-    payment.cae,
-    payment.cbte_nro,
-    payment.cae_vto,
+    invoiceView,
+    invoice.cae,
+    invoice.cbteNro,
+    invoice.caeVto,
     afipBranding
   );
 
@@ -56,9 +62,12 @@ const worker = new Worker("invoices", async (job) => {
 
     const payment = await getPayment(tenantId, paymentId);
     if (!payment) return;
-    if (!POST_AFIP_STATUSES.has(payment.status) && !googleRedelivery) return;
+    const invoice = await getInvoiceByPaymentId(tenantId, paymentId, { includeDocuments: true });
+    if (!POST_AFIP_STATUSES.has(payment.status) && !googleRedelivery && invoice?.status !== "ISSUED") return;
 
-    const hasIssuedInvoice = Boolean(payment.cae && payment.cbte_nro && payment.cae_vto);
+    const hasIssuedInvoice = Boolean(
+      invoice?.status === "ISSUED" && invoice.cae && invoice.cbteNro && invoice.caeVto
+    );
     const googleCtx = hasIssuedInvoice ? await getGoogleInvoiceContext(tenantId) : null;
     if (!hasIssuedInvoice) {
       const sheetsResult = await syncPaymentToSheets(tenantId, payment, {
@@ -71,18 +80,32 @@ const worker = new Worker("invoices", async (job) => {
       return;
     }
 
-    if (googleRedelivery && payment.drive_file_link && payment.sheets_row) {
+    Object.assign(payment, buildInvoicePaymentView(payment, invoice));
+
+    const driveDocument = invoice.documents.find((document) => (
+      document.type === "PDF"
+      && document.storageProvider === "GOOGLE_DRIVE"
+      && document.status === "AVAILABLE"
+      && document.externalUrl
+    ));
+
+    if (driveDocument?.externalUrl && payment.drive_file_link !== driveDocument.externalUrl) {
+      payment.drive_file_link = driveDocument.externalUrl;
+      await updatePayment(tenantId, payment.id, { drive_file_link: driveDocument.externalUrl });
+    }
+
+    if (googleRedelivery && driveDocument && payment.sheets_row) {
       await logPaymentEvent(tenantId, payment.id, "payment_updated", "Entrega Google omitida: ya estaba completa", {
         googleDelivery: "already_complete",
       });
       return;
     }
 
-    const needsDrive = Boolean(googleCtx && !payment.drive_file_link);
+    const needsDrive = Boolean(googleCtx && !driveDocument);
     if (needsDrive) {
       const afipRaw = await getTenantIntegrationConfig(tenantId, "AFIP");
       const afipBranding = normalizeAfipConfig(afipRaw);
-      const temporaryPdf = await createTemporaryInvoicePdf(payment, afipBranding);
+      const temporaryPdf = await createTemporaryInvoicePdf(payment, invoice, afipBranding);
 
       if (!temporaryPdf) {
         await updatePaymentStatus(tenantId, payment.id, "drive_pending", "No se pudo generar el PDF temporal.");
@@ -94,8 +117,8 @@ const worker = new Worker("invoices", async (job) => {
 
       try {
         const cuitFile = String(afipBranding.CUIT ?? "");
-        const invoiceNumber = String(payment.cbte_nro || "").split("-")[1] || String(payment.cbte_nro || "");
-        const fileName = `${cuitFile}_${payment.cbte_tipo?.toString().padStart(3, "0") ?? "000"}_${payment.pto_vta?.toString().padStart(5, "0") ?? "00000"}_${invoiceNumber}_${getTodaysDate()}.pdf`;
+        const invoiceNumber = String(invoice.cbteNro || "").split("-")[1] || String(invoice.cbteNro || "");
+        const fileName = `${cuitFile}_${invoice.cbteTipo?.toString().padStart(3, "0") ?? "000"}_${invoice.ptoVta?.toString().padStart(5, "0") ?? "00000"}_${invoiceNumber}_${getTodaysDate()}.pdf`;
         const driveFile = await uploadToDrive(temporaryPdf.filePath, fileName, {
           accessToken: googleCtx.accessToken,
           folderId: googleCtx.driveFolderId,
@@ -109,8 +132,16 @@ const worker = new Worker("invoices", async (job) => {
           throw new Error("No se pudo subir la factura al drive.");
         }
 
+        await recordAvailableInvoiceDocument(tenantId, invoice.id, {
+          type: "PDF",
+          storageProvider: "GOOGLE_DRIVE",
+          externalId: driveFile.id,
+          externalUrl: driveFile.webViewLink,
+          fileName,
+          mimeType: "application/pdf",
+        });
         payment.drive_file_link = driveFile.webViewLink;
-        await updatePayment(tenantId, payment.id, payment);
+        await updatePayment(tenantId, payment.id, { drive_file_link: driveFile.webViewLink });
         await logPaymentEvent(tenantId, payment.id, "drive_ok", "Factura subida a Drive", {
           driveFileLink: driveFile.webViewLink,
         });
