@@ -25,11 +25,12 @@ export function buildInvoicePaymentView(payment, invoice) {
     customer: invoice.customer ?? payment.customer,
     customer_doc_type: invoice.customerDocType ?? payment.customer_doc_type,
     customer_doc_number: invoice.customerDocNumber ?? payment.customer_doc_number,
-    cae: invoice.cae,
-    cae_vto: invoice.caeVto,
-    cbte_nro: invoice.cbteNro,
-    cbte_tipo: invoice.cbteTipo,
-    pto_vta: invoice.ptoVta,
+    cae: invoice.cae ?? null,
+    cae_vto: invoice.caeVto ?? null,
+    cbte_nro: invoice.cbteNro ?? null,
+    cbte_tipo: invoice.cbteTipo ?? null,
+    pto_vta: invoice.ptoVta ?? null,
+    pdf_path: null,
   };
 }
 
@@ -46,7 +47,7 @@ export function hydratePaymentWithInvoice(payment) {
 
   return {
     ...hydrated,
-    drive_file_link: driveDocument?.externalUrl ?? payment.drive_file_link,
+    drive_file_link: driveDocument?.externalUrl ?? null,
   };
 }
 

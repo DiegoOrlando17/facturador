@@ -33,7 +33,7 @@ export async function syncPaymentToSheets(tenantId, payment, { status, error = n
   if (!result) return { synced: false, reason: "write_failed" };
 
   payment.sheets_row = result.row;
-  await updatePayment(tenantId, payment.id, payment);
+  await updatePayment(tenantId, payment.id, { sheets_row: result.row });
   await logPaymentEvent(tenantId, payment.id, "sheets_ok", `Estado ${status} sincronizado en Sheets`, {
     row: result.row,
     status,

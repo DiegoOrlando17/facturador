@@ -5,7 +5,7 @@ import { Worker } from "bullmq";
 import { connection } from "../config/redis.js";
 import { invoicesQueue } from "../queues/invoices.queue.js";
 
-import { getPayment, updatePaymentStatus, updatePayment } from "../models/Payment.js";
+import { getPayment, updatePaymentStatus } from "../models/Payment.js";
 import {
     ensureAutomaticInvoiceForPayment,
     markInvoiceFailed,
@@ -62,15 +62,7 @@ const worker = new Worker("payments", async (job) => {
         invoice = await ensureAutomaticInvoiceForPayment(tenantId, payment);
 
         if (invoice.status === "ISSUED" && invoice.cae && invoice.cbteNro && invoice.caeVto) {
-            await updatePayment(tenantId, payment.id, {
-                status: "processing",
-                cae: invoice.cae,
-                cae_vto: invoice.caeVto,
-                cbte_nro: invoice.cbteNro,
-                cbte_tipo: invoice.cbteTipo,
-                pto_vta: invoice.ptoVta,
-                error: null,
-            });
+            await updatePaymentStatus(tenantId, payment.id, "processing");
             await logPaymentEvent(tenantId, payment.id, "payment_updated", "Emision ARCA omitida: factura ya emitida", {
                 invoiceId: invoice.id.toString(),
             });
@@ -153,13 +145,6 @@ const worker = new Worker("payments", async (job) => {
 
         await setLastCbteNro(seq.id, nextCbteNro);
 
-        payment.cae = cae;
-        payment.cae_vto = fechaVtoCae;
-        payment.cbte_nro = nroComprobante;
-        payment.cbte_tipo = cbteTipo;
-        payment.pto_vta = ptoVta;
-
-        await updatePayment(tenantId, payment.id, payment);
         await logPaymentEvent(tenantId, payment.id, "afip_ok", "Factura autorizada por AFIP", {
             cae,
             nroComprobante,

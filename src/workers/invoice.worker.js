@@ -3,7 +3,7 @@ import os from "os";
 import path from "path";
 import { Worker } from "bullmq";
 import { connection } from "../config/redis.js";
-import { getPayment, updatePayment, updatePaymentStatus } from "../models/Payment.js";
+import { getPayment, updatePaymentStatus } from "../models/Payment.js";
 import {
   buildInvoicePaymentView,
   getInvoiceByPaymentId,
@@ -89,10 +89,7 @@ const worker = new Worker("invoices", async (job) => {
       && document.externalUrl
     ));
 
-    if (driveDocument?.externalUrl && payment.drive_file_link !== driveDocument.externalUrl) {
-      payment.drive_file_link = driveDocument.externalUrl;
-      await updatePayment(tenantId, payment.id, { drive_file_link: driveDocument.externalUrl });
-    }
+    payment.drive_file_link = driveDocument?.externalUrl ?? null;
 
     if (googleRedelivery && driveDocument && payment.sheets_row) {
       await logPaymentEvent(tenantId, payment.id, "payment_updated", "Entrega Google omitida: ya estaba completa", {
@@ -141,7 +138,6 @@ const worker = new Worker("invoices", async (job) => {
           mimeType: "application/pdf",
         });
         payment.drive_file_link = driveFile.webViewLink;
-        await updatePayment(tenantId, payment.id, { drive_file_link: driveFile.webViewLink });
         await logPaymentEvent(tenantId, payment.id, "drive_ok", "Factura subida a Drive", {
           driveFileLink: driveFile.webViewLink,
         });

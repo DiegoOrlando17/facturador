@@ -1,6 +1,4 @@
 import { PrismaClient } from "@prisma/client";
-import fs from "fs/promises";
-import path from "path";
 import { decryptJson, encryptJson, maskSecrets } from "../utils/crypto.js";
 import { hashPassword } from "../utils/password.js";
 import { createTenantAuditLog } from "./tenantSupport.service.js";
@@ -264,59 +262,7 @@ export async function upsertTenantSubscription(tenantId, body = {}) {
   return subscription;
 }
 
-function resolveDeletableInvoicePath(pdfPath) {
-  if (!pdfPath) return null;
-
-  const cwd = process.cwd();
-  const invoicesDir = path.resolve(cwd, "facturas");
-  const resolved = path.isAbsolute(pdfPath)
-    ? path.resolve(pdfPath)
-    : path.resolve(cwd, pdfPath);
-  const relative = path.relative(invoicesDir, resolved);
-
-  if (relative.startsWith("..") || path.isAbsolute(relative)) {
-    return null;
-  }
-
-  return resolved;
-}
-
-async function deleteLocalInvoiceFiles(payments) {
-  const files = [
-    ...new Set(
-      payments
-        .map((payment) => resolveDeletableInvoicePath(payment.pdf_path))
-        .filter(Boolean)
-    ),
-  ];
-
-  const result = {
-    requested: files.length,
-    deleted: 0,
-    missing: 0,
-    failed: [],
-  };
-
-  for (const filePath of files) {
-    try {
-      await fs.unlink(filePath);
-      result.deleted += 1;
-    } catch (error) {
-      if (error.code === "ENOENT") {
-        result.missing += 1;
-      } else {
-        result.failed.push({
-          path: filePath,
-          error: error.message,
-        });
-      }
-    }
-  }
-
-  return result;
-}
-
-export async function deleteTenantWithData(slug, { deleteLocalFiles = true } = {}) {
+export async function deleteTenantWithData(slug, _options = {}) {
   const tenant = await prisma.tenant.findUnique({
     where: { slug },
     select: { id: true, slug: true, name: true, status: true },
@@ -324,18 +270,13 @@ export async function deleteTenantWithData(slug, { deleteLocalFiles = true } = {
 
   if (!tenant) return null;
 
-  const payments = await prisma.payment.findMany({
-    where: { tenantId: tenant.id },
-    select: { id: true, pdf_path: true },
-  });
-  const paymentIds = payments.map((payment) => payment.id);
-
   const counts = await prisma.$transaction(async (tx) => {
     const deleted = {};
 
-    deleted.paymentEvents = paymentIds.length > 0
-      ? (await tx.paymentEvent.deleteMany({ where: { tenantId: tenant.id } })).count
-      : 0;
+    deleted.invoiceDocuments = (await tx.invoiceDocument.deleteMany({ where: { tenantId: tenant.id } })).count;
+    deleted.invoiceEvents = (await tx.invoiceEvent.deleteMany({ where: { tenantId: tenant.id } })).count;
+    deleted.invoices = (await tx.invoice.deleteMany({ where: { tenantId: tenant.id } })).count;
+    deleted.paymentEvents = (await tx.paymentEvent.deleteMany({ where: { tenantId: tenant.id } })).count;
     deleted.payments = (await tx.payment.deleteMany({ where: { tenantId: tenant.id } })).count;
     deleted.invoiceSequences = (await tx.invoiceSequence.deleteMany({ where: { tenantId: tenant.id } })).count;
     deleted.integrationCheckpoints = (await tx.integrationCheckpoint.deleteMany({ where: { tenantId: tenant.id } })).count;
@@ -357,14 +298,10 @@ export async function deleteTenantWithData(slug, { deleteLocalFiles = true } = {
     integrationCache.delete(integrationCacheKey(tenant.id, provider));
   }
 
-  const files = deleteLocalFiles
-    ? await deleteLocalInvoiceFiles(payments)
-    : { requested: 0, deleted: 0, missing: 0, failed: [] };
-
   return {
     tenant,
     deleted: counts,
-    files,
+    files: { requested: 0, deleted: 0, missing: 0, failed: [] },
   };
 }
 

@@ -89,7 +89,7 @@ function buildPaymentWhere(filters = {}) {
     if (search) {
       where.OR = [
         { provider_payment_id: { contains: search, mode: "insensitive" } },
-        { cbte_nro: { contains: search, mode: "insensitive" } },
+        { invoice: { is: { cbteNro: { contains: search, mode: "insensitive" } } } },
         { customer: { contains: search, mode: "insensitive" } },
         { customer_doc_number: { contains: search, mode: "insensitive" } },
         { tenant: { is: { name: { contains: search, mode: "insensitive" } } } },
@@ -380,7 +380,7 @@ async function buildOperationalServices() {
 
 function getPaymentEventPresentation(event) {
   const provider = event.payment?.provider || "";
-  const cbte = event.payment?.cbte_nro ? ` ${event.payment.cbte_nro}` : "";
+  const cbte = event.payment?.invoice?.cbteNro ? ` ${event.payment.invoice.cbteNro}` : "";
 
   switch (event.type) {
     case "payment_detected":
@@ -435,7 +435,9 @@ async function listRecentActivity() {
           select: {
             id: true,
             provider: true,
-            cbte_nro: true,
+            invoice: {
+              select: { cbteNro: true },
+            },
           },
         },
       },

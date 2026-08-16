@@ -99,10 +99,6 @@ function validateCompletedFlow(payment, { requireDrive, requireSheets }) {
   if (!payment.invoice.cae || !payment.invoice.cbteNro || !payment.invoice.caeVto) {
     throw new Error("Invoice ISSUED no tiene datos fiscales completos");
   }
-  if (payment.cae !== payment.invoice.cae || payment.cbte_nro !== payment.invoice.cbteNro) {
-    throw new Error("El espejo fiscal de Payment no coincide con Invoice");
-  }
-
   const driveDocuments = payment.invoice.documents.filter((document) => (
     document.type === "PDF"
     && document.storageProvider === "GOOGLE_DRIVE"
@@ -243,11 +239,6 @@ async function main() {
       where: { id_tenantId: { id: payment.id, tenantId: tenant.id } },
       data: {
         status: "afip_pending",
-        cae: null,
-        cae_vto: null,
-        cbte_nro: null,
-        cbte_tipo: null,
-        pto_vta: null,
         error: null,
       },
     });
