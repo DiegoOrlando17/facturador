@@ -31,6 +31,15 @@ Validar tambien el modelo de lectura compatible utilizado por admin, portal y CS
 ```powershell
 npm run invoice:verify-read-model
 ```
+
+Con workers activos y ARCA/Google de prueba, ejecutar un flujo integral mediante un pago sintetico:
+
+```powershell
+npm run invoice:test-flow -- --tenant=SLUG --dry-run
+npm run invoice:test-flow -- --tenant=SLUG --amount=100 --require-drive --require-sheets
+```
+
+El comando solo acepta PostgreSQL local y ARCA en homologacion. La segunda ejecucion crea efectos reales en los recursos externos de prueba.
 - Mercado Pago, ARCA y los destinos Google se configuran por tenant; no se usan destinos o tokens Google globales como fallback.
 
 ## Documentacion
