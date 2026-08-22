@@ -15,7 +15,7 @@ test("el catalogo mantiene capacidades acumulativas", () => {
   assert.equal(hasEntitlement(policies[0], ENTITLEMENTS.GOOGLE_DRIVE_SHEETS), false);
   assert.equal(hasEntitlement(policies[2], ENTITLEMENTS.GOOGLE_DRIVE_SHEETS), true);
   assert.equal(hasEntitlement(policies[3], ENTITLEMENTS.OCR_IMPORT), true);
-  assert.equal(supportsProcessingMode(policies[1], "confirmation"), true);
+  assert.equal(supportsProcessingMode(policies[1], "scheduled"), true);
 });
 
 test("los limites comerciales indefinidos no se inventan", () => {

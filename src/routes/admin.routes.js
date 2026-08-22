@@ -57,6 +57,8 @@ import { createPlan, listPlans, updatePlan } from "../services/settings.service.
 import { createAdminToken } from "../utils/adminToken.js";
 import { maskSecrets } from "../utils/crypto.js";
 import { toBigIntId } from "../utils/bigint.js";
+import { normalizeTenantSchedule } from "../domain/tenantScheduler.js";
+import { getTenantSubscriptionPolicy } from "../services/subscriptionPolicy.service.js";
 
 const router = Router();
 
@@ -760,6 +762,10 @@ router.put("/tenants/:slug/integrations/:provider", async (req, res) => {
     const provider = validateProvider(req.params.provider);
     const enabled = req.body.enabled !== undefined ? Boolean(req.body.enabled) : true;
     const config = validateIntegrationConfig(provider, req.body.config);
+    if (provider === "MERCADOPAGO") {
+      const subscription = await getTenantSubscriptionPolicy(tenantId);
+      normalizeTenantSchedule(config, subscription?.policy);
+    }
 
     const row = await replaceTenantIntegrationConfig(tenantId, provider, config, { enabled });
     return res.json(normalizeJsonBigInts({

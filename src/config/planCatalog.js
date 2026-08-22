@@ -54,7 +54,6 @@ export const PLAN_CATALOG = [
 ].map((plan, index) => {
   const tier = index + 1;
   const allowedModes = ["realtime", "scheduled"];
-  if (plan.features.clientApproval) allowedModes.push("confirmation");
 
   const policy = buildPlanPolicy({
     tier,

@@ -2,6 +2,7 @@ import { PrismaClient } from "@prisma/client";
 import { decryptJson, encryptJson, maskSecrets } from "../utils/crypto.js";
 import { hashPassword } from "../utils/password.js";
 import { createTenantAuditLog } from "./tenantSupport.service.js";
+import { clearTenantSubscriptionPolicyCache } from "./subscriptionPolicy.service.js";
 
 const prisma = new PrismaClient();
 
@@ -259,6 +260,7 @@ export async function upsertTenantSubscription(tenantId, body = {}) {
         include: { plan: true },
       });
 
+  clearTenantSubscriptionPolicyCache(tenantId);
   return subscription;
 }
 

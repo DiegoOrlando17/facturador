@@ -16,6 +16,7 @@ export function normalizeMpConfig(mpCfg = {}) {
     POLLING_INTERVAL_MS: Number(mpCfg.POLLING_INTERVAL_MS ?? config.MP.POLLING_INTERVAL ?? 5000),
     RUNS_PER_DAY: mpCfg.RUNS_PER_DAY ? Number(mpCfg.RUNS_PER_DAY) : null,
     RUN_AT_TIMES: Array.isArray(mpCfg.RUN_AT_TIMES) ? mpCfg.RUN_AT_TIMES : [],
+    TIMEZONE: mpCfg.TIMEZONE ?? "America/Argentina/Buenos_Aires",
   };
 }
 

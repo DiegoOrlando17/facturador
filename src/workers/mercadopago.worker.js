@@ -10,51 +10,23 @@ import {
     getIntegrationCheckpoint,
     setIntegrationCheckpoint,
 } from "../services/tenantConfig.service.js";
+import { getTenantSubscriptionPolicy } from "../services/subscriptionPolicy.service.js";
+import { evaluateTenantSchedule, normalizeTenantSchedule } from "../domain/tenantScheduler.js";
 
 let isRunning = false;
 const tenantRuntime = new Map();
 
 const LOOP_INTERVAL_MS = 5000;
 
-function buildUniformRunTimes(runsPerDay) {
-    const count = Math.max(1, Number(runsPerDay || 1));
-    const step = Math.floor((24 * 60) / count);
-
-    return Array.from({ length: count }, (_, index) => {
-        const totalMinutes = index * step;
-        const hh = String(Math.floor(totalMinutes / 60)).padStart(2, "0");
-        const mm = String(totalMinutes % 60).padStart(2, "0");
-        return `${hh}:${mm}`;
-    });
-}
-
-function shouldRunNow(tenantId, mpCfg) {
-    const cfg = normalizeMpConfig(mpCfg);
-    const now = DateTime.now().setZone("America/Argentina/Buenos_Aires");
+async function shouldRunNow(tenantId, mpCfg) {
+    const subscription = await getTenantSubscriptionPolicy(tenantId);
+    const schedule = normalizeTenantSchedule(normalizeMpConfig(mpCfg), subscription?.policy);
+    const now = DateTime.utc();
     const runtimeKey = String(tenantId);
     const state = tenantRuntime.get(runtimeKey) ?? {};
-
-    if (cfg.POLLING_MODE === "realtime") {
-        const interval = Number(cfg.POLLING_INTERVAL_MS || 5000);
-        if (!state.lastRunAt || Date.now() - state.lastRunAt >= interval) {
-            tenantRuntime.set(runtimeKey, { ...state, lastRunAt: Date.now() });
-            return true;
-        }
-        return false;
-    }
-
-    const hhmm = now.toFormat("HH:mm");
-    const runTimes = cfg.RUN_AT_TIMES.length > 0
-        ? cfg.RUN_AT_TIMES
-        : buildUniformRunTimes(cfg.RUNS_PER_DAY ?? 1);
-    const slotKey = `${now.toISODate()}|${hhmm}`;
-
-    if (runTimes.includes(hhmm) && state.lastSlot !== slotKey) {
-        tenantRuntime.set(runtimeKey, { ...state, lastSlot: slotKey, lastRunAt: Date.now() });
-        return true;
-    }
-
-    return false;
+    const decision = evaluateTenantSchedule(schedule, state, now);
+    if (decision.shouldRun) tenantRuntime.set(runtimeKey, decision.runtime);
+    return decision.shouldRun;
 }
 
 async function pollTenant(tenantId, mpCfg) {
@@ -153,7 +125,7 @@ export async function startMercadopagoWorker() {
 
             for (const row of tenants) {
                 try {
-                    if (!shouldRunNow(row.tenantId, row.config)) {
+                    if (!(await shouldRunNow(row.tenantId, row.config))) {
                         continue;
                     }
                     await pollTenant(row.tenantId, row.config);
