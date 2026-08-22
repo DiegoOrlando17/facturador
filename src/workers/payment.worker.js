@@ -153,6 +153,10 @@ const worker = new Worker("payments", async (job) => {
 
         await enqueueInvoicePostProcess(tenantId, payment);
     } catch (err) {
+        if (err?.code === "STATE_CONFLICT") {
+            logger.warn(`Procesamiento omitido por transicion concurrente: ${err.message}`);
+            return;
+        }
         if (tenantId && payment && payment.status === "processing") {
             const errorMessage = err?.message || String(err);
             if (invoice && invoice.status !== "ISSUED") {

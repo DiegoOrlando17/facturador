@@ -1,4 +1,5 @@
 import { db } from "./db.js";
+import { assertPaymentTransition, stateConflict } from "../domain/processingState.js";
 
 /**
  * Inserta o actualiza un pago (idempotente).
@@ -38,14 +39,27 @@ export async function updatePayment(tenantId, id, data = {}) {
  * Actualiza solo el estado (status) de un pago.
  */
 export async function updatePaymentStatus(tenantId, id, newStatus, error = null) {
-  return db.payment.update({
-    where: { id_tenantId: { id, tenantId} },
-    data: {
-      status: newStatus,
-      error,
-      updatedAt: new Date(),
-    },
-    select: { id: true, tenantId: true, status: true, error: true, updatedAt: true },
+  return db.$transaction(async (tx) => {
+    const payment = await tx.payment.findUnique({
+      where: { id_tenantId: { id, tenantId } },
+      select: { status: true },
+    });
+    if (!payment) throw new Error(`Payment no encontrado: ${id}`);
+
+    assertPaymentTransition(payment.status, newStatus);
+
+    const result = await tx.payment.updateMany({
+      where: { id, tenantId, status: payment.status },
+      data: { status: newStatus, error, updatedAt: new Date() },
+    });
+    if (result.count !== 1) {
+      throw stateConflict(`Payment ${id} cambio de estado concurrentemente`);
+    }
+
+    return tx.payment.findUnique({
+      where: { id_tenantId: { id, tenantId } },
+      select: { id: true, tenantId: true, status: true, error: true, updatedAt: true },
+    });
   });
 }
 

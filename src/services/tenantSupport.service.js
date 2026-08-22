@@ -95,11 +95,18 @@ export async function reprocessPaymentAsAdmin(payment, adminUser, step = "auto")
 
   let resolvedStep = step;
   if (step === "auto") {
-    resolvedStep = payment.status === "afip_pending" ? "afip" : "post";
+    resolvedStep = payment.invoice?.status === "ISSUED" ? "post" : "afip";
   }
 
   if (!["afip", "post"].includes(resolvedStep)) {
     throw new Error("step invalido");
+  }
+
+  if (resolvedStep === "afip" && payment.invoice?.status === "ISSUED") {
+    throw new Error("La factura ya fue emitida; solo se permite reprocesar el postproceso");
+  }
+  if (resolvedStep === "post" && payment.invoice?.status !== "ISSUED") {
+    throw new Error("El postproceso requiere una factura emitida");
   }
 
   if (resolvedStep === "afip") {

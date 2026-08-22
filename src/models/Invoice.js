@@ -1,4 +1,5 @@
 import { db } from "./db.js";
+import { assertInvoiceTransition, stateConflict } from "../domain/processingState.js";
 
 function serializePayload(payload) {
   if (!payload) return null;
@@ -150,12 +151,17 @@ export async function recordAvailableInvoiceDocument(tenantId, invoiceId, {
 }
 
 export async function markInvoiceIssuing(tenantId, invoiceId, previousStatus) {
-  const [, event] = await db.$transaction([
-    db.invoice.update({
-      where: { invoice_id_tenantId: { id: invoiceId, tenantId } },
+  assertInvoiceTransition(previousStatus, "ISSUING");
+  return db.$transaction(async (tx) => {
+    const result = await tx.invoice.updateMany({
+      where: { id: invoiceId, tenantId, status: previousStatus },
       data: { status: "ISSUING", error: null },
-    }),
-    db.invoiceEvent.create({
+    });
+    if (result.count !== 1) {
+      throw stateConflict(`Invoice ${invoiceId} cambio de estado concurrentemente`);
+    }
+
+    return tx.invoiceEvent.create({
       data: {
         tenantId,
         invoiceId,
@@ -163,19 +169,27 @@ export async function markInvoiceIssuing(tenantId, invoiceId, previousStatus) {
         message: "Inicio de emision ARCA",
         payloadJson: serializePayload({ previousStatus }),
       },
-    }),
-  ]);
-
-  return event;
+    });
+  });
 }
 
 export async function markInvoiceFailed(tenantId, invoiceId, message, payload = null) {
-  const [invoice] = await db.$transaction([
-    db.invoice.update({
+  return db.$transaction(async (tx) => {
+    const current = await tx.invoice.findUnique({
+      where: { invoice_id_tenantId: { id: invoiceId, tenantId } },
+      select: { status: true },
+    });
+    if (!current) throw new Error(`Invoice no encontrada: ${invoiceId}`);
+    if (current.status === "FAILED") {
+      return tx.invoice.findUnique({ where: { invoice_id_tenantId: { id: invoiceId, tenantId } } });
+    }
+    assertInvoiceTransition(current.status, "FAILED");
+
+    const invoice = await tx.invoice.update({
       where: { invoice_id_tenantId: { id: invoiceId, tenantId } },
       data: { status: "FAILED", error: message },
-    }),
-    db.invoiceEvent.create({
+    });
+    await tx.invoiceEvent.create({
       data: {
         tenantId,
         invoiceId,
@@ -183,16 +197,22 @@ export async function markInvoiceFailed(tenantId, invoiceId, message, payload = 
         message,
         payloadJson: serializePayload(payload),
       },
-    }),
-  ]);
-
-  return invoice;
+    });
+    return invoice;
+  });
 }
 
 export async function markInvoiceIssued(tenantId, invoiceId, fiscalData) {
   const issuedAt = new Date();
-  const [invoice] = await db.$transaction([
-    db.invoice.update({
+  return db.$transaction(async (tx) => {
+    const current = await tx.invoice.findUnique({
+      where: { invoice_id_tenantId: { id: invoiceId, tenantId } },
+      select: { status: true },
+    });
+    if (!current) throw new Error(`Invoice no encontrada: ${invoiceId}`);
+    assertInvoiceTransition(current.status, "ISSUED");
+
+    const invoice = await tx.invoice.update({
       where: { invoice_id_tenantId: { id: invoiceId, tenantId } },
       data: {
         status: "ISSUED",
@@ -204,8 +224,8 @@ export async function markInvoiceIssued(tenantId, invoiceId, fiscalData) {
         issuedAt,
         error: null,
       },
-    }),
-    db.invoiceEvent.create({
+    });
+    await tx.invoiceEvent.create({
       data: {
         tenantId,
         invoiceId,
@@ -213,8 +233,7 @@ export async function markInvoiceIssued(tenantId, invoiceId, fiscalData) {
         message: "Comprobante autorizado por ARCA",
         payloadJson: serializePayload(fiscalData),
       },
-    }),
-  ]);
-
-  return invoice;
+    });
+    return invoice;
+  });
 }
