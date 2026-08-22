@@ -1,4 +1,5 @@
 import { db } from "../models/db.js";
+import { resolvePlanPolicy } from "../domain/planPolicy.js";
 
 const VALID_PLAN_STATUSES = new Set(["ACTIVE", "DISABLED"]);
 const VALID_BILLING_CYCLES = new Set(["monthly", "yearly", "one_time"]);
@@ -14,6 +15,7 @@ function normalizePlan(plan) {
     status: plan.status,
     description: plan.description,
     featuresJson: plan.featuresJson,
+    policy: resolvePlanPolicy(plan),
     createdSubscriptions: plan._count?.subscriptions ?? undefined,
   };
 }
@@ -68,7 +70,15 @@ function normalizePlanPayload(body, { partial = false } = {}) {
   }
 
   if (body.featuresJson !== undefined) {
-    data.featuresJson = String(body.featuresJson || "").trim() || null;
+    const featuresJson = String(body.featuresJson || "").trim() || null;
+    if (featuresJson) {
+      try {
+        JSON.parse(featuresJson);
+      } catch {
+        throw new Error("featuresJson debe ser JSON valido");
+      }
+    }
+    data.featuresJson = featuresJson;
   }
 
   return data;

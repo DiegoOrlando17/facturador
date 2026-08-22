@@ -54,6 +54,7 @@ export function summarizeSubscription(subscription) {
       planName: null,
       billingProvider: null,
       billingRef: null,
+      policy: null,
     };
   }
 
@@ -65,6 +66,7 @@ export function summarizeSubscription(subscription) {
     planName: subscription.plan?.name ?? null,
     billingProvider: subscription.billingProvider ?? null,
     billingRef: subscription.billingRef ?? null,
+    policy: subscription.plan ? resolvePlanPolicy(subscription.plan) : null,
     updatedAt: subscription.updatedAt,
   };
 }
@@ -184,3 +186,4 @@ export function buildDashboardCards(summary) {
     },
   ];
 }
+import { resolvePlanPolicy } from "../domain/planPolicy.js";

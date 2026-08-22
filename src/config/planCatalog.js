@@ -1,5 +1,6 @@
+import { buildPlanPolicy } from "../domain/planPolicy.js";
+
 const baseFeatures = {
-  tier: 1,
   clientPortal: true,
   automaticInvoicing: true,
   realtimeProcessing: true,
@@ -9,7 +10,6 @@ const baseFeatures = {
 
 const tier2Features = {
   ...baseFeatures,
-  tier: 2,
   clientApproval: true,
   deferredAutomaticInvoicing: true,
   creditNotes: true,
@@ -17,14 +17,12 @@ const tier2Features = {
 
 const tier3Features = {
   ...tier2Features,
-  tier: 3,
   manualInvoicing: true,
   googleDriveSheets: true,
 };
 
 const tier4Features = {
   ...tier3Features,
-  tier: 4,
   ocrImport: true,
 };
 
@@ -53,11 +51,34 @@ export const PLAN_CATALOG = [
     description: "Incluye Tier 3 y generacion asistida por OCR desde documentos.",
     features: tier4Features,
   },
-].map((plan) => ({
-  ...plan,
-  price: null,
-  currency: "ARS",
-  billingCycle: "monthly",
-  status: "ACTIVE",
-  featuresJson: JSON.stringify(plan.features, null, 2),
-}));
+].map((plan, index) => {
+  const tier = index + 1;
+  const allowedModes = ["realtime", "scheduled"];
+  if (plan.features.clientApproval) allowedModes.push("confirmation");
+
+  const policy = buildPlanPolicy({
+    tier,
+    entitlements: plan.features,
+    limits: {
+      monthlyInvoices: null,
+      tenantUsers: null,
+      manualInvoicesMonthly: null,
+      ocrDocumentsMonthly: null,
+    },
+    processing: {
+      allowedModes,
+      defaultMode: "realtime",
+      minRealtimeIntervalMs: null,
+      maxRunsPerDay: null,
+    },
+  });
+
+  return {
+    ...plan,
+    price: null,
+    currency: "ARS",
+    billingCycle: "monthly",
+    status: "ACTIVE",
+    featuresJson: JSON.stringify(policy, null, 2),
+  };
+});

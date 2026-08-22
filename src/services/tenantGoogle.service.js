@@ -2,13 +2,14 @@ import axios from "axios";
 import crypto from "crypto";
 import { google } from "googleapis";
 import { config } from "../config/index.js";
+import { ENTITLEMENTS, hasEntitlement } from "../domain/planPolicy.js";
 import {
-  getTenantActivePlan,
   resolveTenantIdBySlug,
   tryGetTenantIntegrationConfig,
   upsertTenantIntegrationConfig,
   listEnabledTenantsByIntegration,
 } from "./tenantConfig.service.js";
+import { getTenantSubscriptionPolicy } from "./subscriptionPolicy.service.js";
 
 export const GOOGLE_SCOPES = [
   "https://www.googleapis.com/auth/drive.file",
@@ -45,21 +46,6 @@ function parseScopes(value) {
   if (Array.isArray(value)) return value;
   if (typeof value === "string") return value.split(" ").filter(Boolean);
   return GOOGLE_SCOPES;
-}
-
-function planHasGoogleDelivery(plan) {
-  if (!plan?.featuresJson) return false;
-
-  try {
-    const features = JSON.parse(plan.featuresJson);
-    if (Array.isArray(features)) {
-      return features.includes("googleDriveSheets");
-    }
-
-    return features?.googleDriveSheets === true;
-  } catch {
-    return false;
-  }
 }
 
 export function buildGoogleOAuthState({
@@ -188,8 +174,8 @@ export async function connectTenantGoogleFromCallback({ code, state }) {
 }
 
 export async function getGoogleInvoiceContext(tenantId) {
-  const plan = await getTenantActivePlan(tenantId);
-  if (!planHasGoogleDelivery(plan)) return null;
+  const subscription = await getTenantSubscriptionPolicy(tenantId);
+  if (!hasEntitlement(subscription?.policy, ENTITLEMENTS.GOOGLE_DRIVE_SHEETS)) return null;
 
   const drive = await tryGetTenantIntegrationConfig(tenantId, "DRIVE");
   const sheets = await tryGetTenantIntegrationConfig(tenantId, "SHEETS");
@@ -221,8 +207,8 @@ export async function getGoogleInvoiceContext(tenantId) {
 }
 
 export async function getTenantSheetsContext(tenantId) {
-  const plan = await getTenantActivePlan(tenantId);
-  if (!planHasGoogleDelivery(plan)) return null;
+  const subscription = await getTenantSubscriptionPolicy(tenantId);
+  if (!hasEntitlement(subscription?.policy, ENTITLEMENTS.GOOGLE_DRIVE_SHEETS)) return null;
 
   const sheets = await tryGetTenantIntegrationConfig(tenantId, "SHEETS");
   if (!sheets) return null;
