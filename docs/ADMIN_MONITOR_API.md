@@ -574,6 +574,8 @@ Body:
 
 Lista usuarios del tenant.
 
+La respuesta nunca incluye `passwordHash`.
+
 ### `PUT /admin/tenants/:slug/users`
 
 Body:
@@ -610,7 +612,7 @@ Notas:
 
 Query param opcional:
 
-- `revealSecrets=true`
+- `revealSecrets=true` requiere rol `SUPERADMIN`
 
 ### `PUT /admin/tenants/:slug/integrations/:provider`
 

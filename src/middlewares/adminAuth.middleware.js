@@ -1,5 +1,6 @@
 import { findAdminUserById, sanitizeAdminUser } from "../services/adminUser.service.js";
 import { verifyAdminToken } from "../utils/adminToken.js";
+import { adminRoleHasPermission } from "../domain/permissions.js";
 
 function readBearerToken(req) {
   const header = String(req.headers.authorization || "");
@@ -34,4 +35,23 @@ export async function requireAdminAuth(req, res, next) {
   } catch (error) {
     return res.status(401).json({ error: error.message || "No autorizado" });
   }
+}
+
+export function assertAdminPermission(req, permission) {
+  if (!adminRoleHasPermission(req.adminAuth?.adminUser?.role, permission)) {
+    const error = new Error("Permiso admin insuficiente");
+    error.statusCode = 403;
+    throw error;
+  }
+}
+
+export function requireAdminPermission(permission) {
+  return (req, res, next) => {
+    try {
+      assertAdminPermission(req, permission);
+      return next();
+    } catch (error) {
+      return res.status(403).json({ error: error.message });
+    }
+  };
 }

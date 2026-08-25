@@ -1,5 +1,6 @@
 import { Router } from "express";
-import { requireAdminAuth } from "../middlewares/adminAuth.middleware.js";
+import { assertAdminPermission, requireAdminAuth, requireAdminPermission } from "../middlewares/adminAuth.middleware.js";
+import { ADMIN_PERMISSIONS } from "../domain/permissions.js";
 import {
   authenticateAdminUser,
   createManagedAdminUser,
@@ -96,14 +97,6 @@ function normalizeSlug(value) {
     .replace(/[^a-z0-9-]/g, "-")
     .replace(/-+/g, "-")
     .replace(/^-|-$/g, "");
-}
-
-function requireSuperadmin(req) {
-  if (req.adminAuth?.adminUser?.role !== "SUPERADMIN") {
-    const error = new Error("Solo SUPERADMIN puede realizar esta accion");
-    error.statusCode = 403;
-    throw error;
-  }
 }
 
 function validateTenantPayload(body, { partial = false } = {}) {
@@ -224,9 +217,8 @@ router.patch("/me", async (req, res) => {
   }
 });
 
-router.get("/users", async (req, res) => {
+router.get("/users", requireAdminPermission(ADMIN_PERMISSIONS.MANAGE_ADMINS), async (req, res) => {
   try {
-    requireSuperadmin(req);
     const users = await listAdminUsers();
     return res.json(normalizeJsonBigInts({
       items: users,
@@ -237,9 +229,8 @@ router.get("/users", async (req, res) => {
   }
 });
 
-router.post("/users", async (req, res) => {
+router.post("/users", requireAdminPermission(ADMIN_PERMISSIONS.MANAGE_ADMINS), async (req, res) => {
   try {
-    requireSuperadmin(req);
     const user = await createManagedAdminUser({
       name: req.body.name,
       email: req.body.email,
@@ -254,9 +245,8 @@ router.post("/users", async (req, res) => {
   }
 });
 
-router.patch("/users/:id", async (req, res) => {
+router.patch("/users/:id", requireAdminPermission(ADMIN_PERMISSIONS.MANAGE_ADMINS), async (req, res) => {
   try {
-    requireSuperadmin(req);
     const user = await updateManagedAdminUser(req.params.id, {
       name: req.body.name,
       email: req.body.email,
@@ -271,9 +261,8 @@ router.patch("/users/:id", async (req, res) => {
   }
 });
 
-router.get("/settings/plans", async (req, res) => {
+router.get("/settings/plans", requireAdminPermission(ADMIN_PERMISSIONS.MANAGE_PLANS), async (req, res) => {
   try {
-    requireSuperadmin(req);
     const plans = await listPlans();
     return res.json(normalizeJsonBigInts({
       items: plans,
@@ -284,9 +273,8 @@ router.get("/settings/plans", async (req, res) => {
   }
 });
 
-router.post("/settings/plans", async (req, res) => {
+router.post("/settings/plans", requireAdminPermission(ADMIN_PERMISSIONS.MANAGE_PLANS), async (req, res) => {
   try {
-    requireSuperadmin(req);
     const plan = await createPlan(req.body);
     return res.status(201).json(normalizeJsonBigInts(plan));
   } catch (error) {
@@ -294,9 +282,8 @@ router.post("/settings/plans", async (req, res) => {
   }
 });
 
-router.patch("/settings/plans/:id", async (req, res) => {
+router.patch("/settings/plans/:id", requireAdminPermission(ADMIN_PERMISSIONS.MANAGE_PLANS), async (req, res) => {
   try {
-    requireSuperadmin(req);
     const plan = await updatePlan(req.params.id, req.body);
     return res.json(normalizeJsonBigInts(plan));
   } catch (error) {
@@ -413,7 +400,7 @@ router.get("/payments/:id/pdf", async (req, res) => {
   }
 });
 
-router.post("/payments/:id/reprocess", async (req, res) => {
+router.post("/payments/:id/reprocess", requireAdminPermission(ADMIN_PERMISSIONS.OPERATE), async (req, res) => {
   try {
     const paymentId = toBigIntId(req.params.id, "paymentId");
     const payment = await getAdminPaymentDetail(paymentId);
@@ -439,7 +426,7 @@ router.post("/payments/:id/reprocess", async (req, res) => {
   }
 });
 
-router.post("/payments/:id/deliver-google", async (req, res) => {
+router.post("/payments/:id/deliver-google", requireAdminPermission(ADMIN_PERMISSIONS.OPERATE), async (req, res) => {
   try {
     const paymentId = toBigIntId(req.params.id, "paymentId");
     const payment = await getAdminPaymentDetail(paymentId);
@@ -473,7 +460,7 @@ router.get("/tenants", async (_req, res) => {
   }
 });
 
-router.post("/tenants", async (req, res) => {
+router.post("/tenants", requireAdminPermission(ADMIN_PERMISSIONS.MANAGE_TENANTS), async (req, res) => {
   try {
     const integrations = req.body.integrations && typeof req.body.integrations === "object"
       ? req.body.integrations
@@ -651,7 +638,7 @@ router.get("/tenants/:slug/notes", async (req, res) => {
   }
 });
 
-router.post("/tenants/:slug/notes", async (req, res) => {
+router.post("/tenants/:slug/notes", requireAdminPermission(ADMIN_PERMISSIONS.OPERATE), async (req, res) => {
   try {
     const tenantId = await resolveTenantIdBySlug(req.params.slug);
     const title = String(req.body.title || "").trim();
@@ -668,7 +655,7 @@ router.post("/tenants/:slug/notes", async (req, res) => {
   }
 });
 
-router.patch("/tenants/:slug", async (req, res) => {
+router.patch("/tenants/:slug", requireAdminPermission(ADMIN_PERMISSIONS.MANAGE_TENANTS), async (req, res) => {
   try {
     const tenant = await updateTenant(req.params.slug, validateTenantPayload(req.body, { partial: true }));
     return res.json(normalizeJsonBigInts(tenant));
@@ -677,7 +664,7 @@ router.patch("/tenants/:slug", async (req, res) => {
   }
 });
 
-router.put("/tenants/:slug/profile", async (req, res) => {
+router.put("/tenants/:slug/profile", requireAdminPermission(ADMIN_PERMISSIONS.MANAGE_TENANTS), async (req, res) => {
   try {
     const tenantId = await resolveTenantIdBySlug(req.params.slug);
     const profile = await upsertTenantProfile(tenantId, req.body);
@@ -687,7 +674,7 @@ router.put("/tenants/:slug/profile", async (req, res) => {
   }
 });
 
-router.post("/tenants/:slug/profile/review", async (req, res) => {
+router.post("/tenants/:slug/profile/review", requireAdminPermission(ADMIN_PERMISSIONS.OPERATE), async (req, res) => {
   try {
     const tenantId = await resolveTenantIdBySlug(req.params.slug);
     const profile = await reviewTenantProfile(tenantId, req.adminAuth.adminUser, {
@@ -700,9 +687,8 @@ router.post("/tenants/:slug/profile/review", async (req, res) => {
   }
 });
 
-router.put("/tenants/:slug/subscription", async (req, res) => {
+router.put("/tenants/:slug/subscription", requireAdminPermission(ADMIN_PERMISSIONS.MANAGE_SUBSCRIPTIONS), async (req, res) => {
   try {
-    requireSuperadmin(req);
     const tenantId = await resolveTenantIdBySlug(req.params.slug);
     const subscription = await upsertTenantSubscription(tenantId, req.body);
     return res.json(normalizeJsonBigInts(subscription));
@@ -711,7 +697,7 @@ router.put("/tenants/:slug/subscription", async (req, res) => {
   }
 });
 
-router.delete("/tenants/:slug", async (req, res) => {
+router.delete("/tenants/:slug", requireAdminPermission(ADMIN_PERMISSIONS.DELETE_TENANT), async (req, res) => {
   try {
     const deleteLocalFiles = String(req.query.deleteLocalFiles || "true") !== "false";
     const result = await deleteTenantWithData(req.params.slug, { deleteLocalFiles });
@@ -733,14 +719,15 @@ router.get("/tenants/:slug/integrations", async (req, res) => {
   try {
     const tenantId = await resolveTenantIdBySlug(req.params.slug);
     const revealSecrets = String(req.query.revealSecrets || "false") === "true";
+    if (revealSecrets) assertAdminPermission(req, ADMIN_PERMISSIONS.REVEAL_SECRETS);
     const integrations = await listTenantIntegrations(tenantId, { revealSecrets });
     return res.json(normalizeJsonBigInts(integrations));
   } catch (error) {
-    return res.status(400).json({ error: error.message || "No se pudieron listar integraciones" });
+    return res.status(error.statusCode || 400).json({ error: error.message || "No se pudieron listar integraciones" });
   }
 });
 
-router.post("/tenants/:slug/integrations/mercadopago/start", async (req, res) => {
+router.post("/tenants/:slug/integrations/mercadopago/start", requireAdminPermission(ADMIN_PERMISSIONS.OPERATE), async (req, res) => {
   try {
     const tenantId = await resolveTenantIdBySlug(req.params.slug);
     const processingStartDate = req.body.processingStartDate || req.body.startDate;
@@ -756,7 +743,7 @@ router.post("/tenants/:slug/integrations/mercadopago/start", async (req, res) =>
   }
 });
 
-router.put("/tenants/:slug/integrations/:provider", async (req, res) => {
+router.put("/tenants/:slug/integrations/:provider", requireAdminPermission(ADMIN_PERMISSIONS.MANAGE_TENANTS), async (req, res) => {
   try {
     const tenantId = await resolveTenantIdBySlug(req.params.slug);
     const provider = validateProvider(req.params.provider);
@@ -780,7 +767,7 @@ router.put("/tenants/:slug/integrations/:provider", async (req, res) => {
   }
 });
 
-router.post("/tenants/:slug/integrations/:provider/test", async (req, res) => {
+router.post("/tenants/:slug/integrations/:provider/test", requireAdminPermission(ADMIN_PERMISSIONS.OPERATE), async (req, res) => {
   try {
     const tenantId = await resolveTenantIdBySlug(req.params.slug);
     const provider = validateProvider(req.params.provider);
@@ -807,6 +794,7 @@ router.get("/tenants/:slug/onboarding", async (req, res) => {
   try {
     const tenantId = await resolveTenantIdBySlug(req.params.slug);
     const revealSecrets = String(req.query.revealSecrets || "false") === "true";
+    if (revealSecrets) assertAdminPermission(req, ADMIN_PERMISSIONS.REVEAL_SECRETS);
     const items = await listTenantOnboardingSubmissions(tenantId, {
       status: req.query.status,
       revealSecrets,
@@ -816,7 +804,7 @@ router.get("/tenants/:slug/onboarding", async (req, res) => {
       total: items.length,
     }));
   } catch (error) {
-    return res.status(400).json({ error: error.message || "No se pudo listar onboarding" });
+    return res.status(error.statusCode || 400).json({ error: error.message || "No se pudo listar onboarding" });
   }
 });
 
@@ -825,16 +813,17 @@ router.get("/tenants/:slug/onboarding/:submissionId", async (req, res) => {
     const tenantId = await resolveTenantIdBySlug(req.params.slug);
     const submissionId = toBigIntId(req.params.submissionId, "submissionId");
     const revealSecrets = String(req.query.revealSecrets || "false") === "true";
+    if (revealSecrets) assertAdminPermission(req, ADMIN_PERMISSIONS.REVEAL_SECRETS);
     const item = await getTenantOnboardingSubmission(tenantId, submissionId, { revealSecrets });
 
     if (!item) return res.status(404).json({ error: "Onboarding no encontrado" });
     return res.json(normalizeJsonBigInts(item));
   } catch (error) {
-    return res.status(400).json({ error: error.message || "No se pudo obtener onboarding" });
+    return res.status(error.statusCode || 400).json({ error: error.message || "No se pudo obtener onboarding" });
   }
 });
 
-router.post("/tenants/:slug/onboarding/:submissionId/approve", async (req, res) => {
+router.post("/tenants/:slug/onboarding/:submissionId/approve", requireAdminPermission(ADMIN_PERMISSIONS.OPERATE), async (req, res) => {
   try {
     const tenantId = await resolveTenantIdBySlug(req.params.slug);
     const submissionId = toBigIntId(req.params.submissionId, "submissionId");
@@ -854,7 +843,7 @@ router.post("/tenants/:slug/onboarding/:submissionId/approve", async (req, res) 
   }
 });
 
-router.post("/tenants/:slug/onboarding/:submissionId/reject", async (req, res) => {
+router.post("/tenants/:slug/onboarding/:submissionId/reject", requireAdminPermission(ADMIN_PERMISSIONS.OPERATE), async (req, res) => {
   try {
     const tenantId = await resolveTenantIdBySlug(req.params.slug);
     const submissionId = toBigIntId(req.params.submissionId, "submissionId");
@@ -882,7 +871,7 @@ router.get("/tenants/:slug/users", async (req, res) => {
   }
 });
 
-router.put("/tenants/:slug/users", async (req, res) => {
+router.put("/tenants/:slug/users", requireAdminPermission(ADMIN_PERMISSIONS.MANAGE_TENANTS), async (req, res) => {
   try {
     const tenantId = await resolveTenantIdBySlug(req.params.slug);
     const email = String(req.body.email || "").trim().toLowerCase();

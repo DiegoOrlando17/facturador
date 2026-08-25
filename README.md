@@ -2,10 +2,20 @@
 
 Facturador de mercado pago.
 
+## Roles y permisos
+
+- Admin `SUPERADMIN`: acceso completo, incluidos admins, planes, suscripciones, eliminacion de tenants y revelacion explicita de secretos.
+- Admin `OPERATOR`: lectura y operacion cotidiana de tenants; no administra privilegios globales ni elimina tenants.
+- Admin `VIEWER`: solo lectura.
+- Portal `owner/admin`: lectura y acciones operativas disponibles.
+- Portal `approver/viewer`: solo lectura hasta implementar el flujo formal de aprobacion.
+
+Los secretos se devuelven enmascarados por defecto y `passwordHash` nunca forma parte de las respuestas de usuarios tenant. La matriz completa esta en `../docs/ai/SECURITY_PERMISSIONS.md`.
+
 ## Entregas de comprobantes
 
 - Todo comprobante emitido en ARCA puede descargarse como PDF; se genera en memoria cuando el usuario lo solicita y no se persiste localmente.
-- Drive/Sheets es opcional y se procesa solo para tenants con suscripcion activa, plan con `featuresJson.googleDriveSheets: true` e integraciones `DRIVE` y `SHEETS` completas.
+- Drive/Sheets es opcional y se procesa solo para tenants con suscripcion activa, entitlement `googleDriveSheets` e integraciones `DRIVE` y `SHEETS` completas.
 - Para Drive, el worker genera un PDF temporal y lo elimina despues del intento de subida, incluso si falla.
 - Desde el detalle admin de un comprobante ya emitido se puede solicitar `Subir a Drive y Sheets`. La accion omite destinos ya registrados y no vuelve a emitir en ARCA.
 - Sheets funciona como registro operativo: agrega una fila por pago y actualiza esa misma fila con estado `ERROR` u `OK` en cada intento. Los errores ARCA se registran aunque no exista PDF; Drive solo aplica a comprobantes emitidos.

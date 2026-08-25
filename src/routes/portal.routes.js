@@ -1,5 +1,6 @@
 import { Router } from "express";
-import { requireTenantAuth } from "../middlewares/tenantAuth.middleware.js";
+import { requireTenantAuth, requireTenantPermission } from "../middlewares/tenantAuth.middleware.js";
+import { TENANT_PERMISSIONS } from "../domain/permissions.js";
 import {
   authenticateTenantUser,
   getTenantPortalPaymentDetail,
@@ -193,7 +194,7 @@ router.get("/integrations", async (req, res) => {
   }
 });
 
-router.post("/integrations/:provider/test", async (req, res) => {
+router.post("/integrations/:provider/test", requireTenantPermission(TENANT_PERMISSIONS.TEST_INTEGRATIONS), async (req, res) => {
   try {
     const provider = String(req.params.provider || "").trim().toUpperCase();
     if (!TESTABLE_PROVIDERS.has(provider)) {
@@ -230,7 +231,7 @@ router.get("/onboarding", async (req, res) => {
   }
 });
 
-router.post("/onboarding", async (req, res) => {
+router.post("/onboarding", requireTenantPermission(TENANT_PERMISSIONS.SUBMIT_ONBOARDING), async (req, res) => {
   try {
     const submission = await createTenantOnboardingSubmission(
       req.tenantAuth.tenantId,

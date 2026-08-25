@@ -1,5 +1,6 @@
 import { getTenantPortalUserById } from "../services/tenantPortal.service.js";
 import { verifyTenantToken } from "../utils/tenantToken.js";
+import { tenantRoleHasPermission } from "../domain/permissions.js";
 
 function readBearerToken(req) {
   const header = String(req.headers.authorization || "");
@@ -34,4 +35,13 @@ export async function requireTenantAuth(req, res, next) {
   } catch (error) {
     return res.status(401).json({ error: error.message || "No autorizado" });
   }
+}
+
+export function requireTenantPermission(permission) {
+  return (req, res, next) => {
+    if (!tenantRoleHasPermission(req.tenantAuth?.tenantUser?.role, permission)) {
+      return res.status(403).json({ error: "Permiso de portal insuficiente" });
+    }
+    return next();
+  };
 }

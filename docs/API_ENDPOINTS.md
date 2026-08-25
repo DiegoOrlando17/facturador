@@ -1105,7 +1105,7 @@ Auth:
 
 Query params:
 
-- `revealSecrets` opcional. Si es `true`, devuelve secretos desencriptados. Por defecto los enmascara.
+- `revealSecrets` opcional. Si es `true`, devuelve secretos desencriptados y requiere rol `SUPERADMIN`. Por defecto los enmascara.
 
 Response `200`:
 
@@ -1468,7 +1468,6 @@ Response `200`:
     "tenantId": "1",
     "email": "owner@cliente.com",
     "role": "owner",
-    "passwordHash": "$2...",
     "status": "ACTIVE",
     "lastLoginAt": "2026-04-18T12:00:00.000Z",
     "createdAt": "2026-04-18T10:00:00.000Z",
@@ -1477,7 +1476,7 @@ Response `200`:
 ]
 ```
 
-Nota: este endpoint devuelve actualmente el registro completo de `TenantUser`, incluido `passwordHash`.
+Nota: `passwordHash` nunca se incluye en la respuesta.
 
 ### `PUT /admin/tenants/:slug/users`
 
@@ -1513,7 +1512,6 @@ Response `200`:
   "tenantId": "1",
   "email": "owner@cliente.com",
   "role": "owner",
-  "passwordHash": "$2...",
   "status": "ACTIVE",
   "lastLoginAt": null,
   "createdAt": "2026-04-18T10:00:00.000Z",

@@ -8,6 +8,16 @@ const prisma = new PrismaClient();
 
 const tenantIdCache = new Map();
 const integrationCache = new Map();
+const SAFE_TENANT_USER_SELECT = {
+  id: true,
+  tenantId: true,
+  email: true,
+  role: true,
+  status: true,
+  lastLoginAt: true,
+  createdAt: true,
+  updatedAt: true,
+};
 
 function integrationCacheKey(tenantId, provider) {
   return `${tenantId}:${provider}`;
@@ -45,6 +55,7 @@ export async function getTenantBySlug(slug) {
       profile: true,
       users: {
         orderBy: [{ role: "asc" }, { email: "asc" }],
+        select: SAFE_TENANT_USER_SELECT,
       },
       subscriptions: {
         include: {
@@ -75,6 +86,7 @@ export async function listTenants() {
       },
       users: {
         orderBy: [{ role: "asc" }, { email: "asc" }],
+        select: SAFE_TENANT_USER_SELECT,
       },
       subscriptions: {
         include: {
@@ -485,6 +497,7 @@ export async function listTenantUsers(tenantId) {
   return prisma.tenantUser.findMany({
     where: { tenantId },
     orderBy: [{ role: "asc" }, { email: "asc" }],
+    select: SAFE_TENANT_USER_SELECT,
   });
 }
 
@@ -540,5 +553,6 @@ export async function addOrUpdateTenantUserWithAuth(
       status: status ?? "ACTIVE",
       passwordHash: data.passwordHash ?? null,
     },
+    select: SAFE_TENANT_USER_SELECT,
   });
 }
