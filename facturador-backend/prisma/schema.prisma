@@ -1,0 +1,466 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  PAST_DUE
+  CANCELED
+}
+
+enum TenantStatus {
+  ACTIVE
+  DISABLED
+}
+
+enum AdminUserRole {
+  SUPERADMIN
+  OPERATOR
+  VIEWER
+}
+
+enum AdminUserStatus {
+  ACTIVE
+  DISABLED
+}
+
+enum TenantUserStatus {
+  ACTIVE
+  DISABLED
+}
+
+enum IntegrationProvider {
+  MERCADOPAGO
+  AFIP
+  DRIVE
+  SHEETS
+}
+
+enum PaymentStatus {
+  pending
+  processing
+  afip_pending
+  pdf_pending
+  drive_pending
+  sheets_pending
+  complete
+  failed
+}
+
+enum PaymentEventType {
+  payment_detected
+  payment_updated
+  invoice_requested
+  afip_ok
+  pdf_ok
+  drive_ok
+  sheets_ok
+  retry_scheduled
+  retried
+  failed
+  note_added
+}
+
+enum InvoiceStatus {
+  DRAFT
+  PENDING_CONFIRMATION
+  QUEUED
+  ISSUING
+  ISSUED
+  FAILED
+}
+
+enum InvoiceType {
+  INVOICE
+  CREDIT_NOTE
+}
+
+enum InvoiceSource {
+  AUTOMATIC
+  CONFIRMATION
+  MANUAL
+  OCR
+}
+
+enum InvoiceEventType {
+  CREATED
+  STATUS_CHANGED
+  ISSUANCE_REQUESTED
+  ISSUED
+  FAILED
+  RETRY_SCHEDULED
+  RETRIED
+  DOCUMENT_CREATED
+  NOTE_ADDED
+}
+
+enum InvoiceDocumentType {
+  PDF
+  SOURCE
+}
+
+enum InvoiceDocumentStatus {
+  AVAILABLE
+  FAILED
+}
+
+model Tenant {
+  id        BigInt       @id @default(autoincrement())
+  name      String
+  slug      String       @unique
+  status    TenantStatus @default(ACTIVE)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  payments              Payment[]
+  invoices              Invoice[]
+  invoiceEvents         InvoiceEvent[]
+  invoiceDocuments      InvoiceDocument[]
+  sequences             InvoiceSequence[]
+  integrations          TenantIntegration[]
+  checkpoints           IntegrationCheckpoint[]
+  users                 TenantUser[]
+  subscriptions         Subscription[]
+  paymentEvents         PaymentEvent[]
+  auditLogs             TenantAuditLog[]
+  notes                 TenantNote[]
+  onboardingSubmissions TenantOnboardingSubmission[]
+  profile               TenantProfile?
+}
+
+model TenantProfile {
+  id                    BigInt    @id @default(autoincrement())
+  tenantId              BigInt    @unique
+  legalName             String?
+  tradeName             String?
+  cuit                  String?
+  ivaCondition          String?
+  fiscalAddress         String?
+  contactEmail          String?
+  contactPhone          String?
+  responsibleName       String?
+  responsibleEmail      String?
+  approvalStatus        String    @default("DRAFT")
+  reviewedByAdminUserId BigInt?
+  reviewNotes           String?
+  reviewedAt            DateTime?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([cuit])
+  @@index([approvalStatus])
+}
+
+model Plan {
+  id           BigInt  @id @default(autoincrement())
+  code         String  @unique
+  name         String
+  price        Float?
+  currency     String  @default("ARS")
+  billingCycle String  @default("monthly")
+  status       String  @default("ACTIVE")
+  description  String?
+  featuresJson String?
+
+  subscriptions Subscription[] // técnico, no de negocio
+}
+
+model Subscription {
+  id       BigInt             @id @default(autoincrement())
+  tenantId BigInt
+  planId   BigInt
+  status   SubscriptionStatus @default(ACTIVE)
+
+  // billing (stripe/mercadopago/etc) si lo implementás
+  billingProvider String?
+  billingRef      String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  plan   Plan   @relation(fields: [planId], references: [id])
+
+  @@index([tenantId])
+}
+
+model TenantIntegration {
+  id       BigInt              @id @default(autoincrement())
+  tenantId BigInt
+  provider IntegrationProvider
+  enabled  Boolean             @default(true)
+
+  // Guardar credenciales cifradas (string JSON cifrado)
+  secretEnc String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, provider])
+  @@index([tenantId])
+}
+
+model IntegrationCheckpoint {
+  id       BigInt              @id @default(autoincrement())
+  tenantId BigInt
+  provider IntegrationProvider
+
+  // ejemplo MP: timestamp + lastPaymentId
+  valueJson String
+
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, provider])
+  @@index([tenantId])
+}
+
+model TenantUser {
+  id           BigInt           @id @default(autoincrement())
+  tenantId     BigInt
+  email        String
+  role         String // owner/admin/viewer/approver
+  passwordHash String?
+  status       TenantUserStatus @default(ACTIVE)
+  lastLoginAt  DateTime?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, email])
+  @@index([tenantId])
+}
+
+model AdminUser {
+  id           BigInt          @id @default(autoincrement())
+  name         String?
+  email        String          @unique
+  passwordHash String
+  role         AdminUserRole
+  status       AdminUserStatus @default(ACTIVE)
+  lastLoginAt  DateTime?
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
+  auditLogs TenantAuditLog[]
+  notes     TenantNote[]
+}
+
+model Payment {
+  id       BigInt @id @default(autoincrement())
+  tenantId BigInt
+
+  provider            String
+  provider_payment_id String
+
+  status PaymentStatus
+
+  payment_method_id   String?
+  amount              Float?
+  currency            String?
+  customer            String?
+  customer_doc_type   String?
+  customer_doc_number String?
+  date_approved       DateTime?
+
+  sheets_row String?
+  error      String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant  Tenant         @relation(fields: [tenantId], references: [id])
+  events  PaymentEvent[]
+  invoice Invoice?
+
+  @@unique([id, tenantId], name: "id_tenantId")
+  @@unique([tenantId, provider, provider_payment_id])
+  @@index([tenantId, status])
+  @@index([tenantId, createdAt])
+}
+
+model Invoice {
+  id               BigInt  @id @default(autoincrement())
+  tenantId         BigInt
+  paymentId        BigInt?
+  relatedInvoiceId BigInt?
+
+  type   InvoiceType   @default(INVOICE)
+  source InvoiceSource @default(AUTOMATIC)
+  status InvoiceStatus @default(DRAFT)
+
+  amount            Float?
+  currency          String?
+  customer          String?
+  customerDocType   String?
+  customerDocNumber String?
+
+  cae      String?
+  caeVto   String?
+  cbteNro  String?
+  cbteTipo Int?
+  ptoVta   Int?
+  issuedAt DateTime?
+  error    String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant         Tenant            @relation(fields: [tenantId], references: [id])
+  payment        Payment?          @relation(fields: [paymentId, tenantId], references: [id, tenantId])
+  relatedInvoice Invoice?          @relation("InvoiceCreditNotes", fields: [relatedInvoiceId, tenantId], references: [id, tenantId])
+  creditNotes    Invoice[]         @relation("InvoiceCreditNotes")
+  events         InvoiceEvent[]
+  documents      InvoiceDocument[]
+
+  @@unique([id, tenantId], name: "invoice_id_tenantId")
+  @@unique([paymentId, tenantId], name: "invoice_paymentId_tenantId")
+  @@index([tenantId, status])
+  @@index([tenantId, type, createdAt])
+  @@index([relatedInvoiceId])
+}
+
+model InvoiceEvent {
+  id          BigInt           @id @default(autoincrement())
+  tenantId    BigInt
+  invoiceId   BigInt
+  type        InvoiceEventType
+  message     String?
+  payloadJson String?
+  createdAt   DateTime         @default(now())
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id])
+  invoice Invoice @relation(fields: [invoiceId, tenantId], references: [id, tenantId])
+
+  @@index([tenantId, createdAt])
+  @@index([invoiceId, createdAt])
+}
+
+model InvoiceDocument {
+  id              BigInt                @id @default(autoincrement())
+  tenantId        BigInt
+  invoiceId       BigInt
+  type            InvoiceDocumentType
+  status          InvoiceDocumentStatus @default(AVAILABLE)
+  storageProvider String?
+  externalId      String?
+  externalUrl     String?
+  fileName        String?
+  mimeType        String?
+  checksum        String?
+  error           String?
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id])
+  invoice Invoice @relation(fields: [invoiceId, tenantId], references: [id, tenantId])
+
+  @@unique([invoiceId, type, storageProvider], name: "invoice_document_delivery")
+  @@index([tenantId, type, createdAt])
+  @@index([invoiceId, createdAt])
+}
+
+model PaymentEvent {
+  id          BigInt           @id @default(autoincrement())
+  tenantId    BigInt
+  paymentId   BigInt
+  type        PaymentEventType
+  message     String?
+  payloadJson String?
+  createdAt   DateTime         @default(now())
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id])
+  payment Payment @relation(fields: [paymentId, tenantId], references: [id, tenantId])
+
+  @@index([tenantId, createdAt])
+  @@index([paymentId, createdAt])
+}
+
+model TenantAuditLog {
+  id          BigInt   @id @default(autoincrement())
+  tenantId    BigInt?
+  actorType   String
+  actorId     String?
+  adminUserId BigInt?
+  action      String
+  entityType  String
+  entityId    String?
+  beforeJson  String?
+  afterJson   String?
+  createdAt   DateTime @default(now())
+
+  tenant    Tenant?    @relation(fields: [tenantId], references: [id])
+  adminUser AdminUser? @relation(fields: [adminUserId], references: [id])
+
+  @@index([tenantId, createdAt])
+  @@index([action, createdAt])
+  @@index([entityType, entityId])
+}
+
+model TenantNote {
+  id                   BigInt   @id @default(autoincrement())
+  tenantId             BigInt
+  createdByAdminUserId BigInt?
+  title                String
+  body                 String
+  pinned               Boolean  @default(false)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  tenant         Tenant     @relation(fields: [tenantId], references: [id])
+  createdByAdmin AdminUser? @relation(fields: [createdByAdminUserId], references: [id])
+
+  @@index([tenantId, pinned, createdAt])
+}
+
+model TenantOnboardingSubmission {
+  id                    BigInt    @id @default(autoincrement())
+  tenantId              BigInt
+  status                String    @default("pending") // pending/approved/rejected
+  submittedByUserId     BigInt?
+  reviewedByAdminUserId BigInt?
+  dataJson              String
+  documentsJson         String?
+  reviewNotes           String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  reviewedAt            DateTime?
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId, status, createdAt])
+}
+
+model InvoiceSequence {
+  id       BigInt @id @default(autoincrement())
+  tenantId BigInt
+
+  pto_vta   Int
+  cbte_tipo Int
+  last_nro  BigInt
+
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, pto_vta, cbte_tipo])
+  @@index([tenantId])
+}
+
+model SystemConfig {
+  id        BigInt   @id @default(autoincrement())
+  key       String   @unique
+  value     String
+  updatedAt DateTime @updatedAt
+}
