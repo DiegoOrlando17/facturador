@@ -1,0 +1,20 @@
+# Environment and secrets
+**/.env
+**/.env.*
+!**/.env.example
+
+# Dependencies and builds
+**/node_modules/
+**/dist/
+**/*.tsbuildinfo
+
+# Backend runtime data
+facturador-backend/certs/
+facturador-backend/credentials/
+facturador-backend/facturas/
+facturador-backend/backups/
+facturador-backend/src/stress-test/runs/
+
+# OS and logs
+.DS_Store
+*.log

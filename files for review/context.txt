@@ -1,0 +1,29 @@
+the goal of this web app is to administrate a software
+that retrieves payments from mercado pago and informs them
+in ARCA. its built for multiple tenants/clients, so the idea
+is to manage absolutely everything from this web portal.
+The main actions should be to add new clients, review and
+approve new clients pending fiscal data, review 
+operative issues with billing, set clients data so that they
+become operative in the sofware without modifying the code,
+review the status of connected services and integrations.
+
+Anothe thing you need to know is that there will be a portal
+for clients, for them to review operations, upload fiscal
+data, manually bill/create invoices, dowload created
+invoices. But this portal is yet not built so it will not be
+reviewd right now.
+
+the users will be the me (a sfotware engineer that
+created this whole software solution) and admins
+that will be working for me doing al these administrative
+tasks. no more than 10 users. their technical level should
+be mid-to-low.
+
+the paltform is web right now, but will have a mobile app in
+the future.
+
+right now we have only one client but expect at least 100
+whithin the nest year of launch. the portal is yet not 
+deployed, so nobody used it so far.
+
