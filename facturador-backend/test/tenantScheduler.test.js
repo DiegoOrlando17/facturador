@@ -18,6 +18,7 @@ test("realtime respeta el intervalo minimo", () => {
   const due = evaluateTenantSchedule(schedule, first.runtime, DateTime.fromISO("2026-08-22T12:00:05Z"));
 
   assert.equal(first.shouldRun, true);
+  assert.match(first.slotKey, /^realtime\|\d+$/);
   assert.equal(early.shouldRun, false);
   assert.equal(due.shouldRun, true);
 });

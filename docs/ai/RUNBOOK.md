@@ -76,6 +76,10 @@ MP_POS_ID=
 
 Las variables globales son compatibilidad heredada/default. El modelo objetivo usa configuracion cifrada por tenant.
 
+Regla critica para `fiebre`: Mercado Pago usa credenciales productivas y es estrictamente de solo lectura para polling y consulta de pagos POS reales. No crear pagos, preferencias, card tokens ni otros recursos en MP. ARCA, Drive y Sheets de este tenant son de prueba. No existe ningun endpoint para crear pagos en Mercado Pago.
+
+`invoice:test-flow` no crea pagos en Mercado Pago: en ejecucion real inserta un `Payment` sintetico solo en PostgreSQL local y lo encola; con `--dry-run` tampoco inserta datos.
+
 ### ARCA/AFIP
 
 ```dotenv
@@ -94,7 +98,7 @@ AFIP_TRA_PATH=
 AFIP_TRACMS_PATH=
 ```
 
-Como alternativa de despliegue, el codigo admite `AFIP_CERT_B64`, `AFIP_KEY_B64`, `AFIP_TA_B64`, `AFIP_TRA_B64` y `AFIP_TRACMS_B64`, que se materializan al arrancar. Probar primero contra homologacion (`AFIP_PRODUCTION=false`).
+Como alternativa de despliegue, el codigo admite `AFIP_CERT_B64`, `AFIP_KEY_B64`, `AFIP_TA_B64`, `AFIP_TRA_B64` y `AFIP_TRACMS_B64`, que se materializan con permisos restringidos en el directorio temporal del sistema al arrancar. Probar primero contra homologacion (`AFIP_PRODUCTION=false`).
 
 ### Google
 
@@ -253,7 +257,7 @@ El scheduler por tenant acepta:
 - `POLLING_MODE=scheduled` con `RUN_AT_TIMES` en formato `HH:mm` o el fallback `RUNS_PER_DAY`;
 - `TIMEZONE` como zona IANA, con default `America/Argentina/Buenos_Aires`.
 
-La configuracion debe estar permitida por la politica del plan. Consultar `docs/ai/SCHEDULER.md` antes de operar multiples replicas del worker: la exclusion distribuida por tenant/slot todavia esta pendiente.
+La configuracion debe estar permitida por la politica del plan. El polling reclama en Redis un lock por tenant y slot para excluir replicas concurrentes. Redis debe usar una politica `noeviction`; validar esta configuracion antes de escalar workers horizontalmente.
 
 ## 7. Verificacion
 
@@ -284,7 +288,7 @@ cd facturador-backend
 npm test
 ```
 
-Resultado: 17 tests correctos el 2026-08-26.
+Resultado: 20 tests correctos el 2026-08-26.
 
 Prisma:
 
@@ -303,14 +307,15 @@ Resultado de `npx prisma validate`: esquema valido el 2026-08-26. Las migracione
 4. API, workers y frontend iniciados correctamente.
 5. Login y navegacion principal del panel admin operativos.
 6. Descarga de PDF operativa.
+7. El tenant `fiebre` completo manualmente el happy path MP por polling -> ARCA -> PDF -> Drive/Sheets, reportado el 2026-08-26.
 
 Estas validaciones fueron reportadas manualmente el 2026-08-14; no representan una suite automatizada.
 
 ### Validaciones diferidas
 
 - El login y los flujos de `/portal` se validaran integralmente al implementar el portal cliente web. Actualmente `/portal-cliente` es un prototipo estatico y una prueba aislada de la API no se considera criterio de cierre inmediato.
-- El flujo sandbox MP -> ARCA, su idempotencia, errores y reintentos deben certificarse durante la Fase 2.
-- Drive/Sheets debe validarse con un tenant elegible durante la Fase 2, incluyendo estados `ERROR`/`OK`, ausencia de duplicados y eliminacion de temporales.
+- La idempotencia integral, concurrencia, errores y reintentos del flujo MP -> ARCA deben certificarse durante la Fase 2.
+- Drive/Sheets tiene happy path validado con un tenant elegible; faltan estados `ERROR`/`OK`, ausencia de duplicados bajo reintento y eliminacion de temporales ante fallos.
 
 No ejecutar pruebas de integraciones con ventas, certificados, puntos de venta o recursos Google de produccion.
 

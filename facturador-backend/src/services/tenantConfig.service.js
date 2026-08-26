@@ -1,7 +1,6 @@
 import { PrismaClient } from "@prisma/client";
 import { decryptJson, encryptJson, maskSecrets } from "../utils/crypto.js";
 import { hashPassword } from "../utils/password.js";
-import { createTenantAuditLog } from "./tenantSupport.service.js";
 import { clearTenantSubscriptionPolicyCache } from "./subscriptionPolicy.service.js";
 
 const prisma = new PrismaClient();
@@ -194,6 +193,7 @@ export async function reviewTenantProfile(tenantId, adminUser, { status, reviewN
     },
   });
 
+  const { createTenantAuditLog } = await import("./tenantSupport.service.js");
   await createTenantAuditLog({
     tenantId,
     adminUserId: BigInt(adminUser.id),

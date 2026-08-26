@@ -41,6 +41,7 @@ Desde 2026-08-26, backend, frontend y documentacion forman un unico repositorio 
 - Mercado Pago POS mediante polling/checkpoints, ARCA/AFIP SDK y servicios XML.
 - Google Drive y Google Sheets.
 - La deteccion por webhooks de Mercado Pago y la integracion Payway fueron retiradas; no forman parte del producto.
+- Mercado Pago es una fuente de pagos POS existentes y se consulta en modo solo lectura. El tenant `fiebre` usa credenciales productivas de MP; nunca se deben crear pagos, preferencias ni tokens de tarjeta con esas credenciales. ARCA, Drive y Sheets configurados para ese tenant son recursos de prueba.
 - PDFKit para comprobantes PDF.
 
 ### Frontend
@@ -55,7 +56,6 @@ La API Express expone:
 - `/admin`: autenticacion y operaciones del panel interno;
 - `/portal`: autenticacion y consultas limitadas al tenant;
 - `/google`: OAuth;
-- `/api`: endpoints heredados de creacion de pagos;
 - `/health`: liveness basico de Express.
 
 Prisma modela tenants, perfil fiscal, usuarios tenant/admin, planes, suscripciones, integraciones cifradas, checkpoints, pagos, comprobantes fiscales, documentos, eventos, auditoria, notas, onboarding y secuencias de factura.
@@ -69,7 +69,7 @@ El comando `invoice:test-flow` permite crear un pago sintetico en PostgreSQL loc
 - Panel admin web: funcional en varias areas, pero requiere smoke tests y completar operacion sin acceso tecnico.
 - Portal API: login, dashboard, pagos, exportacion, PDF, reportes, integraciones y onboarding.
 - Portal web: prototipo estatico; no es todavia una interfaz real sobre `/portal`.
-- Nucleo Mercado Pago/ARCA/PDF/Drive/Sheets: codigo existente, sin certificacion end-to-end reciente.
+- Nucleo Mercado Pago/ARCA/PDF/Drive/Sheets: happy path validado manualmente con el tenant `fiebre` el 2026-08-26; faltan escenarios integrales de error, reintento y concurrencia.
 - Landing, alta autoservicio, cobro recurrente, OCR y mobile: pendientes.
 - Facturacion con confirmacion, manual y notas de credito: pendientes de dominio y flujo completo.
 - Webhooks de Mercado Pago y Payway: retirados del codigo y fuera de alcance.

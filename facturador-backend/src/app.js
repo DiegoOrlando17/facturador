@@ -1,7 +1,6 @@
 import express from "express";
 import dotenv from "dotenv";
 
-import paymentsRouter from "./routes/payments.routes.js";
 import healthRouter from "./routes/health.routes.js";
 import googleRouter from "./routes/google.routes.js";
 import adminRouter from "./routes/admin.routes.js";
@@ -16,6 +15,5 @@ app.use("/health", healthRouter);
 app.use("/google", googleRouter);
 app.use("/admin", adminRouter);
 app.use("/portal", portalRouter);
-app.use("/api", paymentsRouter);
 
 export default app;

@@ -1,6 +1,6 @@
 # Contrato del scheduler por tenant
 
-Ultima revision: 2026-08-22
+Ultima revision: 2026-08-26
 
 ## Alcance
 
@@ -43,9 +43,9 @@ La configuracion se guarda en la integracion `MERCADOPAGO` del tenant y se valid
 1. Se requiere suscripcion y plan `ACTIVE`.
 2. El plan debe habilitar `automaticInvoicing` y el modo solicitado.
 3. Una configuracion invalida se rechaza al guardarla desde admin y tampoco se ejecuta si ya estaba persistida.
-4. Un slot programado se ejecuta una sola vez por tenant dentro de una instancia del worker.
+4. Cada slot se reclama una sola vez por tenant mediante un lock distribuido Redis.
 5. Polling y checkpoints mantienen la idempotencia de deteccion; los jobs posteriores usan IDs deterministas.
 
 ## Limitacion para produccion
 
-El estado `lastRunAt`/`lastSlot` reside en memoria. Con una sola instancia evita duplicados por slot; con varias replicas cada una podria ejecutar el mismo slot. Antes de escalar workers horizontalmente se debe adquirir un lock distribuido en Redis por tenant y slot, con expiracion y observabilidad.
+El estado `lastRunAt`/`lastSlot` local evita reevaluaciones innecesarias dentro de una instancia. La exclusion entre replicas usa `SET NX PX` en Redis con una clave por tenant y slot. Un polling exitoso conserva el claim hasta su expiracion; un fallo libera el lock solo si la instancia conserva el token propietario, permitiendo reintento seguro. Redis debe usar una politica `noeviction` para no descartar locks bajo presion de memoria.

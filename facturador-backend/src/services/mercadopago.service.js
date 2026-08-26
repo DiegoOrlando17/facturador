@@ -1,6 +1,4 @@
 import logger from "../utils/logger.js";
-import fetch from "node-fetch";
-import crypto from "crypto";
 import axios from "axios";
 
 import { DateTime } from "luxon";
@@ -165,72 +163,6 @@ export async function fetchLastPayment(mpCfg = {}) {
   } catch (error) {
     logger.error("Error en FetchLastPayment de Mercadopago:", error);
     return null;
-  }
-}
-
-async function createCardToken() {
-  const response = await fetch(
-    `${config.MP.API_URL}/card_tokens?public_key=${config.MP.PUBLIC_KEY}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        card_number: "5031755734530604",
-        expiration_year: 2030,
-        expiration_month: 11,
-        security_code: "123",
-        cardholder: {
-          name: "APRO",
-          identification: { type: "DNI", number: "12345678" },
-        },
-      }),
-    }
-  );
-
-  const data = await response.json();
-  if (!response.ok) throw new Error(`Error creando card_token: ${JSON.stringify(data)}`);
-  return data.id;
-}
-
-export async function createPaymentMP() {
-  try {
-    const cardTokenId = await createCardToken();
-    const idempotencyKey = crypto.randomUUID();
-
-    const body = {
-      // additional_info: {
-      //   items: [
-      //     { title: "Botella Fernet", quantity: 1, unit_price: 10000 },
-      //   ],
-      // },
-      transaction_amount: 10000,
-      // payment_method_id: "master",
-      payer: {
-        email: "test_user_ar@testuser.com",
-        // identification: {
-        //   type: "DNI",
-        //   number: "12345678",
-        // },
-      },
-      token: cardTokenId,
-      installments: 1,
-    };
-
-    const response = await fetch(`${config.MP.API_URL}/payments`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${config.MP.ACCESS_TOKEN}`,
-        "Content-Type": "application/json",
-        "X-Idempotency-Key": idempotencyKey,
-      },
-      body: JSON.stringify(body),
-    });
-
-    const data = await response.json();
-    return data;
-  } catch (error) {
-    console.error("Error creando pago de prueba:", error);
-    throw error;
   }
 }
 

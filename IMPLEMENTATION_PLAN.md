@@ -23,7 +23,7 @@ Desde la tier inicial, todo comprobante emitido en ARCA debe poder descargarse c
 | Area | Estado | Evidencia y brecha principal |
 | --- | --- | --- |
 | Backend multitenant | Parcial | Express, Prisma/PostgreSQL, tenants, usuarios, perfiles, planes, suscripciones e integraciones. Faltan endurecimiento, tests y validacion integral. |
-| Procesamiento MP POS -> ARCA -> PDF -> Drive/Sheets | Parcial / no verificado | La deteccion vigente debe realizarse por polling/checkpoints: la API POS de Mercado Pago no es compatible con el flujo de webhooks originalmente intentado. No se ejecuto un flujo real de punta a punta en esta revision. |
+| Procesamiento MP POS -> ARCA -> PDF -> Drive/Sheets | Parcial / validado manualmente | El tenant `fiebre` completo el happy path real por polling/checkpoints, ARCA, PDF, Drive y Sheets, reportado por el usuario el 2026-08-26. Faltan certificar fallos, reintentos y concurrencia integral. |
 | Panel admin web | Parcial | Login, dashboard, clientes, detalle, perfil fiscal, suscripcion, integraciones, pagos, notas, onboarding, admins y planes. No garantiza resolver toda incidencia sin DB/codigo. |
 | Portal cliente API | Parcial | Auth, dashboard, pagos, CSV, PDF, reportes, integraciones y onboarding disponibles. Su validacion integral se difiere hasta conectar el portal cliente web. |
 | Portal cliente web | Prototipo | `/portal-cliente` usa datos estaticos y no consume la API del portal. |
@@ -87,13 +87,13 @@ Aceptacion: esquema, API y reglas soportan las cuatro capacidades progresivas de
 
 Objetivo: certificar el flujo principal antes de sumar canales.
 
-- [ ] Probar deteccion de ventas Mercado Pago POS exclusivamente por polling/checkpoints.
+- [x] Probar deteccion de ventas Mercado Pago POS exclusivamente por polling/checkpoints con el tenant `fiebre`.
 - [ ] Probar idempotencia ante eventos duplicados y concurrencia.
-- [ ] Probar emision ARCA, CAE, numeracion, errores y reintentos.
-- [ ] Validar que todo comprobante emitido en ARCA pueda generar un PDF descargable bajo demanda, sin persistencia local.
-- [ ] Validar configuracion opcional por tenant de carpeta Drive y planilla Sheets.
+- [ ] Probar emision ARCA, CAE, numeracion, errores y reintentos. El happy path fue validado manualmente; faltan fallos y reintentos.
+- [x] Validar que todo comprobante emitido en ARCA pueda generar un PDF descargable bajo demanda, sin persistencia local.
+- [x] Validar configuracion opcional por tenant de carpeta Drive y planilla Sheets con el tenant `fiebre`.
 - [ ] Validar que Sheets registre una fila por pago y la actualice entre `ERROR` y `OK` durante reintentos; validar que Drive reciba solo PDF de comprobantes facturados, sin duplicados.
-- [ ] Implementar scheduler por modalidad y tenant.
+- [x] Implementar scheduler por modalidad y tenant con exclusion distribuida Redis por slot.
 - [ ] Completar trazabilidad y acciones seguras de reproceso.
 - [ ] Incorporar tests automatizados de servicios y endpoints criticos.
 
@@ -186,7 +186,7 @@ Aceptacion: los flujos mobile acordados funcionan en Android/iOS y respetan las 
 1. Definir nombres comerciales, precios y limites cuantitativos cuando exista la decision comercial.
 2. Iniciar Fase 2 certificando el nucleo MP -> ARCA con homologacion y recursos de prueba.
 3. Validar idempotencia, errores, reintentos y entregas PDF/Drive/Sheets.
-4. Implementar lock distribuido Redis antes de operar multiples replicas del scheduler.
+4. Validar el lock distribuido Redis al operar multiples replicas del scheduler.
 5. No iniciar OCR, landing de cobro o mobile hasta estabilizar el nucleo fiscal.
 
 ## 7. Riesgos principales
@@ -202,7 +202,7 @@ Aceptacion: los flujos mobile acordados funcionan en Android/iOS y respetan las 
 ## 8. Validacion de esta linea base
 
 - `facturador-frontend`: `npm run build` correcto el 2026-08-26.
-- `facturador-backend`: 17 tests correctos, esquema Prisma valido y todos los `.js` de `src` y `prisma` aprobados por `node --check` el 2026-08-26.
+- `facturador-backend`: 20 tests correctos, esquema Prisma valido y todos los `.js` de `src` y `prisma` aprobados por `node --check` el 2026-08-26.
 - PostgreSQL y Redis locales, migraciones Prisma, datos demo, tenants y planes: reportados como operativos el 2026-08-14.
 - API, workers, frontend, login admin y descarga PDF: reportados como operativos el 2026-08-14.
 - La validacion integral del portal cliente queda diferida hasta reemplazar el prototipo estatico por una aplicacion conectada a `/portal`.

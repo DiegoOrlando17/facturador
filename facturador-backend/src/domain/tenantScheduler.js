@@ -83,10 +83,11 @@ export function evaluateTenantSchedule(schedule, runtime = {}, now = DateTime.ut
 
   if (schedule.mode === PROCESSING_MODES.REALTIME) {
     const nowMs = zonedNow.toMillis();
+    const slotKey = `realtime|${Math.floor(nowMs / schedule.intervalMs)}`;
     const shouldRun = !runtime.lastRunAt || nowMs - runtime.lastRunAt >= schedule.intervalMs;
     return {
       shouldRun,
-      slotKey: null,
+      slotKey,
       runtime: shouldRun ? { ...runtime, lastRunAt: nowMs } : runtime,
     };
   }

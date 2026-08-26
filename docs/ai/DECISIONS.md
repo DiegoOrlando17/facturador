@@ -246,7 +246,7 @@ Consecuencias:
 - los horarios usan `HH:mm` y una zona IANA explicita;
 - `RUNS_PER_DAY` queda como fallback heredado;
 - configuraciones no permitidas se rechazan al guardar y al ejecutar;
-- la deduplicacion por slot es solo por instancia hasta implementar lock distribuido Redis.
+- la deduplicacion por slot usa un lock distribuido Redis con expiracion y liberacion condicionada al token propietario cuando el polling falla.
 
 ## D-015 - Autorizacion por capacidades en backend
 
@@ -286,6 +286,25 @@ Consecuencias:
 - no se admiten `.git` anidados, gitlinks ni submodulos para las dos aplicaciones;
 - los comandos de desarrollo siguen ejecutandose dentro del directorio de cada aplicacion;
 - los antiguos remotos separados no forman parte de la operacion normal.
+
+## D-017 - Mercado Pago productivo como fuente estrictamente de solo lectura
+
+Estado: vigente
+
+Decision: Facturador consulta pagos POS existentes mediante polling/checkpoints y no crea pagos, preferencias, card tokens ni otros recursos en Mercado Pago. Para el tenant `fiebre`, las credenciales MP son productivas aunque ARCA, Drive y Sheets sean de prueba.
+
+Contexto: el entorno de validacion combina pagos reales de Mercado Pago con destinos fiscales y Google de prueba. Un endpoint heredado permitia crear un pago usando configuracion global y podia afectar accidentalmente la cuenta productiva.
+
+Alternativas consideradas: conservar la creacion detras de una variable; exigir autenticacion administrativa; retirar completamente la capacidad de escritura.
+
+Rationale: crear pagos no forma parte del producto ni de la certificacion fiscal. Retirar la capacidad elimina un efecto financiero innecesario y evita que una configuracion mixta se interprete como sandbox integral.
+
+Consecuencias:
+
+- el endpoint heredado `POST /api/crear-pago-mp` y su implementacion fueron eliminados;
+- los flujos de prueba crean, como maximo, registros sinteticos en PostgreSQL local;
+- cualquier futura escritura en Mercado Pago requiere una nueva decision explicita, credenciales sandbox separadas y protecciones automatizadas;
+- resets de checkpoint o reprocesos locales no modifican pagos en Mercado Pago, pero requieren autorizacion porque pueden volver a procesar pagos reales.
 
 ## Decisiones pendientes
 

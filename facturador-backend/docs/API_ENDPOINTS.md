@@ -113,7 +113,6 @@ Granularidades de reportes:
 | GET | `/health` | No | Healthcheck basico |
 | GET | `/google/oauth/start` | No | Inicia OAuth Google para un tenant |
 | GET | `/google/oauth/callback` | No | Callback OAuth Google |
-| POST | `/api/crear-pago-mp` | No | Crea pago de prueba en Mercado Pago |
 | POST | `/admin/auth/login` | No | Login admin |
 | POST | `/admin/auth/logout` | No | Logout admin del lado cliente |
 | GET | `/admin/me` | Admin | Usuario admin autenticado |
@@ -219,28 +218,6 @@ Response `200`:
 ```
 
 La respuesta puede incluir campos adicionales devueltos por el servicio de conexion.
-
-## Endpoints de prueba de pagos
-
-Este endpoint esta montado bajo `/api` y sirve para simular/crear pagos contra Mercado Pago.
-
-### `POST /api/crear-pago-mp`
-
-Crea un pago de prueba en Mercado Pago usando la configuracion global.
-
-Response `200`:
-
-```json
-{
-  "id": "123456789",
-  "provider": "mercadopago",
-  "raw": {}
-}
-```
-
-Errores:
-
-- `500` si no se pudo simular el pago.
 
 ## Admin API
 

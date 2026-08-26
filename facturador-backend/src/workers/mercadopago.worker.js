@@ -12,6 +12,8 @@ import {
 } from "../services/tenantConfig.service.js";
 import { getTenantSubscriptionPolicy } from "../services/subscriptionPolicy.service.js";
 import { evaluateTenantSchedule, normalizeTenantSchedule } from "../domain/tenantScheduler.js";
+import { claimDistributedSlot } from "../services/distributedLock.service.js";
+import { connection } from "../config/redis.js";
 
 let isRunning = false;
 const tenantRuntime = new Map();
@@ -25,8 +27,11 @@ async function shouldRunNow(tenantId, mpCfg) {
     const runtimeKey = String(tenantId);
     const state = tenantRuntime.get(runtimeKey) ?? {};
     const decision = evaluateTenantSchedule(schedule, state, now);
-    if (decision.shouldRun) tenantRuntime.set(runtimeKey, decision.runtime);
-    return decision.shouldRun;
+    return {
+        ...decision,
+        runtimeKey,
+        lockTtlMs: schedule.mode === "realtime" ? Math.max(schedule.intervalMs * 2, 60_000) : 120_000,
+    };
 }
 
 async function pollTenant(tenantId, mpCfg) {
@@ -124,12 +129,25 @@ export async function startMercadopagoWorker() {
             const tenants = await listEnabledTenantsByIntegration("MERCADOPAGO");
 
             for (const row of tenants) {
+                let slotClaim = null;
                 try {
-                    if (!(await shouldRunNow(row.tenantId, row.config))) {
-                        continue;
-                    }
+                    const decision = await shouldRunNow(row.tenantId, row.config);
+                    if (!decision.shouldRun) continue;
+
+                    const lockKey = `facturador:mp-poll:${row.tenantId}:${decision.slotKey}`;
+                    slotClaim = await claimDistributedSlot(connection, lockKey, decision.lockTtlMs);
+                    if (!slotClaim.claimed) continue;
+
                     await pollTenant(row.tenantId, row.config);
+                    tenantRuntime.set(decision.runtimeKey, decision.runtime);
                 } catch (error) {
+                    if (slotClaim?.claimed) {
+                        try {
+                            await slotClaim.release();
+                        } catch (releaseError) {
+                            logger.error(`Error liberando lock MP tenant=${row.tenantId}: ${releaseError.message}`);
+                        }
+                    }
                     logger.error(`❌ Error en polling MP tenant=${row.tenantId}: ${error.message}`);
                 }
             }
