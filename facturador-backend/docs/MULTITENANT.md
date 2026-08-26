@@ -140,7 +140,7 @@ Notas:
 - [x] **E2** - Documentar env global vs secretos por tenant
 
 Runbook:
-- Ver [docs/OPERACION_MULTITENANT.md](/c:/Users/Diego/Documents/PersonalProjects/facturador/docs/OPERACION_MULTITENANT.md)
+- Ver [docs/OPERACION_MULTITENANT.md](OPERACION_MULTITENANT.md)
 
 Comandos operativos:
 - `npm run tenant:bootstrap -- --slug <slug> --name "<nombre>" --plan A --owner-email <mail>`

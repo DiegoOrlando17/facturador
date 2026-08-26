@@ -1,6 +1,6 @@
 # Plan de implementacion - Facturador
 
-Ultima revision: 2026-08-15
+Ultima revision: 2026-08-26
 
 ## 1. Objetivo
 
@@ -63,6 +63,7 @@ Objetivo: poder modificar el sistema sin depender de supuestos heredados.
 - [ ] Validar integralmente la API del portal junto con el portal cliente web cuando se implemente su conexion.
 - [x] Confirmar que documentos historicos siguen vigentes y clasificarlos en `docs/ai/DOCUMENT_STATUS.md` como fuentes vigentes, referencias tecnicas o referencias historicas.
 - [x] Retirar el codigo, endpoints, colas, configuracion y dependencias obsoletos de webhooks y Payway.
+- [x] Unificar backend, frontend y documentacion en un unico repositorio Git, sin gitlinks ni metadatos Git anidados.
 
 Aceptacion: una instalacion limpia puede iniciarse siguiendo el runbook y el estado de cada flujo critico queda reproducible.
 
@@ -190,7 +191,7 @@ Aceptacion: los flujos mobile acordados funcionan en Android/iOS y respetan las 
 
 ## 7. Riesgos principales
 
-- Backend y frontend estaban limpios al 2026-08-14; antes de cada cambio debe volver a comprobarse el estado de ambos repositorios Git independientes.
+- Backend y frontend forman un unico monorepo desde 2026-08-26; antes de cada cambio debe comprobarse el estado Git desde la raiz.
 - Las referencias a webhooks y Payway se conservan solo en el historial de decisiones; no deben reintroducirse sin una nueva decision arquitectonica.
 - `Payment` concentra hoy datos de pago, factura y entregas; extenderlo sin definir el dominio puede dificultar notas de credito y modalidades con aprobacion.
 - Existen defaults de secretos pensados para desarrollo; produccion debe fallar si faltan secretos fuertes.
@@ -200,8 +201,8 @@ Aceptacion: los flujos mobile acordados funcionan en Android/iOS y respetan las 
 
 ## 8. Validacion de esta linea base
 
-- `facturador-frontend`: `npm run build` correcto el 2026-08-10.
-- `facturador`: todos los `.js` de `src` y `prisma` pasaron `node --check` el 2026-08-10.
+- `facturador-frontend`: `npm run build` correcto el 2026-08-26.
+- `facturador-backend`: 17 tests correctos, esquema Prisma valido y todos los `.js` de `src` y `prisma` aprobados por `node --check` el 2026-08-26.
 - PostgreSQL y Redis locales, migraciones Prisma, datos demo, tenants y planes: reportados como operativos el 2026-08-14.
 - API, workers, frontend, login admin y descarga PDF: reportados como operativos el 2026-08-14.
 - La validacion integral del portal cliente queda diferida hasta reemplazar el prototipo estatico por una aplicacion conectada a `/portal`.

@@ -1,8 +1,8 @@
 # Runbook local y operativo
 
-Ultima revision: 2026-08-15
+Ultima revision: 2026-08-26
 
-Estado: entorno local operativo. PostgreSQL, Redis, migraciones, datos demo, API, workers, frontend, login admin y descarga PDF fueron validados manualmente. La validacion del portal cliente se difiere hasta implementar su frontend conectado a `/portal`; las integraciones externas mantienen sus validaciones especificas pendientes.
+Estado: monorepo consolidado y validaciones estaticas correctas al 2026-08-26. PostgreSQL, Redis, migraciones, datos demo, API, workers, frontend, login admin y descarga PDF fueron validados manualmente con anterioridad. La validacion del portal cliente se difiere hasta implementar su frontend conectado a `/portal`; las integraciones externas mantienen sus validaciones especificas pendientes.
 
 ## 1. Requisitos
 
@@ -18,8 +18,8 @@ No usar credenciales ni bases de produccion para completar la puesta en marcha l
 
 Se usan tres procesos independientes:
 
-1. API: `facturador/`.
-2. Workers: `facturador/`.
+1. API: `facturador-backend/`.
+2. Workers: `facturador-backend/`.
 3. Frontend: `facturador-frontend/`.
 
 La API usa por defecto el puerto `5000`. Vite define el puerto del frontend al iniciar.
@@ -29,7 +29,7 @@ La API usa por defecto el puerto `5000`. Vite define el puerto del frontend al i
 Backend:
 
 ```powershell
-cd facturador
+cd facturador-backend
 npm install
 ```
 
@@ -44,7 +44,7 @@ Los repositorios contienen `package-lock.json`; cualquier cambio de dependencias
 
 ## 4. Variables de entorno
 
-El backend carga `facturador/.env`. No copiar secretos a documentacion ni commits.
+El backend carga `facturador-backend/.env`. No copiar secretos a documentacion ni commits.
 
 ### Minimo para API, datos y workers
 
@@ -157,7 +157,7 @@ Si no se define, el frontend usa `/api`, lo que requiere un proxy o despliegue b
 
 ## 5. Base de datos
 
-Desde `facturador/`:
+Desde `facturador-backend/`:
 
 ```powershell
 npx prisma generate
@@ -225,14 +225,14 @@ La migracion `20260816100000_remove_payment_fiscal_fields` elimina de `Payment` 
 Terminal 1, API:
 
 ```powershell
-cd facturador
+cd facturador-backend
 npm start
 ```
 
 Terminal 2, workers:
 
 ```powershell
-cd facturador
+cd facturador-backend
 npm run start:workers
 ```
 
@@ -266,25 +266,34 @@ cd facturador-frontend
 npm run build
 ```
 
-Resultado: correcto el 2026-08-10 (TypeScript y build Vite).
+Resultado: correcto el 2026-08-26 (TypeScript y build Vite).
 
 Sintaxis backend:
 
 ```powershell
-cd facturador
+cd facturador-backend
 Get-ChildItem -Recurse -File -Filter '*.js' src,prisma | ForEach-Object { node --check $_.FullName }
 ```
 
-Resultado: correcto el 2026-08-10.
+Resultado: correcto el 2026-08-26.
+
+Tests unitarios backend:
+
+```powershell
+cd facturador-backend
+npm test
+```
+
+Resultado: 17 tests correctos el 2026-08-26.
 
 Prisma:
 
 ```powershell
-cd facturador
+cd facturador-backend
 npx prisma validate
 ```
 
-Las migraciones, la creacion de datos demo, tenants y planes fueron ejecutadas correctamente en el entorno local, segun validacion manual reportada el 2026-08-14.
+Resultado de `npx prisma validate`: esquema valido el 2026-08-26. Las migraciones, la creacion de datos demo, tenants y planes fueron ejecutadas correctamente en el entorno local, segun validacion manual reportada el 2026-08-14.
 
 ### Validaciones manuales completadas
 

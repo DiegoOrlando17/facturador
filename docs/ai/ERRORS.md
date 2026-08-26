@@ -36,6 +36,6 @@ El flujo post-ARCA trataba Drive y Sheets como pasos obligatorios. Si el tenant 
 
 ### Related files
 
-- `facturador/src/workers/invoice.worker.js`
-- `facturador/src/services/tenantGoogle.service.js`
-- `facturador/src/services/tenantConfig.service.js`
+- `facturador-backend/src/workers/invoice.worker.js`
+- `facturador-backend/src/services/tenantGoogle.service.js`
+- `facturador-backend/src/services/tenantConfig.service.js`

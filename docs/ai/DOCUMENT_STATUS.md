@@ -1,6 +1,6 @@
 # Estado de la documentacion historica
 
-Ultima revision: 2026-08-22
+Ultima revision: 2026-08-26
 
 Este inventario clasifica la documentacion anterior a `IMPLEMENTATION_PLAN.md`. No reemplaza al codigo como fuente de contratos implementados.
 
@@ -14,6 +14,7 @@ Este inventario clasifica la documentacion anterior a `IMPLEMENTATION_PLAN.md`. 
 | `docs/ai/DECISIONS.md` | Decisiones tecnicas vigentes y pendientes. |
 | `docs/ai/RUNBOOK.md` | Operacion y validaciones comprobadas. |
 | `docs/ai/ERRORS.md` | Errores recurrentes y soluciones reutilizables. |
+| `README.md` | Entrada operativa y estructura del monorepo. |
 
 ## Referencias tecnicas conservadas
 
@@ -21,20 +22,20 @@ Estos documentos siguen siendo utiles para entender contratos o implementaciones
 
 | Documento | Clasificacion |
 | --- | --- |
-| `facturador/docs/API_ENDPOINTS.md` | Referencia general de API. |
-| `facturador/docs/ADMIN_MONITOR_API.md` | Referencia del contrato del panel admin. |
-| `facturador/docs/PORTAL_API.md` | Referencia del contrato del portal cliente. |
+| `facturador-backend/docs/API_ENDPOINTS.md` | Referencia general de API. |
+| `facturador-backend/docs/ADMIN_MONITOR_API.md` | Referencia del contrato del panel admin. |
+| `facturador-backend/docs/PORTAL_API.md` | Referencia del contrato del portal cliente. |
 | `facturador-frontend/docs/API_ENDPOINTS.md` | Copia de referencia usada por el frontend; no es fuente canonica. |
-| `facturador/docs/OPERACION_MULTITENANT.md` | Referencia operativa; `docs/ai/RUNBOOK.md` tiene precedencia. |
+| `facturador-backend/docs/OPERACION_MULTITENANT.md` | Referencia operativa; `docs/ai/RUNBOOK.md` tiene precedencia. |
 
 ## Referencias historicas
 
 | Documento o directorio | Motivo |
 | --- | --- |
-| `facturador/docs/ROADMAP_PRODUCCION.md` | Roadmap anterior, reemplazado por `IMPLEMENTATION_PLAN.md`. |
-| `facturador/docs/MULTITENANT.md` | Checklist historico, reemplazado por el plan y contexto centrales. |
-| `facturador/docs/DOMAIN_DECISIONS.md` | Antecedentes de dominio; las decisiones vigentes estan en `docs/ai/DECISIONS.md`. |
-| `facturador/docs/MONITOR_PORTAL.md` | Propuesta inicial de producto y UI; no define el alcance vigente. |
+| `facturador-backend/docs/ROADMAP_PRODUCCION.md` | Roadmap anterior, reemplazado por `IMPLEMENTATION_PLAN.md`. |
+| `facturador-backend/docs/MULTITENANT.md` | Checklist historico, reemplazado por el plan y contexto centrales. |
+| `facturador-backend/docs/DOMAIN_DECISIONS.md` | Antecedentes de dominio; las decisiones vigentes estan en `docs/ai/DECISIONS.md`. |
+| `facturador-backend/docs/MONITOR_PORTAL.md` | Propuesta inicial de producto y UI; no define el alcance vigente. |
 | `files for review/` | Capturas, analisis y contexto visual de referencia; no son implementacion ni criterios de aceptacion. |
 | `ToDo.md` | Lista informal de incidencias; debe convertirse en tareas verificables antes de implementar. |
 

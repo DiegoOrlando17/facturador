@@ -1,6 +1,6 @@
 # Contexto del proyecto
 
-Ultima revision: 2026-08-15
+Ultima revision: 2026-08-26
 
 ## Producto
 
@@ -15,9 +15,9 @@ El alcance completo tambien incluye panel admin web/mobile, portal cliente web/m
 
 Todas las tiers incluyen la descarga desde el portal del PDF de cada comprobante emitido en ARCA. A partir de la tier 3 se ofrece una integracion opcional con Google del cliente: una carpeta de Drive para los PDF facturados y una planilla de Sheets para registrar el estado de todos los pagos procesados.
 
-## Repositorios y estructura
+## Repositorio y estructura
 
-- `facturador/`: API y workers Node.js.
+- `facturador-backend/`: API y workers Node.js.
 - `facturador-frontend/`: aplicacion React que hoy contiene principalmente el panel admin y un prototipo estatico del portal cliente.
 - `docs/ai/SCOPE.md`: fuente del alcance funcional.
 - `IMPLEMENTATION_PLAN.md`: estado y secuencia de trabajo vigente.
@@ -29,7 +29,7 @@ Todas las tiers incluyen la descarga desde el portal del PDF de cada comprobante
 - `docs/ai/SECURITY_PERMISSIONS.md`: matriz de capacidades para roles admin y tenant.
 - `files for review/`: analisis y capturas de referencia visual; no son implementacion ejecutable.
 
-Los directorios `facturador/` y `facturador-frontend/` son repositorios Git separados. Ambos tienen cambios locales no confirmados al 2026-08-10.
+Desde 2026-08-26, backend, frontend y documentacion forman un unico repositorio Git. No hay gitlinks, submodulos ni metadatos `.git` dentro de los directorios de las aplicaciones; el estado y los commits se administran desde la raiz.
 
 ## Stack confirmado
 
@@ -93,13 +93,13 @@ El comando `invoice:test-flow` permite crear un pago sintetico en PostgreSQL loc
 - `Invoice`, `InvoiceEvent` e `InvoiceDocument` son el dominio fiscal vigente. `Payment` conserva datos y estado operativo del cobro, pero ya no almacena CAE, numero/tipo de comprobante, punto de venta, PDF ni enlace Drive. Admin, portal y CSV mantienen campos compatibles mediante una proyeccion desde `Invoice`.
 - El modelo de plan usa `featuresJson`; no hay entitlements/limites tipados ni enforcement integral.
 - El healthcheck no comprueba PostgreSQL, Redis, colas ni integraciones.
-- No existen scripts de test, lint o CI en los `package.json`.
+- El backend tiene tests unitarios con `node:test`; el frontend valida tipos durante el build. Todavia no hay lint ni CI.
 - Hay valores fallback de secretos para desarrollo; no son aceptables en produccion.
 - El storage local de PDFs no tiene aun estrategia productiva documentada.
 - No se verifico en esta revision el estado de migraciones contra una base real.
 
 ## Documentacion relacionada
 
-- `facturador/docs/API_ENDPOINTS.md`, `ADMIN_MONITOR_API.md` y `PORTAL_API.md`: contratos historicos; deben contrastarse con las rutas antes de usarlos como fuente normativa.
-- `facturador/docs/ROADMAP_PRODUCCION.md`: roadmap historico utilizado como evidencia, reemplazado como plan activo por `IMPLEMENTATION_PLAN.md`.
-- `facturador/docs/DOMAIN_DECISIONS.md`: antecedente de decisiones incorporado a `docs/ai/DECISIONS.md`.
+- `facturador-backend/docs/API_ENDPOINTS.md`, `ADMIN_MONITOR_API.md` y `PORTAL_API.md`: contratos historicos; deben contrastarse con las rutas antes de usarlos como fuente normativa.
+- `facturador-backend/docs/ROADMAP_PRODUCCION.md`: roadmap historico utilizado como evidencia, reemplazado como plan activo por `IMPLEMENTATION_PLAN.md`.
+- `facturador-backend/docs/DOMAIN_DECISIONS.md`: antecedente de decisiones incorporado a `docs/ai/DECISIONS.md`.

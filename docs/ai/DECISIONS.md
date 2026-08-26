@@ -1,6 +1,6 @@
 # Decisiones tecnicas y de producto
 
-Ultima revision: 2026-08-10
+Ultima revision: 2026-08-26
 
 Este archivo registra decisiones durables. Las preguntas abiertas se incluyen al final y no deben tratarse como decisiones aprobadas.
 
@@ -267,6 +267,25 @@ Consecuencias:
 - `passwordHash` no se serializa en operaciones administrativas de usuarios tenant;
 - `revealSecrets=true` requiere `SUPERADMIN`;
 - cambios futuros de rol deben agregar tests de permisos y revisar la UI correspondiente.
+
+## D-016 - Monorepo unico para backend, frontend y documentacion
+
+Estado: vigente
+
+Decision: administrar `facturador-backend/`, `facturador-frontend/` y la documentacion central dentro de un unico repositorio Git, con un solo remoto operativo `origin`.
+
+Contexto: backend y frontend se desarrollaban en repositorios independientes, mientras el plan y la documentacion compartida necesitaban coordinar cambios entre ambos. La separacion dejaba estados Git y commits que no representaban una version integral del producto.
+
+Alternativas consideradas: conservar repositorios independientes; usar submodulos; importar ambos historiales y operar un monorepo.
+
+Rationale: el producto comparte contratos, plan, runbook y criterios de validacion. Un monorepo permite versionar esos cambios de forma atomica y reduce el riesgo de combinaciones incompatibles.
+
+Consecuencias:
+
+- el estado Git, las ramas y los commits se administran desde la raiz;
+- no se admiten `.git` anidados, gitlinks ni submodulos para las dos aplicaciones;
+- los comandos de desarrollo siguen ejecutandose dentro del directorio de cada aplicacion;
+- los antiguos remotos separados no forman parte de la operacion normal.
 
 ## Decisiones pendientes
 
