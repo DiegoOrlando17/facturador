@@ -116,6 +116,21 @@ SHEET_NAME=Hoja1
 
 Tambien se admite `GOOGLE_TOKEN_B64`. `NGROK_URL` puede actuar como base de callback en desarrollo.
 
+Para generar nuevamente el token Google global configurado en `GOOGLE_TOKEN_PATH`, sin editar ni descomentar codigo:
+
+```powershell
+cd facturador-backend
+npm run google:new-token
+```
+
+El comando valida `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` y `GOOGLE_TOKEN_PATH`, muestra la URL de autorizacion, solicita el codigo OAuth y reemplaza el archivo configurado con permisos restringidos. Usar solo con la cuenta y los recursos Google de prueba previstos. Si Google no devuelve `refresh_token`, revocar previamente el acceso de la aplicacion y repetir el consentimiento.
+
+Para comprobar solamente la configuracion sin iniciar OAuth ni modificar archivos:
+
+```powershell
+npm run google:new-token -- --check
+```
+
 La configuracion operativa objetivo es por tenant y debe identificar, como minimo:
 
 - credenciales/autorizacion del cliente;

@@ -14,6 +14,7 @@
     "tenant:bootstrap": "node src/scripts/bootstrap-legacy-tenant.js",
     "tenant:setup-demo": "node src/scripts/setup-demo.js",
     "plans:sync": "node src/scripts/sync-plans.js",
+    "google:new-token": "node src/scripts/get-google-token.js",
     "invoice:verify-backfill": "node src/scripts/verify-invoice-backfill.js",
     "invoice:verify-read-model": "node src/scripts/verify-invoice-read-model.js",
     "invoice:test-flow": "node src/scripts/test-invoice-flow.js",
