@@ -7,6 +7,7 @@ import { invoicesQueue } from "../queues/invoices.queue.js";
 import { keepGoogleConnectionsAlive } from "../services/tenantGoogle.service.js";
 import { buildQueueJobId, toQueueId } from "../utils/bigint.js";
 import { logPaymentEvent } from "../services/paymentEvent.service.js";
+import { addOrReplaceFailedJob, resolveAutomaticRetryStep } from "../domain/retryPolicy.js";
 
 const RETRY_INTERVAL_MS = 10 * 60 * 1000; // 10 minutos
 
@@ -24,8 +25,8 @@ async function reenqueuePendingPayments() {
         const { id, tenantId, provider_payment_id, status } = payment;
         const invoice = await getInvoiceByPaymentId(tenantId, id);
 
-        if (status === "afip_pending") {
-          const step = invoice?.status === "ISSUED" ? "post" : "afip";
+        const step = resolveAutomaticRetryStep(status, invoice?.status);
+        if (step) {
           await logPaymentEvent(tenantId, id, "retry_scheduled", `Retry worker reencolo paso ${step}`, {
             status,
             invoiceStatus: invoice?.status ?? null,
@@ -38,22 +39,10 @@ async function reenqueuePendingPayments() {
             });
           }
           const queue = step === "afip" ? paymentsQueue : invoicesQueue;
-          await queue.add(`${step}-${tenantId}-${payment.provider_payment_id.toString()}`, { tenantId: toQueueId(tenantId), paymentId: toQueueId(payment.id) }, {
+          await addOrReplaceFailedJob(queue, `${step}-${tenantId}-${payment.provider_payment_id.toString()}`, { tenantId: toQueueId(tenantId), paymentId: toQueueId(payment.id) }, {
             jobId: buildQueueJobId({ tenantId, paymentId: payment.id, step }),
             attempts: 5,
             backoff: { type: "exponential", delay: step === "afip" ? 3000 : 2000 },
-            removeOnComplete: true,
-            removeOnFail: 50,
-          });
-        }
-        else if (["pdf_pending", "drive_pending", "sheets_pending"].includes(status)) {
-          await logPaymentEvent(tenantId, id, "retry_scheduled", "Retry worker reencolo paso post-AFIP", {
-            status,
-          });
-          await invoicesQueue.add(`invoices-${payment.provider_payment_id.toString()}`, { tenantId: toQueueId(tenantId), paymentId: toQueueId(payment.id) }, {
-            jobId: buildQueueJobId({ tenantId, paymentId: payment.id, step: "post" }),
-            attempts: 5,
-            backoff: { type: "exponential", delay: 2000 },
             removeOnComplete: true,
             removeOnFail: 50,
           });

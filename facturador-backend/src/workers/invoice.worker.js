@@ -68,7 +68,19 @@ const worker = new Worker("invoices", async (job) => {
     const hasIssuedInvoice = Boolean(
       invoice?.status === "ISSUED" && invoice.cae && invoice.cbteNro && invoice.caeVto
     );
-    const googleCtx = hasIssuedInvoice ? await getGoogleInvoiceContext(tenantId) : null;
+    let googleCtx = null;
+    if (hasIssuedInvoice) {
+      try {
+        googleCtx = await getGoogleInvoiceContext(tenantId);
+      } catch (error) {
+        const message = `No se pudo autenticar Google: ${error?.message || String(error)}`;
+        await updatePaymentStatus(tenantId, payment.id, "drive_pending", message);
+        await logPaymentEvent(tenantId, payment.id, "failed", "No se pudo autenticar Google para el postproceso", {
+          invoiceStatus: invoice.status,
+        });
+        throw error;
+      }
+    }
     if (!hasIssuedInvoice) {
       const sheetsResult = await syncPaymentToSheets(tenantId, payment, {
         status: "ERROR",

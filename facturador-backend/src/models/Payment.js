@@ -100,6 +100,7 @@ export async function getPendingPayments(tenantId = null) {
       ...(tenantId ? { tenantId } : {}),
       status: {
         in: [
+          "processing",
           "afip_pending",
           "pdf_pending",
           "drive_pending",

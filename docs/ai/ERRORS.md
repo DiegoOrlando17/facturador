@@ -5,6 +5,41 @@ Reusable debugging notes for recurring or high-value errors.
 Do not use this as a task history. Commits are the task history.
 
 ---
+# Pagos quedan en processing despues de un fallo Google
+
+Area: Node | BullMQ | Google Drive/Sheets | Workers
+Status: solved
+Last seen: 2026-08-28
+
+### Symptoms
+
+Tras corregir o reautorizar Google, las facturas ya emitidas permanecen en `processing` y el retry worker no vuelve a procesarlas.
+
+### Root cause
+
+El postproceso obtenia el contexto Google mientras el pago seguia en `processing`. Si la autenticacion fallaba, el error se relanzaba sin moverlo a un estado reintentable. Ademas, el retry worker no consultaba `processing` y un job BullMQ fallido conservado con el mismo `jobId` no se reencolaba mediante un nuevo `add`.
+
+### Fix
+
+- Un fallo de autenticacion Google posterior a una factura `ISSUED` mueve el pago a `drive_pending`.
+- El retry worker recupera `processing` solo cuando la factura ya esta `ISSUED` y ejecuta exclusivamente el postproceso.
+- Los estados `processing` con emision fiscal incierta no se reintentan automaticamente en ARCA.
+- Un job fallido con el mismo ID se reemplaza antes de reencolarlo.
+
+### First checks next time
+
+1. Comparar `Payment.status` con `Invoice.status` y confirmar si existe CAE.
+2. Verificar que `retry.worker.js` este ejecutandose y conectado a Redis.
+3. Revisar el estado del job deterministico en BullMQ.
+4. Nunca reenviar a ARCA automaticamente una factura con estado fiscal incierto.
+
+### Related files
+
+- `facturador-backend/src/workers/invoice.worker.js`
+- `facturador-backend/src/workers/retry.worker.js`
+- `facturador-backend/src/domain/retryPolicy.js`
+- `facturador-backend/src/models/Payment.js`
+
 # Google OAuth: Error 400 redirect_uri_mismatch
 
 Area: Node | Google OAuth | Admin
