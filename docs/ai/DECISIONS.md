@@ -323,7 +323,7 @@ Consecuencias:
 - el inicio publico `/google/oauth/start` fue retirado;
 - `POST /admin/tenants/:slug/integrations/google/oauth-url` requiere `admin.manageTenants`;
 - el callback conserva carpeta Drive, spreadsheet y hoja existentes y reemplaza el refresh token cifrado en ambas integraciones;
-- el comando `google:new-token` queda solo para compatibilidad con el token global heredado, no como operacion normal por tenant.
+- el mecanismo global `GOOGLE_TOKEN_PATH`/`GOOGLE_TOKEN_B64` y el comando `google:new-token` fueron retirados; la autorizacion Google se administra exclusivamente por tenant.
 
 ## Decisiones pendientes
 

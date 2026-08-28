@@ -39,12 +39,8 @@ export const config = {
   GOOGLE: {
     CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
     CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,
-    DRIVE_FOLDER_ID: process.env.DRIVE_FOLDER_ID,
-    SHEETS_ID: process.env.SHEET_ID,
-    SHEET_NAME: process.env.SHEET_NAME || "Hoja1",
-    TOKEN_B64: process.env.GOOGLE_TOKEN_B64,
-    TOKEN: process.env.GOOGLE_TOKEN_PATH,
     REDIRECT_URI: process.env.GOOGLE_REDIRECT_URI || `${googleRedirectBase}/google/oauth/callback`,
+    REDIRECT_URI_EXPLICIT: Boolean(process.env.GOOGLE_REDIRECT_URI),
     STATE_SECRET: process.env.GOOGLE_STATE_SECRET || process.env.GOOGLE_CLIENT_SECRET || "google-state-secret",
   },
 

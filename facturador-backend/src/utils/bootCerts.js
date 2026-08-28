@@ -25,7 +25,4 @@ export function writeFilesFromEnv() {
   if (config.AFIP.TA_B64) {
     config.AFIP.TA = writeBase64File("TA-wsfe.json", config.AFIP.TA_B64);
   }
-  if (config.GOOGLE.TOKEN_B64) {
-    config.GOOGLE.TOKEN = writeBase64File("token.json", config.GOOGLE.TOKEN_B64);
-  }
 }

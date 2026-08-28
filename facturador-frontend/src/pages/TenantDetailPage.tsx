@@ -308,11 +308,9 @@ const integrationTemplates: Record<IntegrationProvider, Record<string, unknown>>
     KEY_B64: "",
   },
   DRIVE: {
-    REFRESH_TOKEN: "",
     DRIVE_FOLDER_ID: "",
   },
   SHEETS: {
-    REFRESH_TOKEN: "",
     SHEETS_ID: "",
     SHEET_NAME: "",
   },
@@ -341,19 +339,9 @@ const integrationFieldDefinitions: Record<IntegrationProvider, IntegrationFieldD
     { key: "ALIC_IVA", label: "Alicuota IVA", inputType: "number", valueType: "number" },
   ],
   DRIVE: [
-    { key: "REFRESH_TOKEN", label: "Refresh token", required: true, secret: true, inputType: "password" },
-    { key: "CLIENT_ID", label: "Client ID" },
-    { key: "CLIENT_SECRET", label: "Client secret", secret: true, inputType: "password" },
-    { key: "SCOPES", label: "Scopes", valueType: "list", helper: "Separados por coma." },
-    { key: "TOKEN_TYPE", label: "Tipo de token" },
     { key: "DRIVE_FOLDER_ID", label: "Carpeta Drive" },
   ],
   SHEETS: [
-    { key: "REFRESH_TOKEN", label: "Refresh token", required: true, secret: true, inputType: "password" },
-    { key: "CLIENT_ID", label: "Client ID" },
-    { key: "CLIENT_SECRET", label: "Client secret", secret: true, inputType: "password" },
-    { key: "SCOPES", label: "Scopes", valueType: "list", helper: "Separados por coma." },
-    { key: "TOKEN_TYPE", label: "Tipo de token" },
     { key: "SHEETS_ID", label: "Spreadsheet ID" },
     { key: "SHEET_NAME", label: "Nombre de hoja" },
   ],
@@ -1167,7 +1155,7 @@ export function TenantDetailPage() {
           label: "Google Drive",
           detail: hasMeaningfulConfig(integrationByProvider("DRIVE"))
             ? "Conexion de Drive cargada."
-            : "Cargar REFRESH_TOKEN y datos de carpeta si aplican.",
+            : "Autorizar Google y configurar la carpeta de destino.",
           isComplete: hasMeaningfulConfig(integrationByProvider("DRIVE")),
           targetId: "tenant-integrations",
           impact: "No bloquea facturacion, degrada entrega de PDFs",
@@ -1179,7 +1167,7 @@ export function TenantDetailPage() {
           label: "Google Sheets",
           detail: hasMeaningfulConfig(integrationByProvider("SHEETS"))
             ? "Conexion de Sheets cargada."
-            : "Cargar REFRESH_TOKEN y spreadsheet de destino.",
+            : "Autorizar Google y configurar el spreadsheet de destino.",
           isComplete: hasMeaningfulConfig(integrationByProvider("SHEETS")),
           targetId: "tenant-integrations",
           impact: "No bloquea facturacion, degrada registro contable",

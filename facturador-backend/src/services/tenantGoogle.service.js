@@ -5,8 +5,8 @@ import { config } from "../config/index.js";
 import { ENTITLEMENTS, hasEntitlement } from "../domain/planPolicy.js";
 import {
   resolveTenantIdBySlug,
+  replaceTenantIntegrationConfig,
   tryGetTenantIntegrationConfig,
-  upsertTenantIntegrationConfig,
   listEnabledTenantsByIntegration,
 } from "./tenantConfig.service.js";
 import { getTenantSubscriptionPolicy } from "./subscriptionPolicy.service.js";
@@ -16,15 +16,63 @@ export const GOOGLE_SCOPES = [
   "https://www.googleapis.com/auth/spreadsheets",
 ];
 
+export function mergeGoogleTenantIntegrationConfig(provider, existing = {}, submitted = {}) {
+  const managedConfig = {
+    REFRESH_TOKEN: existing.REFRESH_TOKEN,
+    SCOPES: existing.SCOPES,
+    TOKEN_TYPE: existing.TOKEN_TYPE,
+  };
+
+  if (provider === "DRIVE") {
+    return { DRIVE_FOLDER_ID: submitted.DRIVE_FOLDER_ID, ...managedConfig };
+  }
+  if (provider === "SHEETS") {
+    return {
+      SHEETS_ID: submitted.SHEETS_ID,
+      SHEET_NAME: submitted.SHEET_NAME ?? "Hoja1",
+      ...managedConfig,
+    };
+  }
+  throw new Error("Proveedor Google invalido");
+}
+
 /** @type {Map<string, { accessToken: string, expiresAt: number }>} */
 const tenantAccessTokenCache = new Map();
 
 function createOAuthClient() {
+  validateGoogleOAuthSettings({
+    clientId: config.GOOGLE.CLIENT_ID,
+    clientSecret: config.GOOGLE.CLIENT_SECRET,
+    redirectUri: config.GOOGLE.REDIRECT_URI,
+    redirectUriExplicit: config.GOOGLE.REDIRECT_URI_EXPLICIT,
+  });
   return new google.auth.OAuth2(
     config.GOOGLE.CLIENT_ID,
     config.GOOGLE.CLIENT_SECRET,
     config.GOOGLE.REDIRECT_URI
   );
+}
+
+export function validateGoogleOAuthSettings({ clientId, clientSecret, redirectUri, redirectUriExplicit }) {
+  if (!clientId || !clientSecret) {
+    throw new Error("GOOGLE_CLIENT_ID y GOOGLE_CLIENT_SECRET son obligatorios para OAuth por tenant");
+  }
+  if (!redirectUriExplicit) {
+    throw new Error("GOOGLE_REDIRECT_URI debe definirse explicitamente y coincidir con una URI autorizada de un cliente OAuth Web application");
+  }
+
+  let parsed;
+  try {
+    parsed = new URL(redirectUri);
+  } catch {
+    throw new Error("GOOGLE_REDIRECT_URI no es una URL valida");
+  }
+  if (parsed.protocol !== "https:" && !(parsed.protocol === "http:" && ["localhost", "127.0.0.1"].includes(parsed.hostname))) {
+    throw new Error("GOOGLE_REDIRECT_URI debe usar HTTPS, salvo callbacks locales con localhost");
+  }
+  if (parsed.pathname !== "/google/oauth/callback") {
+    throw new Error("GOOGLE_REDIRECT_URI debe finalizar en /google/oauth/callback");
+  }
 }
 
 function encodeBase64Url(value) {
@@ -136,8 +184,6 @@ export async function connectTenantGoogleFromCallback({ code, state }) {
   const sheetsExisting = await tryGetTenantIntegrationConfig(tenantId, "SHEETS");
 
   const sharedGoogleConfig = {
-    CLIENT_ID: config.GOOGLE.CLIENT_ID,
-    CLIENT_SECRET: config.GOOGLE.CLIENT_SECRET,
     REFRESH_TOKEN: tokens.refresh_token
       ?? driveExisting?.REFRESH_TOKEN
       ?? sheetsExisting?.REFRESH_TOKEN
@@ -146,7 +192,7 @@ export async function connectTenantGoogleFromCallback({ code, state }) {
     TOKEN_TYPE: tokens.token_type ?? "Bearer",
   };
 
-  await upsertTenantIntegrationConfig(tenantId, "DRIVE", {
+  await replaceTenantIntegrationConfig(tenantId, "DRIVE", {
     ...sharedGoogleConfig,
     DRIVE_FOLDER_ID:
       payload.driveFolderId
@@ -154,7 +200,7 @@ export async function connectTenantGoogleFromCallback({ code, state }) {
       ?? null,
   });
 
-  await upsertTenantIntegrationConfig(tenantId, "SHEETS", {
+  await replaceTenantIntegrationConfig(tenantId, "SHEETS", {
     ...sharedGoogleConfig,
     SHEETS_ID:
       payload.sheetsId

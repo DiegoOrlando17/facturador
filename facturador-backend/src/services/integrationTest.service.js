@@ -117,22 +117,28 @@ export async function testAfipConnection(afipCfg = {}) {
   };
 }
 
-async function getGoogleAccessToken(googleCfg = {}) {
-  const clientId = googleCfg.CLIENT_ID ?? config.GOOGLE.CLIENT_ID;
-  const clientSecret = googleCfg.CLIENT_SECRET ?? config.GOOGLE.CLIENT_SECRET;
+export function buildGoogleTokenRequest(googleCfg = {}, googleAppConfig = config.GOOGLE) {
+  const clientId = googleAppConfig.CLIENT_ID;
+  const clientSecret = googleAppConfig.CLIENT_SECRET;
   const refreshToken = googleCfg.REFRESH_TOKEN;
 
   if (!refreshToken) throw new Error("GOOGLE.REFRESH_TOKEN es obligatorio");
   if (!clientId) throw new Error("GOOGLE.CLIENT_ID es obligatorio");
   if (!clientSecret) throw new Error("GOOGLE.CLIENT_SECRET es obligatorio");
 
+  return {
+    client_id: clientId,
+    client_secret: clientSecret,
+    refresh_token: refreshToken,
+    grant_type: "refresh_token",
+  };
+}
+
+async function getGoogleAccessToken(googleCfg = {}) {
+  const tokenRequest = buildGoogleTokenRequest(googleCfg);
+
   const response = await axios.post("https://oauth2.googleapis.com/token", null, {
-    params: {
-      client_id: clientId,
-      client_secret: clientSecret,
-      refresh_token: refreshToken,
-      grant_type: "refresh_token",
-    },
+    params: tokenRequest,
     timeout: 30000,
   });
 

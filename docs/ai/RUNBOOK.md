@@ -105,37 +105,17 @@ Como alternativa de despliegue, el codigo admite `AFIP_CERT_B64`, `AFIP_KEY_B64`
 ```dotenv
 GOOGLE_CLIENT_ID=
 GOOGLE_CLIENT_SECRET=
-GOOGLE_REDIRECT_BASE_URL=http://localhost:5000
 GOOGLE_REDIRECT_URI=http://localhost:5000/google/oauth/callback
 GOOGLE_STATE_SECRET=<secreto-aleatorio-fuerte>
-GOOGLE_TOKEN_PATH=
-DRIVE_FOLDER_ID=
-SHEET_ID=
-SHEET_NAME=Hoja1
 ```
 
-Tambien se admite `GOOGLE_TOKEN_B64`. `NGROK_URL` puede actuar como base de callback en desarrollo.
+El OAuth por tenant requiere un cliente de tipo **Web application**. En Google Cloud, registrar como Authorized redirect URI exactamente el mismo valor de `GOOGLE_REDIRECT_URI` (incluidos esquema, host, puerto, path y barra final). No usar para este flujo un cliente Desktop/Installed ni depender del fallback `NGROK_URL`. Para desarrollo local se recomienda `http://localhost:5000/google/oauth/callback`; reiniciar la API despues de cambiar las credenciales o la URI.
 
-Para generar nuevamente el token Google global configurado en `GOOGLE_TOKEN_PATH`, sin editar ni descomentar codigo:
-
-```powershell
-cd facturador-backend
-npm run google:new-token
-```
-
-El comando valida `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` y `GOOGLE_TOKEN_PATH`, muestra la URL de autorizacion, solicita el codigo OAuth y reemplaza el archivo configurado con permisos restringidos. Usar solo con la cuenta y los recursos Google de prueba previstos. Si Google no devuelve `refresh_token`, revocar previamente el acceso de la aplicacion y repetir el consentimiento.
-
-Para comprobar solamente la configuracion sin iniciar OAuth ni modificar archivos:
-
-```powershell
-npm run google:new-token -- --check
-```
-
-Para las integraciones por tenant, usar `Conectar / reautorizar Google` desde la pestaña Integraciones del detalle admin. El backend genera una URL firmada y efimera para el tenant seleccionado; el callback conserva carpeta Drive, spreadsheet y hoja existentes, y reemplaza el refresh token cifrado en `DRIVE` y `SHEETS`. No existe un inicio OAuth publico por slug.
+`GOOGLE_CLIENT_ID` y `GOOGLE_CLIENT_SECRET` identifican a la aplicacion Facturador frente a Google; no son credenciales del tenant. Para cada tenant, usar `Conectar / reautorizar Google` desde la pestaña Integraciones del detalle admin. El backend genera una URL firmada y efimera, el callback resuelve el tenant desde DB y guarda su refresh token cifrado en `DRIVE` y `SHEETS`, conservando carpeta, spreadsheet y hoja. No existe token global ni inicio OAuth publico por slug.
 
 La configuracion operativa objetivo es por tenant y debe identificar, como minimo:
 
-- credenciales/autorizacion del cliente;
+- refresh token cifrado obtenido mediante el consentimiento del cliente;
 - carpeta Drive destino de los PDF;
 - spreadsheet y hoja donde se registran los comprobantes.
 
@@ -305,7 +285,7 @@ cd facturador-backend
 npm test
 ```
 
-Resultado: 22 tests correctos el 2026-08-26.
+Resultado: 26 tests correctos el 2026-08-28.
 
 Prisma:
 

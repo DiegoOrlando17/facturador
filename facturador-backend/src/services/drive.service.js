@@ -1,7 +1,6 @@
 import fs from "fs";
 import { google } from "googleapis";
 import logger from "../utils/logger.js";
-import { getAccessToken } from "./google-auth.js";
 
 /**
  * @param {string} pdfPath
@@ -33,18 +32,5 @@ export async function uploadToDrive(pdfPath, filename, opts = {}) {
   } catch (error) {
     logger.error("Error en el uploadToDrive: " + error);
     return null;
-  }
-}
-
-export async function keepTokenAlive() {
-  try {
-    const accessToken = await getAccessToken();
-    const auth = new google.auth.OAuth2();
-    auth.setCredentials({ access_token: accessToken });
-
-    const drive = google.drive({ version: "v3", auth });
-    await drive.files.list({ pageSize: 1 });
-  } catch (error) {
-    console.error("Error manteniendo sesion Google:", error.message);
   }
 }

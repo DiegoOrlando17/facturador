@@ -20,12 +20,6 @@ Los secretos se devuelven enmascarados por defecto y `passwordHash` nunca forma 
 - Desde el detalle admin de un comprobante ya emitido se puede solicitar `Subir a Drive y Sheets`. La accion omite destinos ya registrados y no vuelve a emitir en ARCA.
 - Sheets funciona como registro operativo: agrega una fila por pago y actualiza esa misma fila con estado `ERROR` u `OK` en cada intento. Los errores ARCA se registran aunque no exista PDF; Drive solo aplica a comprobantes emitidos.
 
-Para regenerar interactivamente el token Google global configurado en `GOOGLE_TOKEN_PATH`:
-
-```powershell
-npm run google:new-token
-```
-
 ## Planes
 
 Los planes vigentes se sincronizan de forma idempotente con:

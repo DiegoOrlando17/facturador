@@ -62,7 +62,7 @@ import { maskSecrets } from "../utils/crypto.js";
 import { toBigIntId } from "../utils/bigint.js";
 import { normalizeTenantSchedule } from "../domain/tenantScheduler.js";
 import { getTenantSubscriptionPolicy } from "../services/subscriptionPolicy.service.js";
-import { buildTenantGoogleAuthUrl } from "../services/tenantGoogle.service.js";
+import { buildTenantGoogleAuthUrl, mergeGoogleTenantIntegrationConfig } from "../services/tenantGoogle.service.js";
 
 const router = Router();
 
@@ -149,14 +149,27 @@ function validateIntegrationConfig(provider, config) {
   }
 
   if (provider === "DRIVE") {
-    if (!current.REFRESH_TOKEN) throw new Error("DRIVE.REFRESH_TOKEN es obligatorio");
+    if (!current.REFRESH_TOKEN) throw new Error("Conecta Google por OAuth antes de guardar o probar Drive");
   }
 
   if (provider === "SHEETS") {
-    if (!current.REFRESH_TOKEN) throw new Error("SHEETS.REFRESH_TOKEN es obligatorio");
+    if (!current.REFRESH_TOKEN) throw new Error("Conecta Google por OAuth antes de guardar o probar Sheets");
   }
 
   return current;
+}
+
+async function resolveGoogleManagedIntegrationConfig(tenantId, provider, submittedConfig) {
+  if (provider !== "DRIVE" && provider !== "SHEETS") {
+    return validateIntegrationConfig(provider, submittedConfig);
+  }
+
+  const existing = await tryGetTenantIntegrationConfig(tenantId, provider);
+  const submitted = submittedConfig && typeof submittedConfig === "object" && !Array.isArray(submittedConfig)
+    ? submittedConfig
+    : {};
+  const config = mergeGoogleTenantIntegrationConfig(provider, existing, submitted);
+  return validateIntegrationConfig(provider, config);
 }
 
 async function buildAnalyticsFilters(query) {
@@ -773,7 +786,7 @@ router.put("/tenants/:slug/integrations/:provider", requireAdminPermission(ADMIN
     const tenantId = await resolveTenantIdBySlug(req.params.slug);
     const provider = validateProvider(req.params.provider);
     const enabled = req.body.enabled !== undefined ? Boolean(req.body.enabled) : true;
-    const config = validateIntegrationConfig(provider, req.body.config);
+    const config = await resolveGoogleManagedIntegrationConfig(tenantId, provider, req.body.config);
     if (provider === "MERCADOPAGO") {
       const subscription = await getTenantSubscriptionPolicy(tenantId);
       normalizeTenantSchedule(config, subscription?.policy);
@@ -797,7 +810,7 @@ router.post("/tenants/:slug/integrations/:provider/test", requireAdminPermission
     const tenantId = await resolveTenantIdBySlug(req.params.slug);
     const provider = validateProvider(req.params.provider);
     const config = req.body?.config !== undefined
-      ? validateIntegrationConfig(provider, req.body.config)
+      ? await resolveGoogleManagedIntegrationConfig(tenantId, provider, req.body.config)
       : await getTenantIntegrationConfig(tenantId, provider);
     const result = await testIntegrationConnection(provider, config);
 

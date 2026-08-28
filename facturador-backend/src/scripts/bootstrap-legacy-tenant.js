@@ -1,5 +1,3 @@
-import fs from "fs";
-import path from "path";
 import { PrismaClient } from "@prisma/client";
 import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
@@ -16,22 +14,6 @@ function compactObject(value) {
       current !== ""
     )
   );
-}
-
-function readGoogleTokenFile() {
-  if (!config.GOOGLE.TOKEN) return null;
-
-  const tokenPath = path.isAbsolute(config.GOOGLE.TOKEN)
-    ? config.GOOGLE.TOKEN
-    : path.resolve(process.cwd(), config.GOOGLE.TOKEN);
-
-  if (!fs.existsSync(tokenPath)) return null;
-
-  try {
-    return JSON.parse(fs.readFileSync(tokenPath, "utf8"));
-  } catch (_error) {
-    return null;
-  }
 }
 
 function buildTenantIntegrationsFromEnv() {
@@ -62,34 +44,6 @@ function buildTenantIntegrationsFromEnv() {
   });
   if (afipConfig.CUIT && afipConfig.PTO_VTA && afipConfig.CBTE_TIPO) {
     integrations.push({ provider: "AFIP", config: afipConfig });
-  }
-
-  const googleToken = readGoogleTokenFile();
-  const googleShared = compactObject({
-    CLIENT_ID: config.GOOGLE.CLIENT_ID,
-    CLIENT_SECRET: config.GOOGLE.CLIENT_SECRET,
-    REFRESH_TOKEN: googleToken?.refresh_token,
-    SCOPES: typeof googleToken?.scope === "string"
-      ? googleToken.scope.split(" ").filter(Boolean)
-      : undefined,
-    TOKEN_TYPE: googleToken?.token_type,
-  });
-
-  const driveConfig = compactObject({
-    ...googleShared,
-    DRIVE_FOLDER_ID: config.GOOGLE.DRIVE_FOLDER_ID,
-  });
-  if (driveConfig.REFRESH_TOKEN) {
-    integrations.push({ provider: "DRIVE", config: driveConfig });
-  }
-
-  const sheetsConfig = compactObject({
-    ...googleShared,
-    SHEETS_ID: config.GOOGLE.SHEETS_ID,
-    SHEET_NAME: config.GOOGLE.SHEET_NAME,
-  });
-  if (sheetsConfig.REFRESH_TOKEN) {
-    integrations.push({ provider: "SHEETS", config: sheetsConfig });
   }
 
   return integrations;

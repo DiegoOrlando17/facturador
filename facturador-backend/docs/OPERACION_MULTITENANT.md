@@ -31,7 +31,7 @@ Estas variables todavia pueden existir como fallback para instalaciones viejas o
 - `AFIP_*`
 - `GOOGLE_CLIENT_ID`
 - `GOOGLE_CLIENT_SECRET`
-- `GOOGLE_TOKEN_PATH` o `GOOGLE_TOKEN_B64`
+- Google se autoriza desde el detalle admin y el refresh token se guarda cifrado por tenant.
 - `DRIVE_FOLDER_ID`
 - `SHEET_ID`
 - `SHEET_NAME`
