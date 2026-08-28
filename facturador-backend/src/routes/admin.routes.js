@@ -1,4 +1,5 @@
 import { Router } from "express";
+import crypto from "crypto";
 import { assertAdminPermission, requireAdminAuth, requireAdminPermission } from "../middlewares/adminAuth.middleware.js";
 import { ADMIN_PERMISSIONS } from "../domain/permissions.js";
 import {
@@ -36,6 +37,7 @@ import {
   replaceTenantIntegrationConfig,
   resolveTenantIdBySlug,
   reviewTenantProfile,
+  tryGetTenantIntegrationConfig,
   upsertTenantProfile,
   upsertTenantSubscription,
   updateTenant,
@@ -60,6 +62,7 @@ import { maskSecrets } from "../utils/crypto.js";
 import { toBigIntId } from "../utils/bigint.js";
 import { normalizeTenantSchedule } from "../domain/tenantScheduler.js";
 import { getTenantSubscriptionPolicy } from "../services/subscriptionPolicy.service.js";
+import { buildTenantGoogleAuthUrl } from "../services/tenantGoogle.service.js";
 
 const router = Router();
 
@@ -724,6 +727,28 @@ router.get("/tenants/:slug/integrations", async (req, res) => {
     return res.json(normalizeJsonBigInts(integrations));
   } catch (error) {
     return res.status(error.statusCode || 400).json({ error: error.message || "No se pudieron listar integraciones" });
+  }
+});
+
+router.post("/tenants/:slug/integrations/google/oauth-url", requireAdminPermission(ADMIN_PERMISSIONS.MANAGE_TENANTS), async (req, res) => {
+  try {
+    const tenantId = await resolveTenantIdBySlug(req.params.slug);
+    const [drive, sheets] = await Promise.all([
+      tryGetTenantIntegrationConfig(tenantId, "DRIVE"),
+      tryGetTenantIntegrationConfig(tenantId, "SHEETS"),
+    ]);
+    const flowId = crypto.randomUUID();
+    const authUrl = buildTenantGoogleAuthUrl({
+      tenantSlug: req.params.slug,
+      flowId,
+      driveFolderId: drive?.DRIVE_FOLDER_ID ?? null,
+      sheetsId: sheets?.SHEETS_ID ?? null,
+      sheetName: sheets?.SHEET_NAME ?? "Hoja1",
+    });
+
+    return res.json({ authUrl, flowId });
+  } catch (error) {
+    return res.status(400).json({ error: error.message || "No se pudo iniciar OAuth Google" });
   }
 });
 

@@ -1,27 +1,7 @@
 import { Router } from "express";
-import { buildTenantGoogleAuthUrl, connectTenantGoogleFromCallback } from "../services/tenantGoogle.service.js";
+import { connectTenantGoogleFromCallback } from "../services/tenantGoogle.service.js";
 
 const router = Router();
-
-router.get("/oauth/start", async (req, res) => {
-  try {
-    const tenantSlug = String(req.query.tenant || "").trim();
-    if (!tenantSlug) {
-      return res.status(400).json({ error: "Falta tenant" });
-    }
-
-    const authUrl = buildTenantGoogleAuthUrl({
-      tenantSlug,
-      driveFolderId: req.query.driveFolderId ? String(req.query.driveFolderId) : null,
-      sheetsId: req.query.sheetsId ? String(req.query.sheetsId) : null,
-      sheetName: req.query.sheetName ? String(req.query.sheetName) : null,
-    });
-
-    return res.redirect(authUrl);
-  } catch (error) {
-    return res.status(500).json({ error: error.message || "No se pudo iniciar OAuth Google" });
-  }
-});
 
 router.get("/oauth/callback", async (req, res) => {
   try {
@@ -33,11 +13,24 @@ router.get("/oauth/callback", async (req, res) => {
     }
 
     const result = await connectTenantGoogleFromCallback({ code, state });
-    return res.status(200).json({
+    const completionMessage = JSON.stringify({
+      type: "facturador:google-oauth",
       ok: true,
-      message: "Google conectado al tenant",
-      ...result,
-    });
+      tenantSlug: result.tenantSlug,
+      flowId: result.flowId,
+    }).replace(/</g, "\\u003c");
+    return res.status(200).type("html").send(`<!doctype html>
+<html lang="es">
+  <head><meta charset="utf-8"><title>Google conectado</title></head>
+  <body>
+    <p>Google se conecto correctamente al tenant.</p>
+    <p>Esta ventana se cerrara automaticamente.</p>
+    <script>
+      if (window.opener) window.opener.postMessage(${completionMessage}, "*");
+      window.close();
+    </script>
+  </body>
+</html>`);
   } catch (error) {
     return res.status(500).json({ error: error.message || "No se pudo completar OAuth Google" });
   }

@@ -111,7 +111,6 @@ Granularidades de reportes:
 | Metodo | Path | Auth | Descripcion |
 | --- | --- | --- | --- |
 | GET | `/health` | No | Healthcheck basico |
-| GET | `/google/oauth/start` | No | Inicia OAuth Google para un tenant |
 | GET | `/google/oauth/callback` | No | Callback OAuth Google |
 | POST | `/admin/auth/login` | No | Login admin |
 | POST | `/admin/auth/logout` | No | Logout admin del lado cliente |
@@ -135,6 +134,7 @@ Granularidades de reportes:
 | GET | `/admin/tenants/:slug/notes` | Admin | Lista notas internas |
 | POST | `/admin/tenants/:slug/notes` | Admin | Crea nota interna |
 | GET | `/admin/tenants/:slug/integrations` | Admin | Lista integraciones |
+| POST | `/admin/tenants/:slug/integrations/google/oauth-url` | Admin | Inicia OAuth Google firmado para el tenant |
 | POST | `/admin/tenants/:slug/integrations/mercadopago/start` | Admin | Importa y procesa pagos MP desde fecha |
 | PUT | `/admin/tenants/:slug/integrations/:provider` | Admin | Reemplaza configuracion de integracion |
 | POST | `/admin/tenants/:slug/integrations/:provider/test` | Admin | Prueba conexion con la configuracion guardada |
@@ -175,27 +175,16 @@ Response `200`:
 
 ## Google OAuth
 
-### `GET /google/oauth/start`
+### `POST /admin/tenants/:slug/integrations/google/oauth-url`
 
-Inicia el flujo OAuth de Google para conectar Drive/Sheets de un tenant.
+Genera la URL OAuth para conectar o reautorizar Drive/Sheets del tenant. Requiere autenticacion admin y permiso `tenants:manage`. Conserva los destinos Drive/Sheets existentes.
 
-Query params:
-
-- `tenant` requerido. Slug del tenant.
-- `driveFolderId` opcional. Carpeta de Drive a configurar.
-- `sheetsId` opcional. Spreadsheet a configurar.
-- `sheetName` opcional. Hoja/tab a configurar.
-
-Response:
-
-- `302 Found` redirige a la URL de autorizacion de Google.
-- `400` si falta `tenant`.
-
-Error:
+Response `200`:
 
 ```json
 {
-  "error": "Falta tenant"
+  "authUrl": "https://accounts.google.com/o/oauth2/v2/auth?...",
+  "flowId": "uuid-del-flujo"
 }
 ```
 
@@ -208,14 +197,7 @@ Query params:
 - `code` requerido. Codigo OAuth entregado por Google.
 - `state` requerido. Estado firmado/generado por la API en el inicio del flujo.
 
-Response `200`:
-
-```json
-{
-  "ok": true,
-  "message": "Google conectado al tenant"
-}
-```
+Response `200`: pagina HTML que confirma la conexion, notifica a la ventana admin que inicio el flujo y se cierra automaticamente.
 
 La respuesta puede incluir campos adicionales devueltos por el servicio de conexion.
 

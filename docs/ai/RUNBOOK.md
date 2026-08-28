@@ -131,6 +131,8 @@ Para comprobar solamente la configuracion sin iniciar OAuth ni modificar archivo
 npm run google:new-token -- --check
 ```
 
+Para las integraciones por tenant, usar `Conectar / reautorizar Google` desde la pestaña Integraciones del detalle admin. El backend genera una URL firmada y efimera para el tenant seleccionado; el callback conserva carpeta Drive, spreadsheet y hoja existentes, y reemplaza el refresh token cifrado en `DRIVE` y `SHEETS`. No existe un inicio OAuth publico por slug.
+
 La configuracion operativa objetivo es por tenant y debe identificar, como minimo:
 
 - credenciales/autorizacion del cliente;
@@ -303,7 +305,7 @@ cd facturador-backend
 npm test
 ```
 
-Resultado: 20 tests correctos el 2026-08-26.
+Resultado: 22 tests correctos el 2026-08-26.
 
 Prisma:
 

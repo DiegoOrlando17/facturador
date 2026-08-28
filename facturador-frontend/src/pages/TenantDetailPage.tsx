@@ -242,6 +242,11 @@ type IntegrationTestResponse = {
   [key: string]: unknown;
 };
 
+type GoogleOAuthUrlResponse = {
+  authUrl: string;
+  flowId: string;
+};
+
 type OnboardingSubmission = {
   id: string;
   tenantId: string;
@@ -843,6 +848,7 @@ export function TenantDetailPage() {
   );
   const [isSavingIntegration, setIsSavingIntegration] = useState(false);
   const [isTestingIntegration, setIsTestingIntegration] = useState(false);
+  const [isAuthorizingGoogle, setIsAuthorizingGoogle] = useState(false);
   const [integrationErrorMessage, setIntegrationErrorMessage] = useState<string | null>(null);
   const [integrationSuccessMessage, setIntegrationSuccessMessage] = useState<string | null>(null);
   const [integrationTestResult, setIntegrationTestResult] = useState<IntegrationTestResponse | null>(null);
@@ -1725,6 +1731,72 @@ export function TenantDetailPage() {
       setIntegrationErrorMessage(getApiErrorMessage(error, "No se pudo guardar la integracion."));
     } finally {
       setIsSavingIntegration(false);
+    }
+  }
+
+  async function handleAuthorizeGoogle() {
+    if (!slug || !token) {
+      setIntegrationErrorMessage("No tenemos una sesion o tenant valido para conectar Google.");
+      return;
+    }
+
+    const popup = window.open("about:blank", "facturador-google-oauth", "popup,width=620,height=760");
+    if (!popup) {
+      setIntegrationErrorMessage("El navegador bloqueo la ventana de Google. Habilita popups e intenta nuevamente.");
+      return;
+    }
+
+    setIsAuthorizingGoogle(true);
+    setIntegrationErrorMessage(null);
+    setIntegrationSuccessMessage(null);
+
+    try {
+      const response = await apiRequest<GoogleOAuthUrlResponse>(
+        `/admin/tenants/${slug}/integrations/google/oauth-url`,
+        { method: "POST", token },
+      );
+      popup.location.href = response.authUrl;
+
+      await new Promise<void>((resolve, reject) => {
+        const startedAt = Date.now();
+        let completed = false;
+        const cleanup = () => {
+          completed = true;
+          window.clearInterval(intervalId);
+          window.removeEventListener("message", handleMessage);
+        };
+        const handleMessage = (event: MessageEvent) => {
+          const message = event.data as { type?: string; ok?: boolean; tenantSlug?: string; flowId?: string } | null;
+          if (message?.type !== "facturador:google-oauth"
+            || message.tenantSlug !== slug
+            || message.flowId !== response.flowId
+            || !message.ok) return;
+          cleanup();
+          resolve();
+        };
+        const intervalId = window.setInterval(() => {
+          if (completed) return;
+          if (popup.closed) {
+            cleanup();
+            reject(new Error("La ventana se cerro antes de confirmar la autorizacion Google."));
+            return;
+          }
+          if (Date.now() - startedAt > 10 * 60 * 1000) {
+            cleanup();
+            popup.close();
+            reject(new Error("La autorizacion Google excedio el tiempo disponible."));
+          }
+        }, 500);
+        window.addEventListener("message", handleMessage);
+      });
+
+      setIntegrationSuccessMessage("Autorizacion Google finalizada. Se actualizaron Drive y Sheets del tenant.");
+      await Promise.all([reloadIntegrations(), reload()]);
+    } catch (error) {
+      popup.close();
+      setIntegrationErrorMessage(getApiErrorMessage(error, error instanceof Error ? error.message : "No se pudo conectar Google."));
+    } finally {
+      setIsAuthorizingGoogle(false);
     }
   }
 
@@ -3360,6 +3432,16 @@ export function TenantDetailPage() {
                   ) : null}
 
                   <div className="integration-form__actions">
+                    {integrationProvider === "DRIVE" || integrationProvider === "SHEETS" ? (
+                      <button
+                        type="button"
+                        className="secondary-button"
+                        disabled={isAuthorizingGoogle || isSavingIntegration || isTestingIntegration}
+                        onClick={() => void handleAuthorizeGoogle()}
+                      >
+                        {isAuthorizingGoogle ? "Esperando autorizacion..." : "Conectar / reautorizar Google"}
+                      </button>
+                    ) : null}
                     <button type="button" className="secondary-button" disabled={!canTestIntegration} onClick={() => void handleTestIntegration()}>
                       {isTestingIntegration ? "Probando conexion..." : "Probar conexion"}
                     </button>

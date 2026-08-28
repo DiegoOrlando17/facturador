@@ -72,7 +72,7 @@ Que hace:
 1. Configurar `.env` legacy con las credenciales actuales.
 2. Ejecutar `npm run tenant:bootstrap -- --slug <slug> --name "<nombre>" --plan A --owner-email <mail>`.
 3. Revisar `GET /admin/tenants/<slug>` y `GET /admin/tenants/<slug>/integrations?revealSecrets=true`.
-4. Si Google no vino desde token global, conectar con `GET /google/oauth/start?tenant=<slug>`.
+4. Conectar o reautorizar Google desde Integraciones en el detalle admin del tenant; el inicio OAuth publico fue retirado.
 5. Levantar API y workers.
 6. Ejecutar pruebas end-to-end.
 

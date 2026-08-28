@@ -55,7 +55,7 @@ La API Express expone:
 
 - `/admin`: autenticacion y operaciones del panel interno;
 - `/portal`: autenticacion y consultas limitadas al tenant;
-- `/google`: OAuth;
+- `/google`: callback OAuth publico con `state` firmado; el inicio del flujo se autoriza desde admin por tenant;
 - `/health`: liveness basico de Express.
 
 Prisma modela tenants, perfil fiscal, usuarios tenant/admin, planes, suscripciones, integraciones cifradas, checkpoints, pagos, comprobantes fiscales, documentos, eventos, auditoria, notas, onboarding y secuencias de factura.

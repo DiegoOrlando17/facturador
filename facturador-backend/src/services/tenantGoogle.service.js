@@ -50,12 +50,14 @@ function parseScopes(value) {
 
 export function buildGoogleOAuthState({
   tenantSlug,
+  flowId = null,
   driveFolderId = null,
   sheetsId = null,
   sheetName = null,
 }) {
   const payload = JSON.stringify({
     tenantSlug,
+    flowId,
     driveFolderId,
     sheetsId,
     sheetName,
@@ -67,7 +69,7 @@ export function buildGoogleOAuthState({
   return `${encodedPayload}.${signature}`;
 }
 
-function parseGoogleOAuthState(state) {
+export function parseGoogleOAuthState(state) {
   if (!state || !state.includes(".")) {
     throw new Error("State Google invalido");
   }
@@ -110,9 +112,9 @@ async function getAccessTokenFromRefreshCached(tenantId, { clientId, clientSecre
   return response.data.access_token;
 }
 
-export function buildTenantGoogleAuthUrl({ tenantSlug, driveFolderId = null, sheetsId = null, sheetName = null }) {
+export function buildTenantGoogleAuthUrl({ tenantSlug, flowId = null, driveFolderId = null, sheetsId = null, sheetName = null }) {
   const oAuth2Client = createOAuthClient();
-  const state = buildGoogleOAuthState({ tenantSlug, driveFolderId, sheetsId, sheetName });
+  const state = buildGoogleOAuthState({ tenantSlug, flowId, driveFolderId, sheetsId, sheetName });
 
   return oAuth2Client.generateAuthUrl({
     access_type: "offline",
@@ -169,6 +171,7 @@ export async function connectTenantGoogleFromCallback({ code, state }) {
   return {
     tenantId,
     tenantSlug: payload.tenantSlug,
+    flowId: payload.flowId,
     scopes,
   };
 }

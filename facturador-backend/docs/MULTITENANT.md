@@ -103,7 +103,7 @@ Convencion `TenantIntegration.secretEnc` para Google:
 ```
 
 Rutas OAuth Google:
-- `GET /google/oauth/start?tenant=<slug>&driveFolderId=<id>&sheetsId=<id>&sheetName=<nombre>`
+- `POST /admin/tenants/:slug/integrations/google/oauth-url` (admin autenticado)
 - `GET /google/oauth/callback`
 
 Notas:

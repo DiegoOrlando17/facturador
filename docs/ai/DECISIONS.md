@@ -306,6 +306,25 @@ Consecuencias:
 - cualquier futura escritura en Mercado Pago requiere una nueva decision explicita, credenciales sandbox separadas y protecciones automatizadas;
 - resets de checkpoint o reprocesos locales no modifican pagos en Mercado Pago, pero requieren autorizacion porque pueden volver a procesar pagos reales.
 
+## D-018 - OAuth Google iniciado desde admin y vinculado al tenant
+
+Estado: vigente
+
+Decision: iniciar la autorizacion Google de cada tenant exclusivamente desde un endpoint admin autenticado. El callback publico acepta solo un `state` firmado y efimero que incluye tenant y un identificador unico del flujo.
+
+Contexto: el OAuth por tenant ya persistia refresh tokens cifrados, pero el inicio era una ruta publica basada en slug y no estaba expuesto en el panel. La renovacion operativa terminaba dependiendo del token global y de ejecutar codigo manualmente.
+
+Alternativas consideradas: mantener el inicio publico; renovar un token global por CLI; iniciar OAuth desde el detalle admin del tenant.
+
+Rationale: el administrador ya opera integraciones por tenant y tiene permisos definidos. Vincular inicio, callback y ventana mediante `state` firmado y `flowId` evita cruces entre tenants y elimina el conocimiento manual de secretos.
+
+Consecuencias:
+
+- el inicio publico `/google/oauth/start` fue retirado;
+- `POST /admin/tenants/:slug/integrations/google/oauth-url` requiere `admin.manageTenants`;
+- el callback conserva carpeta Drive, spreadsheet y hoja existentes y reemplaza el refresh token cifrado en ambas integraciones;
+- el comando `google:new-token` queda solo para compatibilidad con el token global heredado, no como operacion normal por tenant.
+
 ## Decisiones pendientes
 
 No estan aprobadas; deben resolverse antes de las fases que dependen de ellas.
