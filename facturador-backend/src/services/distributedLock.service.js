@@ -7,6 +7,10 @@ end
 return 0
 `;
 
+export function buildPaymentPostProcessLockKey(tenantId, paymentId) {
+  return `facturador:invoice-post:${tenantId}:${paymentId}`;
+}
+
 export async function claimDistributedSlot(redis, key, ttlMs) {
   const token = crypto.randomUUID();
   const claimed = await redis.set(key, token, "PX", ttlMs, "NX");

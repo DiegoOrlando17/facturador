@@ -285,7 +285,7 @@ cd facturador-backend
 npm test
 ```
 
-Resultado: 36 tests correctos el 2026-08-30.
+Resultado: 37 tests correctos el 2026-08-30.
 
 Prisma:
 
@@ -330,6 +330,7 @@ No ejecutar pruebas de integraciones con ventas, certificados, puntos de venta o
 - No revelar `secretEnc`, hashes o tokens en respuestas/logs.
 - No editar pagos, secuencias o estados directamente en DB salvo procedimiento aprobado con backup y rollback.
 - Cualquier reproceso debe identificar tenant y pago, ser idempotente y dejar auditoria.
+- El postproceso Drive/Sheets usa el lock Redis `facturador:invoice-post:<tenantId>:<paymentId>` para impedir entregas concurrentes del mismo pago entre replicas o jobs manuales y automaticos.
 - Antes de migrar produccion: backup verificado, revision SQL, ventana de despliegue y plan de rollback.
 
 ## 10. Deploy, backup y rollback

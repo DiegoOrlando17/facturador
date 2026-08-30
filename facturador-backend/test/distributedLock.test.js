@@ -1,6 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { claimDistributedSlot } from "../src/services/distributedLock.service.js";
+import {
+  buildPaymentPostProcessLockKey,
+  claimDistributedSlot,
+} from "../src/services/distributedLock.service.js";
 
 class FakeRedis {
   constructor() {
@@ -44,4 +47,10 @@ test("un claim rechazado no libera el slot de otra replica", async () => {
 
   assert.equal(await rejected.release(), false);
   assert.equal(redis.values.has("tenant:slot"), true);
+});
+
+test("el lock de postproceso aisla tenant y pago", () => {
+  assert.equal(buildPaymentPostProcessLockKey(7n, 42n), "facturador:invoice-post:7:42");
+  assert.notEqual(buildPaymentPostProcessLockKey(7n, 42n), buildPaymentPostProcessLockKey(8n, 42n));
+  assert.notEqual(buildPaymentPostProcessLockKey(7n, 42n), buildPaymentPostProcessLockKey(7n, 43n));
 });

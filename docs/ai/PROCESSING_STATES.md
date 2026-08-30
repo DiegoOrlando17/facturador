@@ -44,6 +44,7 @@ Los auto-reintentos solo toman `afip_pending`, `pdf_pending`, `drive_pending` y 
 5. Drive usa una entrega unica por factura, tipo y proveedor; Sheets reutiliza `Payment.sheets_row`.
 6. Los reprocesos se encolan con un `jobId` deterministico por tenant, pago y paso.
 7. Toda solicitud manual de reproceso debe dejar `PaymentEvent` y `TenantAuditLog`.
+8. El postproceso externo de una factura se serializa con un lock Redis por tenant y pago; una ejecucion concurrente no vuelve a escribir Drive o Sheets.
 
 ## Reproceso
 

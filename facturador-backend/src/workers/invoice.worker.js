@@ -19,6 +19,10 @@ import { getTenantIntegrationConfig } from "../services/tenantConfig.service.js"
 import { toBigIntId } from "../utils/bigint.js";
 import { getTodaysDate } from "../utils/date.js";
 import logger from "../utils/logger.js";
+import {
+  buildPaymentPostProcessLockKey,
+  claimDistributedSlot,
+} from "../services/distributedLock.service.js";
 
 const POST_AFIP_STATUSES = new Set([
   "processing",
@@ -26,6 +30,7 @@ const POST_AFIP_STATUSES = new Set([
   "drive_pending",
   "sheets_pending",
 ]);
+const POST_PROCESS_LOCK_TTL_MS = 10 * 60 * 1000;
 
 async function createTemporaryInvoicePdf(payment, invoice, afipBranding) {
   const invoiceView = buildInvoicePaymentView(payment, invoice);
@@ -60,6 +65,17 @@ const worker = new Worker("invoices", async (job) => {
       throw new Error("Job invalido: faltan tenantId o paymentId");
     }
 
+    const postProcessClaim = await claimDistributedSlot(
+      connection,
+      buildPaymentPostProcessLockKey(tenantId, paymentId),
+      POST_PROCESS_LOCK_TTL_MS
+    );
+    if (!postProcessClaim.claimed) {
+      logger.info(`Postproceso omitido: otro worker procesa tenant=${tenantId} payment=${paymentId}`);
+      return;
+    }
+
+    try {
     const payment = await getPayment(tenantId, paymentId);
     if (!payment) return;
     const invoice = await getInvoiceByPaymentId(tenantId, paymentId, { includeDocuments: true });
@@ -178,6 +194,13 @@ const worker = new Worker("invoices", async (job) => {
       driveDelivery: googleCtx ? "processed_or_existing" : "not_enabled_or_incomplete",
       sheetsDelivery: sheetsResult.synced ? "synced" : "not_enabled_or_incomplete",
     });
+    } finally {
+      try {
+        await postProcessClaim.release();
+      } catch (releaseError) {
+        logger.error(`No se pudo liberar lock postproceso tenant=${tenantId} payment=${paymentId}: ${releaseError.message}`);
+      }
+    }
   } catch (error) {
     logger.error("Error en el invoice worker: " + error);
     throw error;
