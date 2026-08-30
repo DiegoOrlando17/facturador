@@ -4,6 +4,7 @@ import { paymentsQueue } from "../queues/payments.queue.js";
 import { invoicesQueue } from "../queues/invoices.queue.js";
 import { logPaymentEvent } from "./paymentEvent.service.js";
 import { getGoogleInvoiceContext, getTenantSheetsContext } from "./tenantGoogle.service.js";
+import { addOrReplaceFailedJob, resolveManualRetryStep } from "../domain/retryPolicy.js";
 
 function serializeJson(value) {
   return value ? JSON.stringify(value) : null;
@@ -93,24 +94,11 @@ export async function reprocessPaymentAsAdmin(payment, adminUser, step = "auto")
   const tenantId = payment.tenantId;
   const paymentId = payment.id;
 
-  let resolvedStep = step;
-  if (step === "auto") {
-    resolvedStep = payment.invoice?.status === "ISSUED" ? "post" : "afip";
-  }
-
-  if (!["afip", "post"].includes(resolvedStep)) {
-    throw new Error("step invalido");
-  }
-
-  if (resolvedStep === "afip" && payment.invoice?.status === "ISSUED") {
-    throw new Error("La factura ya fue emitida; solo se permite reprocesar el postproceso");
-  }
-  if (resolvedStep === "post" && payment.invoice?.status !== "ISSUED") {
-    throw new Error("El postproceso requiere una factura emitida");
-  }
+  const resolvedStep = resolveManualRetryStep(step, payment.invoice?.status);
 
   if (resolvedStep === "afip") {
-    await paymentsQueue.add(
+    await addOrReplaceFailedJob(
+      paymentsQueue,
       `payments-${tenantId}-${payment.provider_payment_id.toString()}`,
       { tenantId: toQueueId(tenantId), paymentId: toQueueId(paymentId) },
       {
@@ -122,7 +110,8 @@ export async function reprocessPaymentAsAdmin(payment, adminUser, step = "auto")
       }
     );
   } else {
-    await invoicesQueue.add(
+    await addOrReplaceFailedJob(
+      invoicesQueue,
       `invoices-${payment.provider_payment_id.toString()}`,
       { tenantId: toQueueId(tenantId), paymentId: toQueueId(paymentId) },
       {
@@ -179,7 +168,8 @@ export async function deliverPaymentToGoogleAsAdmin(payment, adminUser) {
     throw new Error("El tenant no tiene un plan Google elegible ni una integracion Drive/Sheets utilizable");
   }
 
-  await invoicesQueue.add(
+  await addOrReplaceFailedJob(
+    invoicesQueue,
     `google-delivery-${payment.provider_payment_id.toString()}`,
     {
       tenantId: toQueueId(payment.tenantId),

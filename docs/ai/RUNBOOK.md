@@ -285,7 +285,7 @@ cd facturador-backend
 npm test
 ```
 
-Resultado: 34 tests correctos el 2026-08-30.
+Resultado: 36 tests correctos el 2026-08-30.
 
 Prisma:
 

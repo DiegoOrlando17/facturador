@@ -94,7 +94,7 @@ Objetivo: certificar el flujo principal antes de sumar canales.
 - [x] Validar configuracion opcional por tenant de carpeta Drive y planilla Sheets con el tenant `fiebre`.
 - [ ] Validar que Sheets registre una fila por pago y la actualice entre `ERROR` y `OK` durante reintentos; validar que Drive reciba solo PDF de comprobantes facturados, sin duplicados.
 - [x] Implementar scheduler por modalidad y tenant con exclusion distribuida Redis por slot.
-- [ ] Completar trazabilidad y acciones seguras de reproceso.
+- [x] Completar trazabilidad y acciones seguras de reproceso.
 - [ ] Incorporar tests automatizados de servicios y endpoints criticos.
 
 Herramienta disponible: `npm run invoice:test-flow -- --tenant=SLUG` crea un pago sintetico local y recorre el flujo real de workers contra homologacion/recursos de prueba, incluyendo una segunda pasada idempotente. Su ejecucion exitosa debe registrarse antes de cerrar esta fase.
@@ -202,7 +202,7 @@ Aceptacion: los flujos mobile acordados funcionan en Android/iOS y respetan las 
 ## 8. Validacion de esta linea base
 
 - `facturador-frontend`: `npm run build` correcto el 2026-08-26.
-- `facturador-backend`: 34 tests correctos, esquema Prisma valido y todos los `.js` de `src` y `prisma` aprobados por `node --check` el 2026-08-30.
+- `facturador-backend`: 36 tests correctos, esquema Prisma valido y todos los `.js` de `src` y `prisma` aprobados por `node --check` el 2026-08-30.
 - PostgreSQL y Redis locales, migraciones Prisma, datos demo, tenants y planes: reportados como operativos el 2026-08-14.
 - API, workers, frontend, login admin y descarga PDF: reportados como operativos el 2026-08-14.
 - La validacion integral del portal cliente queda diferida hasta reemplazar el prototipo estatico por una aplicacion conectada a `/portal`.

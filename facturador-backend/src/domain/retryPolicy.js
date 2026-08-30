@@ -15,6 +15,23 @@ export function resolveAutomaticRetryStep(paymentStatus, invoiceStatus) {
   return null;
 }
 
+export function resolveManualRetryStep(requestedStep, invoiceStatus) {
+  const step = requestedStep === "auto"
+    ? invoiceStatus === "ISSUED" ? "post" : "afip"
+    : requestedStep;
+
+  if (!["afip", "post"].includes(step)) {
+    throw new Error("step invalido");
+  }
+  if (step === "afip" && invoiceStatus === "ISSUED") {
+    throw new Error("La factura ya fue emitida; solo se permite reprocesar el postproceso");
+  }
+  if (step === "post" && invoiceStatus !== "ISSUED") {
+    throw new Error("El postproceso requiere una factura emitida");
+  }
+  return step;
+}
+
 export async function addOrReplaceFailedJob(queue, name, data, options) {
   const existing = options.jobId ? await queue.getJob(options.jobId) : null;
   if (!existing) {
