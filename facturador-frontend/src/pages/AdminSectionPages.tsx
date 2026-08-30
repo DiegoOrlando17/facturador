@@ -132,6 +132,21 @@ type DashboardResponse = {
   summary: {
     payments: DashboardPaymentsSummary;
   };
+  attentionItems?: Array<{
+    id: string;
+    type: string;
+    title: string;
+    detail: string;
+    priority: "danger" | "warning" | "info";
+    actionLabel: string;
+    actionPath: string;
+    createdAt?: string;
+    tenant: {
+      id: string;
+      slug: string;
+      name: string;
+    };
+  }>;
 };
 
 type CreateTenantResponse = {
@@ -847,32 +862,43 @@ export function IntegrationsSectionPage() {
 }
 
 export function AlertsSectionPage() {
-  const rows = [
-    ["Datos fiscales incompletos", "Fiebre Flow", "Critica", "Bloquea activacion", "Cliente", "Resolver", "danger"],
-    ["Mercado Pago sin configurar", "Club Demo", "Advertencia", "Bloquea cobros automaticos", "Admin tecnico", "Configurar", "warning"],
-    ["Error al emitir factura", "Cliente X", "Critica", "Bloquea comprobante", "Admin", "Ver detalle", "danger"],
-  ] as const;
+  const { token } = useAuth();
+  const { data, errorMessage, isLoading, reload } = useApiResource<DashboardResponse>("/admin/dashboard", {
+    enabled: Boolean(token),
+    fallbackErrorMessage: "No se pudieron cargar las alertas operativas.",
+  });
+  const rows = data?.attentionItems ?? [];
+  const criticalCount = rows.filter((item) => item.priority === "danger").length;
+  const warningCount = rows.filter((item) => item.priority === "warning").length;
 
   return (
     <main className="admin-section-page">
       <SectionHeader
         title="Alertas"
         detail="Problemas, errores y eventos que requieren atencion."
-        actions={<button type="button" className="section-button section-button--soft">Marcar todas como leidas</button>}
+        actions={<button type="button" className="section-button section-button--soft" onClick={() => void reload()}>Actualizar</button>}
       />
-      <div className="section-tabs"><span className="section-tab section-tab--active">Todas <b>3</b></span><span className="section-tab">Criticas <b>1</b></span><span className="section-tab">Advertencias <b>0</b></span><span className="section-tab">Informativas <b>0</b></span></div>
+      <div className="section-tabs"><span className="section-tab section-tab--active">Todas <b>{rows.length}</b></span><span className="section-tab">Criticas <b>{criticalCount}</b></span><span className="section-tab">Advertencias <b>{warningCount}</b></span></div>
       <section className="section-table-card">
         <div className="section-table section-table--alerts">
           <div className="section-table__head">
             <span>Alerta</span><span>Cliente</span><span>Severidad</span><span>Impacto</span><span>Responsable</span><span>Accion</span>
           </div>
-          {rows.map(([alert, client, severity, impact, owner, action, tone]) => (
-            <div key={`${alert}-${client}`} className="section-table__row">
-              <span>{alert}</span><strong>{client}</strong><span><StatusBadge tone={tone}>{severity}</StatusBadge></span><span>{impact}</span>
-              <span>{owner}</span>
-              <button type="button" className="section-mini-button">{action}</button>
+          {isLoading ? (
+            <div className="section-table__state">Cargando alertas...</div>
+          ) : errorMessage ? (
+            <div className="section-table__state section-table__state--danger">{errorMessage}</div>
+          ) : rows.length > 0 ? rows.map((item) => (
+            <div key={item.id} className="section-table__row">
+              <span>{item.title}</span><strong>{item.tenant.name}</strong>
+              <span><StatusBadge tone={item.priority === "danger" ? "danger" : item.priority === "warning" ? "warning" : "info"}>{item.priority === "danger" ? "Critica" : item.priority === "warning" ? "Advertencia" : "Informativa"}</StatusBadge></span>
+              <span>{item.detail}</span>
+              <span>{item.type.startsWith("payment_") ? "Admin" : "Configuracion"}</span>
+              <Link to={item.actionPath} className="section-mini-button">{item.actionLabel}</Link>
             </div>
-          ))}
+          )) : (
+            <div className="section-table__state">No hay alertas operativas pendientes.</div>
+          )}
         </div>
       </section>
       <section className="section-help-card">

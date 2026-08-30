@@ -19,6 +19,7 @@ Los secretos se devuelven enmascarados por defecto y `passwordHash` nunca forma 
 - Para Drive, el worker genera un PDF temporal y lo elimina despues del intento de subida, incluso si falla.
 - Desde el detalle admin de un comprobante ya emitido se puede solicitar `Subir a Drive y Sheets`. La accion omite destinos ya registrados y no vuelve a emitir en ARCA.
 - Sheets funciona como registro operativo: agrega una fila por pago y actualiza esa misma fila con estado `ERROR` u `OK` en cada intento. Los errores ARCA se registran aunque no exista PDF; Drive solo aplica a comprobantes emitidos.
+- El dashboard y `/alerts` consideran incidentes operativos los estados `afip_pending`, `pdf_pending`, `drive_pending`, `sheets_pending`, `failed` y `processing` con error, y enlazan al recurso que requiere intervencion.
 
 ## Planes
 

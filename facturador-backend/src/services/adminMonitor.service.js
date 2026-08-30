@@ -9,6 +9,7 @@ import { hydratePaymentWithInvoice } from "../models/Invoice.js";
 import { normalizeAfipConfig } from "./afip.service.js";
 import { normalizeMpConfig } from "./mercadopago.service.js";
 import { decryptJson } from "../utils/crypto.js";
+import { buildPaymentAttentionWhere, isPaymentAttentionState } from "../domain/paymentAttention.js";
 
 const DEFAULT_PAGE = 1;
 const DEFAULT_PAGE_SIZE = 20;
@@ -488,8 +489,8 @@ async function listRecentActivity() {
     ...payments.map((payment) => ({
       id: `payment-${payment.id}`,
       type: payment.status,
-      icon: payment.status === "failed" ? "alert" : payment.provider === "MERCADOPAGO" ? "mp" : "invoice",
-      title: payment.status === "failed"
+      icon: isPaymentAttentionState(payment.status, payment.error) ? "alert" : payment.provider === "MERCADOPAGO" ? "mp" : "invoice",
+      title: isPaymentAttentionState(payment.status, payment.error)
         ? payment.error || "Pago con error"
         : `Pago ${payment.status} por ${payment.provider}`,
       tenant: payment.tenant,
@@ -675,7 +676,7 @@ async function listAttentionItems() {
       },
     }),
     db.payment.findMany({
-      where: { status: "failed" },
+      where: buildPaymentAttentionWhere(),
       orderBy: [{ updatedAt: "desc" }],
       take: 5,
       include: {
@@ -753,7 +754,7 @@ export async function getAdminDashboardSummary(filters = {}) {
         },
       },
     }),
-    db.payment.count({ where: { ...paymentWhere, status: "failed" } }),
+    db.payment.count({ where: { ...paymentWhere, ...buildPaymentAttentionWhere() } }),
     db.payment.count({ where: { ...paymentWhere, status: "complete" } }),
     db.tenant.count({
       where: {
@@ -767,9 +768,7 @@ export async function getAdminDashboardSummary(filters = {}) {
           },
           {
             payments: {
-              some: {
-                status: "failed",
-              },
+              some: buildPaymentAttentionWhere(),
             },
           },
           {
