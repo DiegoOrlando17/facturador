@@ -226,6 +226,14 @@ Ejecutar el flujo real controlado:
 npm run invoice:test-flow -- --tenant=SLUG --amount=100 --require-drive --require-sheets
 ```
 
+Para validar de forma deterministica error ARCA, reintento y Sheets `ERROR` -> `OK`:
+
+```powershell
+npm run invoice:test-flow -- --tenant=SLUG --amount=100 --require-drive --require-sheets --verify-error-recovery
+```
+
+La falla controlada solo se acepta para el pago sintetico `test_flow` y configuracion de homologacion. La primera pasada no consulta ni consume numeracion ARCA; el reintento exitoso si emite un comprobante de homologacion y debe conservar la misma fila Sheets.
+
 El comando crea un `Payment` sintetico, lo encola, espera `Payment.complete`/`Invoice.ISSUED`, genera el PDF y reencola el mismo pago para comprobar idempotencia. Solo admite PostgreSQL local y rechaza configuraciones/URLs ARCA que parezcan productivas. La ejecucion consume numeracion de homologacion y puede crear un archivo y una fila reales en Drive/Sheets de prueba; esos efectos externos no se revierten automaticamente.
 
 Validacion registrada el 2026-09-01 para `fiebre`: estado final `complete`/`ISSUED`, comprobante de homologacion, un documento Drive, una fila Sheets y segunda pasada idempotente. La auditoria posterior no detecto documentos registrados faltantes, IDs duplicados ni filas desalineadas.
@@ -296,7 +304,7 @@ cd facturador-backend
 npm test
 ```
 
-Resultado: 43 tests correctos el 2026-09-01.
+Resultado: 46 tests correctos el 2026-09-01.
 
 Prisma:
 

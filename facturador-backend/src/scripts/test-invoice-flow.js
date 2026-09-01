@@ -7,6 +7,8 @@ import { normalizeAfipConfig } from "../services/afip.service.js";
 import { generateInvoicePdfForPayment } from "../services/invoicePdf.service.js";
 import { getTenantIntegrationConfig } from "../services/tenantConfig.service.js";
 import { logPaymentEvent } from "../services/paymentEvent.service.js";
+import { google } from "googleapis";
+import { getTenantSheetsContext } from "../services/tenantGoogle.service.js";
 
 const POLL_INTERVAL_MS = 2000;
 let paymentsQueue;
@@ -48,18 +50,57 @@ function assertHomologation(afipConfig) {
   return normalized;
 }
 
-async function enqueuePayment(tenantId, paymentId, runId, step) {
+async function enqueuePayment(tenantId, paymentId, runId, step, { testFault = null, attempts = 5 } = {}) {
   const queue = await getPaymentsQueue();
   await queue.add(`invoice-test-${runId}-${step}`, {
     tenantId: toQueueId(tenantId),
     paymentId: toQueueId(paymentId),
+    ...(testFault ? { testFault } : {}),
   }, {
     jobId: buildQueueJobId({ tenantId, paymentId, step: `invoice-test-${runId}-${step}` }),
-    attempts: 5,
+    attempts,
     backoff: { type: "exponential", delay: 3000 },
     removeOnComplete: true,
     removeOnFail: 50,
   });
+}
+
+async function waitForControlledFailure(tenantId, paymentId, timeoutMs, requireSheets) {
+  const deadline = Date.now() + timeoutMs;
+  let lastState = "";
+
+  while (Date.now() < deadline) {
+    const payment = await getFlowState(tenantId, paymentId);
+    const currentState = `${payment?.status || "missing"}/${payment?.invoice?.status || "missing"}`;
+    if (currentState !== lastState) {
+      console.log(`[controlled-error] ${currentState}`);
+      lastState = currentState;
+    }
+
+    if (payment?.status === "afip_pending" && payment.invoice?.status === "FAILED") {
+      if (requireSheets && !payment.sheets_row) {
+        await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
+        continue;
+      }
+      return payment;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
+  }
+
+  throw new Error("La falla ARCA controlada no alcanzo afip_pending/FAILED dentro del timeout");
+}
+
+async function readSheetDelivery(sheetsContext, rowRange) {
+  const auth = new google.auth.OAuth2();
+  auth.setCredentials({ access_token: sheetsContext.accessToken });
+  const sheets = google.sheets({ version: "v4", auth });
+  const response = await sheets.spreadsheets.values.get({
+    spreadsheetId: sheetsContext.sheetsId,
+    range: rowRange,
+  });
+  const values = response.data.values?.[0] || [];
+  return { status: values[7] || null, error: values[9] || null };
 }
 
 async function getFlowState(tenantId, paymentId) {
@@ -154,6 +195,11 @@ async function main() {
       default: true,
       describe: "Reencola el mismo pago y comprueba que no se vuelva a emitir",
     })
+    .option("verify-error-recovery", {
+      type: "boolean",
+      default: false,
+      describe: "Simula una respuesta ARCA fallida y verifica recuperacion ERROR a OK",
+    })
     .option("dry-run", {
       type: "boolean",
       default: false,
@@ -229,13 +275,59 @@ async function main() {
     },
   }, null, 2));
 
-  await enqueuePayment(tenant.id, payment.id, runId, "initial");
-  let completed = await waitForCompletion(tenant.id, payment.id, timeoutMs, "initial");
+  let controlledFailure = null;
+  let controlledSheetsRow = null;
+  if (argv.verifyErrorRecovery) {
+    await enqueuePayment(tenant.id, payment.id, runId, "controlled-error", {
+      testFault: "afip_error_once",
+      attempts: 1,
+    });
+    controlledFailure = await waitForControlledFailure(
+      tenant.id,
+      payment.id,
+      timeoutMs,
+      argv.requireSheets
+    );
+    controlledSheetsRow = controlledFailure.sheets_row;
+
+    if (argv.requireSheets) {
+      const sheetsContext = await getTenantSheetsContext(tenant.id);
+      if (!sheetsContext) throw new Error("No se pudo obtener contexto Sheets para validar ERROR");
+      const sheetDelivery = await readSheetDelivery(sheetsContext, controlledSheetsRow);
+      if (sheetDelivery.status !== "ERROR") {
+        throw new Error(`Se esperaba estado ERROR en Sheets y se obtuvo ${sheetDelivery.status || "vacio"}`);
+      }
+    }
+
+    await logPaymentEvent(tenant.id, payment.id, "retried", "Recuperacion sintetica posterior a error ARCA", { runId });
+    await enqueuePayment(tenant.id, payment.id, runId, "recovery");
+  } else {
+    await enqueuePayment(tenant.id, payment.id, runId, "initial");
+  }
+
+  let completed = await waitForCompletion(
+    tenant.id,
+    payment.id,
+    timeoutMs,
+    argv.verifyErrorRecovery ? "recovery" : "initial"
+  );
   const initialDocuments = validateCompletedFlow(completed, argv);
   const initialInvoiceId = completed.invoice.id;
   const initialCae = completed.invoice.cae;
   const initialCbteNro = completed.invoice.cbteNro;
   const initialDriveCount = initialDocuments.length;
+
+  if (argv.verifyErrorRecovery && argv.requireSheets) {
+    if (completed.sheets_row !== controlledSheetsRow) {
+      throw new Error("El reintento creo otra fila Sheets en lugar de actualizar la fila ERROR");
+    }
+    const sheetsContext = await getTenantSheetsContext(tenant.id);
+    if (!sheetsContext) throw new Error("No se pudo obtener contexto Sheets para validar OK");
+    const sheetDelivery = await readSheetDelivery(sheetsContext, completed.sheets_row);
+    if (sheetDelivery.status !== "OK" || sheetDelivery.error) {
+      throw new Error(`Sheets no quedo en OK sin error: status=${sheetDelivery.status || "vacio"}`);
+    }
+  }
 
   const { pdfBuffer } = await generateInvoicePdfForPayment(tenant.id, payment.id);
   if (!Buffer.isBuffer(pdfBuffer) || pdfBuffer.length === 0) {
@@ -279,13 +371,14 @@ async function main() {
     pdfBytes: pdfBuffer.length,
     driveDocuments: completed.invoice.documents.filter((document) => document.storageProvider === "GOOGLE_DRIVE").length,
     sheetsRow: completed.sheets_row,
+    errorRecoveryVerified: argv.verifyErrorRecovery,
     idempotencyVerified: argv.verifyIdempotency,
   }, null, 2));
 }
 
 main()
   .catch((error) => {
-    console.error(error);
+    console.error(JSON.stringify({ valid: false, error: error?.message || String(error) }, null, 2));
     process.exitCode = 1;
   })
   .finally(async () => {

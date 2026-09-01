@@ -13,11 +13,12 @@ import {
     markInvoiceIssuing,
 } from "../models/Invoice.js";
 import { getNextCbteNro, setLastCbteNro, resyncCbteNro } from "../models/InvoiceSequence.js";
-import { createInvoiceAFIP } from "../services/afip.service.js";
+import { createInvoiceAFIP, normalizeAfipConfig } from "../services/afip.service.js";
 
 import { getTenantIntegrationConfig } from "../services/tenantConfig.service.js";
 import { logPaymentEvent } from "../services/paymentEvent.service.js";
 import { syncPaymentToSheets } from "../services/paymentSheets.service.js";
+import { buildControlledAfipError } from "../domain/controlledAfipTest.js";
 
 async function recordAfipFailureInSheets(tenantId, payment, errorMessage) {
     try {
@@ -99,20 +100,25 @@ const worker = new Worker("payments", async (job) => {
             throw new Error("AFIP config incompleta (PTO_VTA/CBTE_TIPO).");
         }
 
-        const seq = await getNextCbteNro(tenantId, ptoVta, cbteTipo, afipCfg);
-        if (!seq) {
-            await markInvoiceFailed(tenantId, invoice.id, "No se pudo obtener el ultimo comprobante.");
-            await updatePaymentStatus(tenantId, payment.id, "afip_pending", "No se pudo obtener el ultimo comprobante.");
-            await logPaymentEvent(tenantId, payment.id, "failed", "No se pudo obtener el ultimo comprobante.");
-            payment.status = "afip_pending";
-            payment.error = "No se pudo obtener el ultimo comprobante.";
-            await recordAfipFailureInSheets(tenantId, payment, payment.error);
-            throw new Error("No se pudo obtener el ultimo comprobante.");
+        let seq = null;
+        let nextCbteNro = null;
+        let response = buildControlledAfipError(job.data, payment, normalizeAfipConfig(afipCfg));
+
+        if (!response) {
+            seq = await getNextCbteNro(tenantId, ptoVta, cbteTipo, afipCfg);
+            if (!seq) {
+                await markInvoiceFailed(tenantId, invoice.id, "No se pudo obtener el ultimo comprobante.");
+                await updatePaymentStatus(tenantId, payment.id, "afip_pending", "No se pudo obtener el ultimo comprobante.");
+                await logPaymentEvent(tenantId, payment.id, "failed", "No se pudo obtener el ultimo comprobante.");
+                payment.status = "afip_pending";
+                payment.error = "No se pudo obtener el ultimo comprobante.";
+                await recordAfipFailureInSheets(tenantId, payment, payment.error);
+                throw new Error("No se pudo obtener el ultimo comprobante.");
+            }
+
+            nextCbteNro = seq.next;
+            response = await createInvoiceAFIP(nextCbteNro, payment.amount, afipCfg);
         }
-
-        const nextCbteNro = seq.next;
-
-        const response = await createInvoiceAFIP(nextCbteNro, payment.amount, afipCfg);
         if (response.error) {
             await markInvoiceFailed(tenantId, invoice.id, "Error al emitir en ARCA", {
                 error: String(response.error),

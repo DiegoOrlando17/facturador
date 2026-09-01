@@ -56,7 +56,10 @@ Con workers activos y ARCA/Google de prueba, ejecutar un flujo integral mediante
 ```powershell
 npm run invoice:test-flow -- --tenant=SLUG --dry-run
 npm run invoice:test-flow -- --tenant=SLUG --amount=100 --require-drive --require-sheets
+npm run invoice:test-flow -- --tenant=SLUG --amount=100 --require-drive --require-sheets --verify-error-recovery
 ```
+
+`--verify-error-recovery` se limita a pagos sinteticos `test_flow` y ARCA homologacion: simula una respuesta fallida sin consultar ARCA en la primera pasada, comprueba Sheets `ERROR` y luego ejecuta un reintento real que debe actualizar la misma fila a `OK`.
 
 El comando solo acepta PostgreSQL local y ARCA en homologacion. La segunda ejecucion crea efectos reales en los recursos externos de prueba.
 - Mercado Pago, ARCA y los destinos Google se configuran por tenant; no se usan destinos o tokens Google globales como fallback.
