@@ -13,7 +13,23 @@ type Plan = {
   status: "ACTIVE" | "DISABLED";
   description: string | null;
   featuresJson: string | null;
+  policy: PlanPolicy;
   createdSubscriptions?: number;
+};
+
+type PlanLimitKey = "monthlyInvoices" | "tenantUsers" | "manualInvoicesMonthly" | "ocrDocumentsMonthly";
+
+type PlanPolicy = {
+  schemaVersion: 1;
+  tier: number | null;
+  entitlements: Record<string, boolean>;
+  limits: Record<PlanLimitKey, number | null>;
+  processing: {
+    allowedModes: string[];
+    defaultMode: string | null;
+    minIntervalMinutes: number | null;
+    maxRunsPerDay: number | null;
+  };
 };
 
 type PlansResponse = {
@@ -46,23 +62,87 @@ const planFeatureOptions = [
   ["ocrImport", "Importacion OCR"],
 ] as const;
 
-function parsePlanFeatures(value: string) {
-  if (!value.trim()) return {};
+const planLimitOptions: Array<[PlanLimitKey, string]> = [
+  ["monthlyInvoices", "Facturas mensuales"],
+  ["tenantUsers", "Usuarios del cliente"],
+  ["manualInvoicesMonthly", "Facturas manuales mensuales"],
+  ["ocrDocumentsMonthly", "Documentos OCR mensuales"],
+];
+
+function createEmptyPlanPolicy(): PlanPolicy {
+  return {
+    schemaVersion: 1,
+    tier: null,
+    entitlements: {},
+    limits: {
+      monthlyInvoices: null,
+      tenantUsers: null,
+      manualInvoicesMonthly: null,
+      ocrDocumentsMonthly: null,
+    },
+    processing: {
+      allowedModes: [],
+      defaultMode: null,
+      minIntervalMinutes: null,
+      maxRunsPerDay: null,
+    },
+  };
+}
+
+function parsePlanPolicy(value: string): PlanPolicy {
+  const emptyPolicy = createEmptyPlanPolicy();
+  if (!value.trim()) return emptyPolicy;
 
   try {
     const parsed = JSON.parse(value) as unknown;
-    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
-      ? parsed as Record<string, unknown>
-      : {};
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return emptyPolicy;
+
+    const raw = parsed as Record<string, unknown>;
+    if (raw.schemaVersion === 1 && raw.entitlements && typeof raw.entitlements === "object") {
+      return {
+        ...emptyPolicy,
+        ...raw,
+        schemaVersion: 1,
+        entitlements: raw.entitlements as Record<string, boolean>,
+        limits: {
+          ...emptyPolicy.limits,
+          ...(raw.limits && typeof raw.limits === "object" ? raw.limits : {}),
+        },
+        processing: {
+          ...emptyPolicy.processing,
+          ...(raw.processing && typeof raw.processing === "object" ? raw.processing : {}),
+        },
+      } as PlanPolicy;
+    }
+
+    const legacyEntitlements = Object.fromEntries(
+      Object.entries(raw).filter(([, enabled]) => typeof enabled === "boolean")
+    ) as Record<string, boolean>;
+    return { ...emptyPolicy, entitlements: legacyEntitlements };
   } catch {
-    return {};
+    return emptyPolicy;
   }
 }
 
 function updateFeatureJson(value: string, key: string, checked: boolean) {
+  const policy = parsePlanPolicy(value);
   return JSON.stringify({
-    ...parsePlanFeatures(value),
-    [key]: checked,
+    ...policy,
+    entitlements: {
+      ...policy.entitlements,
+      [key]: checked,
+    },
+  }, null, 2);
+}
+
+function updateLimitJson(value: string, key: PlanLimitKey, rawValue: string) {
+  const policy = parsePlanPolicy(value);
+  return JSON.stringify({
+    ...policy,
+    limits: {
+      ...policy.limits,
+      [key]: rawValue === "" ? null : Number(rawValue),
+    },
   }, null, 2);
 }
 
@@ -99,6 +179,7 @@ export function SettingsPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const editablePolicy = parsePlanPolicy(form.featuresJson);
 
   useEffect(() => {
     if (token && user?.role === "SUPERADMIN") {
@@ -260,6 +341,12 @@ export function SettingsPage() {
                   <div className="plan-card__meta">
                     <strong>{formatPlanPrice(plan)}</strong>
                     <span>{getBillingCycleLabel(plan.billingCycle)}</span>
+                    <span>{Object.values(plan.policy.entitlements).filter(Boolean).length} servicios activos</span>
+                    <span>
+                      {Object.values(plan.policy.limits).some((limit) => limit !== null)
+                        ? "Con limites configurados"
+                        : "Sin limites definidos"}
+                    </span>
                     <span>{plan.createdSubscriptions ?? 0} suscripciones</span>
                   </div>
                   <div className="plan-card__actions">
@@ -375,13 +462,11 @@ export function SettingsPage() {
             <div className="features-toggle-list">
               <span>Funciones incluidas</span>
               {planFeatureOptions.map(([key, label]) => {
-                const features = parsePlanFeatures(form.featuresJson);
-
                 return (
                   <label key={key} className="checkbox-field">
                     <input
                       type="checkbox"
-                      checked={Boolean(features[key])}
+                      checked={Boolean(editablePolicy.entitlements[key])}
                       onChange={(event) => setForm((current) => ({
                         ...current,
                         featuresJson: updateFeatureJson(current.featuresJson, key, event.target.checked),
@@ -392,6 +477,26 @@ export function SettingsPage() {
                   </label>
                 );
               })}
+            </div>
+            <div className="features-toggle-list">
+              <span>Limites opcionales</span>
+              {planLimitOptions.map(([key, label]) => (
+                <label key={key} className="field">
+                  <span>{label}</span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={editablePolicy.limits[key] ?? ""}
+                    onChange={(event) => setForm((current) => ({
+                      ...current,
+                      featuresJson: updateLimitJson(current.featuresJson, key, event.target.value),
+                    }))}
+                    placeholder="Sin limite definido"
+                    disabled={isSaving}
+                  />
+                </label>
+              ))}
             </div>
             <details className="advanced-json-box">
               <summary>Avanzado: editar JSON</summary>

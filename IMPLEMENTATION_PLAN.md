@@ -106,7 +106,7 @@ Aceptacion: un tenant demo completa MP -> ARCA y puede generar el PDF bajo deman
 Objetivo: resolver altas, configuracion e incidentes habituales sin acceder a DB o codigo.
 
 - [ ] Validar manualmente los flujos ya construidos y corregir contratos inconsistentes.
-- [ ] Completar planes: servicios, limites, precio, moneda, ciclo y estado.
+- [x] Completar planes: editor admin de servicios, limites opcionales, precio, moneda, ciclo y estado sobre la politica versionada vigente.
 - [ ] Completar administradores, roles y cambio/restablecimiento de password.
 - [ ] Mostrar auditoria de acciones sensibles.
 - [ ] Convertir alertas en una cola operativa accionable.
@@ -201,7 +201,7 @@ Aceptacion: los flujos mobile acordados funcionan en Android/iOS y respetan las 
 
 ## 8. Validacion de esta linea base
 
-- `facturador-frontend`: `npm run build` correcto el 2026-08-26.
+- `facturador-frontend`: `npm run build` correcto el 2026-09-01, incluido el editor admin de politicas y limites de planes.
 - `facturador-backend`: 50 tests correctos, incluidos endpoints administrativos criticos de reproceso y entrega Google; esquema Prisma valido y todos los `.js` de `src` y `prisma` aprobados por `node --check` el 2026-09-01.
 - PostgreSQL y Redis locales, migraciones Prisma, datos demo, tenants y planes: reportados como operativos el 2026-08-14.
 - API, workers, frontend, login admin y descarga PDF: reportados como operativos el 2026-08-14.

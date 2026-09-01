@@ -36,6 +36,10 @@ npm run dev
 
 La configuracion completa, las variables de entorno y las precauciones para integraciones externas estan en [`docs/ai/RUNBOOK.md`](docs/ai/RUNBOOK.md).
 
+## Administracion de planes
+
+El panel `Configuracion` permite a `SUPERADMIN` crear y editar planes, precio, moneda, ciclo, estado, servicios habilitados y limites opcionales. Dejar un limite vacio conserva el valor comercial como no definido.
+
 ## Validacion
 
 ```powershell
@@ -57,4 +61,3 @@ No ejecutar pruebas contra ARCA, Mercado Pago o recursos Google de produccion.
 - [`docs/ai/DECISIONS.md`](docs/ai/DECISIONS.md): decisiones tecnicas.
 - [`docs/ai/RUNBOOK.md`](docs/ai/RUNBOOK.md): setup, operacion y validacion.
 - [`docs/ai/DOCUMENT_STATUS.md`](docs/ai/DOCUMENT_STATUS.md): precedencia documental.
-
