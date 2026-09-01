@@ -1,4 +1,3 @@
-import axios from "axios";
 import crypto from "crypto";
 import { google } from "googleapis";
 import { config } from "../config/index.js";
@@ -10,6 +9,7 @@ import {
   listEnabledTenantsByIntegration,
 } from "./tenantConfig.service.js";
 import { getTenantSubscriptionPolicy } from "./subscriptionPolicy.service.js";
+import { requestGoogleAccessToken, sanitizeGoogleTokenError } from "./googleToken.service.js";
 
 export const GOOGLE_SCOPES = [
   "https://www.googleapis.com/auth/drive.file",
@@ -143,21 +143,14 @@ async function getAccessTokenFromRefreshCached(tenantId, { clientId, clientSecre
     return cached.accessToken;
   }
 
-  const response = await axios.post("https://oauth2.googleapis.com/token", null, {
-    params: {
-      client_id: clientId,
-      client_secret: clientSecret,
-      refresh_token: refreshToken,
-      grant_type: "refresh_token",
-    },
-  });
+  const tokens = await requestGoogleAccessToken({ clientId, clientSecret, refreshToken });
 
-  const expiresIn = (response.data.expires_in ?? 3600) * 1000;
+  const expiresIn = (tokens.expires_in ?? 3600) * 1000;
   tenantAccessTokenCache.set(String(tenantId), {
-    accessToken: response.data.access_token,
+    accessToken: tokens.access_token,
     expiresAt: Date.now() + expiresIn,
   });
-  return response.data.access_token;
+  return tokens.access_token;
 }
 
 export function buildTenantGoogleAuthUrl({ tenantSlug, flowId = null, driveFolderId = null, sheetsId = null, sheetName = null }) {
@@ -177,7 +170,12 @@ export async function connectTenantGoogleFromCallback({ code, state }) {
   const tenantId = await resolveTenantIdBySlug(payload.tenantSlug);
 
   const oAuth2Client = createOAuthClient();
-  const { tokens } = await oAuth2Client.getToken(code);
+  let tokens;
+  try {
+    ({ tokens } = await oAuth2Client.getToken(code));
+  } catch (error) {
+    throw sanitizeGoogleTokenError(error, "No se pudo completar la autorizacion Google");
+  }
   const scopes = parseScopes(tokens.scope);
 
   const driveExisting = await tryGetTenantIntegrationConfig(tenantId, "DRIVE");

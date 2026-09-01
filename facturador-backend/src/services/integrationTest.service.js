@@ -2,6 +2,7 @@ import axios from "axios";
 import { getLastInvoiceAFIP, normalizeAfipConfig } from "./afip.service.js";
 import { normalizeMpConfig } from "./mercadopago.service.js";
 import { config } from "../config/index.js";
+import { buildGoogleTokenRequest as buildTokenRequest, requestGoogleAccessToken } from "./googleToken.service.js";
 
 function summarizeMpPayment(payment) {
   if (!payment) return null;
@@ -118,31 +119,21 @@ export async function testAfipConnection(afipCfg = {}) {
 }
 
 export function buildGoogleTokenRequest(googleCfg = {}, googleAppConfig = config.GOOGLE) {
-  const clientId = googleAppConfig.CLIENT_ID;
-  const clientSecret = googleAppConfig.CLIENT_SECRET;
-  const refreshToken = googleCfg.REFRESH_TOKEN;
-
-  if (!refreshToken) throw new Error("GOOGLE.REFRESH_TOKEN es obligatorio");
-  if (!clientId) throw new Error("GOOGLE.CLIENT_ID es obligatorio");
-  if (!clientSecret) throw new Error("GOOGLE.CLIENT_SECRET es obligatorio");
-
-  return {
-    client_id: clientId,
-    client_secret: clientSecret,
-    refresh_token: refreshToken,
-    grant_type: "refresh_token",
-  };
+  return buildTokenRequest({
+    clientId: googleAppConfig.CLIENT_ID,
+    clientSecret: googleAppConfig.CLIENT_SECRET,
+    refreshToken: googleCfg.REFRESH_TOKEN,
+  });
 }
 
 async function getGoogleAccessToken(googleCfg = {}) {
   const tokenRequest = buildGoogleTokenRequest(googleCfg);
-
-  const response = await axios.post("https://oauth2.googleapis.com/token", null, {
-    params: tokenRequest,
-    timeout: 30000,
+  const tokens = await requestGoogleAccessToken({
+    clientId: tokenRequest.client_id,
+    clientSecret: tokenRequest.client_secret,
+    refreshToken: tokenRequest.refresh_token,
   });
-
-  return response.data.access_token;
+  return tokens.access_token;
 }
 
 export async function testDriveConnection(driveCfg = {}) {

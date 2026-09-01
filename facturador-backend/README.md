@@ -21,6 +21,14 @@ Los secretos se devuelven enmascarados por defecto y `passwordHash` nunca forma 
 - Sheets funciona como registro operativo: agrega una fila por pago y actualiza esa misma fila con estado `ERROR` u `OK` en cada intento. Los errores ARCA se registran aunque no exista PDF; Drive solo aplica a comprobantes emitidos.
 - El dashboard y `/alerts` consideran incidentes operativos los estados `afip_pending`, `pdf_pending`, `drive_pending`, `sheets_pending`, `failed` y `processing` con error, y enlazan al recurso que requiere intervencion.
 
+Para auditar sin escrituras las entregas historicas de un tenant en PostgreSQL, Drive y Sheets:
+
+```powershell
+npm run google:audit-deliveries -- --tenant=SLUG
+```
+
+El comando informa referencias faltantes, IDs de pago repetidos y recursos no vinculados. No agrega, actualiza ni elimina archivos, filas o pagos.
+
 ## Planes
 
 Los planes vigentes se sincronizan de forma idempotente con:

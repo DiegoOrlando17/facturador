@@ -113,6 +113,15 @@ El OAuth por tenant requiere un cliente de tipo **Web application**. En Google C
 
 `GOOGLE_CLIENT_ID` y `GOOGLE_CLIENT_SECRET` identifican a la aplicacion Facturador frente a Google; no son credenciales del tenant. Para cada tenant, usar `Conectar / reautorizar Google` desde la pestaña Integraciones del detalle admin. El backend genera una URL firmada y efimera, el callback resuelve el tenant desde DB y guarda su refresh token cifrado en `DRIVE` y `SHEETS`, conservando carpeta, spreadsheet y hoja. No existe token global ni inicio OAuth publico por slug.
 
+Para auditar las entregas de un tenant sin modificar PostgreSQL, Drive o Sheets:
+
+```powershell
+cd facturador-backend
+npm run google:audit-deliveries -- --tenant=SLUG
+```
+
+La salida JSON usa codigo `0` sin inconsistencias criticas, `2` si detecta referencias faltantes/duplicadas y `1` si la auditoria no pudo completarse. Los recursos externos sin correspondencia local se informan como advertencias y nunca se eliminan.
+
 La configuracion operativa objetivo es por tenant y debe identificar, como minimo:
 
 - refresh token cifrado obtenido mediante el consentimiento del cliente;
@@ -285,7 +294,7 @@ cd facturador-backend
 npm test
 ```
 
-Resultado: 37 tests correctos el 2026-08-30.
+Resultado: 42 tests correctos el 2026-09-01.
 
 Prisma:
 

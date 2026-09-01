@@ -5,6 +5,38 @@ Reusable debugging notes for recurring or high-value errors.
 Do not use this as a task history. Commits are the task history.
 
 ---
+# Secretos Google expuestos en errores HTTP detallados
+
+Area: Node | Google OAuth | Seguridad
+Status: partial
+Last seen: 2026-08-30
+
+### Symptoms
+
+Al imprimir un error Axios completo durante la renovacion OAuth, la configuracion de la solicitud puede incluir `client_secret` y `refresh_token`.
+
+### Root cause
+
+La renovacion enviaba credenciales como query params. Axios conserva URL, parametros y configuracion dentro del objeto de error, que puede volcarse accidentalmente en diagnosticos detallados.
+
+### Fix
+
+- Enviar credenciales OAuth como cuerpo `application/x-www-form-urlencoded`, nunca como query string.
+- Capturar el error HTTP dentro del servicio y devolver solo status/codigo Google sanitizados.
+- Si hubo una exposicion, rotar el Client Secret, revocar la autorizacion afectada y reautorizar el tenant.
+
+### First checks next time
+
+1. No imprimir objetos Axios completos ni `error.config`.
+2. Buscar secretos en URL, params, logs y salidas de CI/diagnostico.
+3. Confirmar la rotacion antes de reutilizar la integracion.
+
+### Related files
+
+- `facturador-backend/src/services/googleToken.service.js`
+- `facturador-backend/src/services/tenantGoogle.service.js`
+- `facturador-backend/src/services/integrationTest.service.js`
+
 # Pagos quedan en processing despues de un fallo Google
 
 Area: Node | BullMQ | Google Drive/Sheets | Workers
