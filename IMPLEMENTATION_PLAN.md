@@ -89,13 +89,13 @@ Objetivo: certificar el flujo principal antes de sumar canales.
 
 - [x] Probar deteccion de ventas Mercado Pago POS exclusivamente por polling/checkpoints con el tenant `fiebre`.
 - [x] Probar idempotencia ante eventos duplicados y concurrencia mediante segunda pasada integral y locks Redis por pago/slot.
-- [ ] Probar emision ARCA, CAE, numeracion, errores y reintentos. Emision, CAE y numeracion se validaron en homologacion el 2026-09-01; falta el circuito controlado de error y recuperacion.
+- [x] Probar emision ARCA, CAE, numeracion, errores y reintentos en homologacion, incluyendo falla controlada y recuperacion exitosa el 2026-09-01.
 - [x] Validar que todo comprobante emitido en ARCA pueda generar un PDF descargable bajo demanda, sin persistencia local.
 - [x] Validar configuracion opcional por tenant de carpeta Drive y planilla Sheets con el tenant `fiebre`.
-- [ ] Validar que Sheets registre una fila por pago y la actualice entre `ERROR` y `OK` durante reintentos; la segunda pasada y la auditoria del 2026-09-01 confirmaron una fila y un documento Drive para el caso sintetico, sin duplicados. Falta certificar `ERROR` -> `OK`.
+- [x] Validar que Sheets registre una fila por pago y la actualice entre `ERROR` y `OK` durante reintentos; Drive conservo un unico PDF y la auditoria no detecto entregas registradas faltantes ni IDs Sheets duplicados.
 - [x] Implementar scheduler por modalidad y tenant con exclusion distribuida Redis por slot.
 - [x] Completar trazabilidad y acciones seguras de reproceso.
-- [ ] Incorporar tests automatizados de servicios y endpoints criticos.
+- [x] Incorporar tests automatizados de servicios y endpoints criticos, incluyendo acciones admin de reproceso y entrega Google con permisos, validaciones y respuestas seguras.
 
 Herramienta disponible: `npm run invoice:test-flow -- --tenant=SLUG` crea un pago sintetico local y recorre el flujo real de workers contra homologacion/recursos de prueba, incluyendo una segunda pasada idempotente. Con `--verify-error-recovery` simula primero una respuesta ARCA fallida, verifica `afip_pending`/`FAILED` y Sheets `ERROR`, y luego recupera contra homologacion comprobando la misma fila en `OK`. Su ejecucion exitosa debe registrarse antes de cerrar esta fase.
 
@@ -202,10 +202,11 @@ Aceptacion: los flujos mobile acordados funcionan en Android/iOS y respetan las 
 ## 8. Validacion de esta linea base
 
 - `facturador-frontend`: `npm run build` correcto el 2026-08-26.
-- `facturador-backend`: 46 tests correctos, esquema Prisma valido y todos los `.js` de `src` y `prisma` aprobados por `node --check` el 2026-09-01.
+- `facturador-backend`: 50 tests correctos, incluidos endpoints administrativos criticos de reproceso y entrega Google; esquema Prisma valido y todos los `.js` de `src` y `prisma` aprobados por `node --check` el 2026-09-01.
 - PostgreSQL y Redis locales, migraciones Prisma, datos demo, tenants y planes: reportados como operativos el 2026-08-14.
 - API, workers, frontend, login admin y descarga PDF: reportados como operativos el 2026-08-14.
 - La validacion integral del portal cliente queda diferida hasta reemplazar el prototipo estatico por una aplicacion conectada a `/portal`.
 - Las integraciones externas y el flujo completo MP -> ARCA -> Google conservan el estado de validacion especifico indicado en las fases siguientes.
 - `invoice:test-flow -- --tenant=fiebre --amount=100 --require-drive --require-sheets`: correcto el 2026-09-01 contra PostgreSQL local, ARCA homologacion y Google de test; genero `Invoice.ISSUED`, CAE, un documento Drive y una fila Sheets, y la segunda pasada fue idempotente.
+- `invoice:test-flow -- --tenant=fiebre --amount=100 --require-drive --require-sheets --verify-error-recovery`: correcto el 2026-09-01; verifico `afip_pending`/`FAILED`, fila Sheets `ERROR`, recuperacion `complete`/`ISSUED`, CAE, actualizacion de la misma fila a `OK`, un documento Drive y segunda pasada idempotente.
 - `google:audit-deliveries -- --tenant=fiebre`: correcto el 2026-09-01, sin documentos registrados faltantes, IDs de pago duplicados ni filas Sheets desalineadas; permanecen recursos historicos externos no vinculados a la DB actual.

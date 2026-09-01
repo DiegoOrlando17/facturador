@@ -63,6 +63,7 @@ import { toBigIntId } from "../utils/bigint.js";
 import { normalizeTenantSchedule } from "../domain/tenantScheduler.js";
 import { getTenantSubscriptionPolicy } from "../services/subscriptionPolicy.service.js";
 import { buildTenantGoogleAuthUrl, mergeGoogleTenantIntegrationConfig } from "../services/tenantGoogle.service.js";
+import { createAdminPaymentActionsRouter } from "./adminPaymentActions.routes.js";
 
 const router = Router();
 
@@ -219,6 +220,13 @@ router.get("/me", requireAdminAuth, (req, res) => {
 });
 
 router.use(requireAdminAuth);
+
+router.use(createAdminPaymentActionsRouter({
+  requireAdminPermission,
+  getAdminPaymentDetail,
+  reprocessPaymentAsAdmin,
+  deliverPaymentToGoogleAsAdmin,
+}));
 
 router.patch("/me", async (req, res) => {
   try {
@@ -413,53 +421,6 @@ router.get("/payments/:id/pdf", async (req, res) => {
     return res.send(pdfBuffer);
   } catch (error) {
     return res.status(400).json({ error: error.message || "No se pudo obtener el PDF" });
-  }
-});
-
-router.post("/payments/:id/reprocess", requireAdminPermission(ADMIN_PERMISSIONS.OPERATE), async (req, res) => {
-  try {
-    const paymentId = toBigIntId(req.params.id, "paymentId");
-    const payment = await getAdminPaymentDetail(paymentId);
-
-    if (!payment) {
-      return res.status(404).json({ error: "Pago no encontrado" });
-    }
-
-    const result = await reprocessPaymentAsAdmin(
-      payment,
-      req.adminAuth.adminUser,
-      String(req.body.step || "auto").trim().toLowerCase()
-    );
-
-    return res.status(202).json(normalizeJsonBigInts({
-      ok: true,
-      paymentId,
-      tenantId: payment.tenantId,
-      ...result,
-    }));
-  } catch (error) {
-    return res.status(400).json({ error: error.message || "No se pudo solicitar reproceso" });
-  }
-});
-
-router.post("/payments/:id/deliver-google", requireAdminPermission(ADMIN_PERMISSIONS.OPERATE), async (req, res) => {
-  try {
-    const paymentId = toBigIntId(req.params.id, "paymentId");
-    const payment = await getAdminPaymentDetail(paymentId);
-
-    if (!payment) {
-      return res.status(404).json({ error: "Pago no encontrado" });
-    }
-
-    const result = await deliverPaymentToGoogleAsAdmin(payment, req.adminAuth.adminUser);
-    return res.status(result.queued ? 202 : 200).json(normalizeJsonBigInts({
-      ok: true,
-      paymentId,
-      tenantId: payment.tenantId,
-      ...result,
-    }));
-  } catch (error) {
-    return res.status(400).json({ error: error.message || "No se pudo solicitar la entrega Google" });
   }
 });
 

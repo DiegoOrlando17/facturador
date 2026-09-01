@@ -238,6 +238,8 @@ El comando crea un `Payment` sintetico, lo encola, espera `Payment.complete`/`In
 
 Validacion registrada el 2026-09-01 para `fiebre`: estado final `complete`/`ISSUED`, comprobante de homologacion, un documento Drive, una fila Sheets y segunda pasada idempotente. La auditoria posterior no detecto documentos registrados faltantes, IDs duplicados ni filas desalineadas.
 
+La variante `--verify-error-recovery` tambien fue validada el 2026-09-01: alcanzo `afip_pending`/`FAILED`, escribio `ERROR` en Sheets, recupero en homologacion a `complete`/`ISSUED` con CAE, actualizo la misma fila a `OK`, conservo un unico documento Drive y supero la segunda pasada idempotente.
+
 La migracion `20260816100000_remove_payment_fiscal_fields` elimina de `Payment` las columnas fiscales y de documentos despues de copiar referencias Drive/PDF heredadas a `InvoiceDocument`. Fue aplicada y validada localmente el 2026-08-16 con backup previo. Antes de aplicarla en otro ambiente, generar un `pg_dump`, verificar el archivo y detener API/workers para regenerar Prisma Client sin bloqueos de Windows.
 
 ## 6. Arranque local
@@ -304,7 +306,7 @@ cd facturador-backend
 npm test
 ```
 
-Resultado: 46 tests correctos el 2026-09-01.
+Resultado: 50 tests correctos el 2026-09-01. La suite incluye pruebas HTTP aisladas de los endpoints admin de reproceso y entrega Google; usa dobles en memoria y no accede a DB, Redis, Mercado Pago, ARCA ni Google.
 
 Prisma:
 
@@ -330,8 +332,6 @@ Estas validaciones fueron reportadas manualmente el 2026-08-14; no representan u
 ### Validaciones diferidas
 
 - El login y los flujos de `/portal` se validaran integralmente al implementar el portal cliente web. Actualmente `/portal-cliente` es un prototipo estatico y una prueba aislada de la API no se considera criterio de cierre inmediato.
-- La idempotencia integral, concurrencia, errores y reintentos del flujo MP -> ARCA deben certificarse durante la Fase 2.
-- Drive/Sheets tiene happy path validado con un tenant elegible; faltan estados `ERROR`/`OK`, ausencia de duplicados bajo reintento y eliminacion de temporales ante fallos.
 
 No ejecutar pruebas de integraciones con ventas, certificados, puntos de venta o recursos Google de produccion.
 
