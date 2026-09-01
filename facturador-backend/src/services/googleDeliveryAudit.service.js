@@ -17,24 +17,34 @@ function issueSummary(items, sampleSize = 20) {
   return { count: items.length, samples: items.slice(0, sampleSize) };
 }
 
+function driveIdFromDocument(document) {
+  if (document.externalId) return document.externalId;
+  const match = String(document.externalUrl || "").match(/\/file\/d\/([^/?]+)/i);
+  return match?.[1] ?? null;
+}
+
 export function auditGoogleDeliveries({ payments = [], driveFiles = [], sheetValues = [] }) {
   const knownPaymentIds = new Set(payments.map((payment) => String(payment.providerPaymentId)));
   const trackedDocuments = payments.flatMap((payment) => payment.driveDocuments.map((document) => ({
     paymentId: String(payment.providerPaymentId),
-    externalId: document.externalId,
+    externalId: driveIdFromDocument(document),
     fileName: document.fileName,
   })));
   const trackedDriveIds = new Set(trackedDocuments.map((document) => document.externalId).filter(Boolean));
   const driveIds = new Set(driveFiles.map((file) => file.id).filter(Boolean));
   const sheetIds = sheetValues.map((row) => String(row?.[0] || "").trim());
+  const dataSheetIds = sheetIds.filter((id) => !["pago", "id pago", "provider_payment_id"].includes(id.toLowerCase()));
 
   const missingDriveDocuments = trackedDocuments.filter((document) => (
     !document.externalId || !driveIds.has(document.externalId)
   ));
   const untrackedDriveFiles = driveFiles.filter((file) => file.id && !trackedDriveIds.has(file.id));
-  const duplicateDriveNames = duplicates(driveFiles.map((file) => file.name));
-  const duplicateSheetPaymentIds = duplicates(sheetIds.filter((id) => knownPaymentIds.has(id)));
-  const untrackedSheetIds = [...new Set(sheetIds.filter((id) => id && !knownPaymentIds.has(id)))];
+  const trackedFileNames = new Set(trackedDocuments.map((document) => document.fileName).filter(Boolean));
+  const duplicateDriveNames = duplicates(
+    driveFiles.filter((file) => trackedFileNames.has(file.name)).map((file) => file.name)
+  );
+  const duplicateSheetPaymentIds = duplicates(dataSheetIds.filter((id) => knownPaymentIds.has(id)));
+  const untrackedSheetIds = [...new Set(dataSheetIds.filter((id) => id && !knownPaymentIds.has(id)))];
 
   const missingOrMismatchedSheetRows = payments
     .filter((payment) => payment.sheetsRow)

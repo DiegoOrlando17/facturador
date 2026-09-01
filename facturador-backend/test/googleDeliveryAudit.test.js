@@ -2,11 +2,11 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { auditGoogleDeliveries } from "../src/services/googleDeliveryAudit.service.js";
 
-function payment(id, row, externalId, fileName = `${id}.pdf`) {
+function payment(id, row, externalId, fileName = `${id}.pdf`, externalUrl = null) {
   return {
     providerPaymentId: id,
     sheetsRow: row,
-    driveDocuments: externalId ? [{ externalId, fileName }] : [],
+    driveDocuments: externalId || externalUrl ? [{ externalId, externalUrl, fileName }] : [],
   };
 }
 
@@ -43,5 +43,23 @@ test("los recursos ajenos se informan como advertencias sin modificarlos", () =>
 
   assert.equal(report.ok, true);
   assert.equal(report.warnings.untrackedDriveFiles.count, 1);
-  assert.equal(report.warnings.untrackedSheetIds.count, 2);
+  assert.equal(report.warnings.untrackedSheetIds.count, 1);
+});
+
+test("la auditoria recupera IDs Drive de documentos historicos", () => {
+  const report = auditGoogleDeliveries({
+    payments: [payment(
+      "pay-1",
+      "Hoja1!A2:J2",
+      null,
+      "legacy.pdf",
+      "https://drive.google.com/file/d/legacy-file-id/view?usp=drivesdk"
+    )],
+    driveFiles: [{ id: "legacy-file-id", name: "renamed-legacy.pdf" }],
+    sheetValues: [["ID Pago"], ["pay-1"]],
+  });
+
+  assert.equal(report.ok, true);
+  assert.equal(report.errors.missingDriveDocuments.count, 0);
+  assert.equal(report.warnings.untrackedSheetIds.count, 0);
 });

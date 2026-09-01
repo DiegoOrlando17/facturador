@@ -63,7 +63,7 @@ async function main() {
           select: {
             documents: {
               where: { type: "PDF", storageProvider: "GOOGLE_DRIVE", status: "AVAILABLE" },
-              select: { externalId: true, fileName: true },
+              select: { externalId: true, externalUrl: true, fileName: true },
             },
           },
         },

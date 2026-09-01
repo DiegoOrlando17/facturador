@@ -228,6 +228,8 @@ npm run invoice:test-flow -- --tenant=SLUG --amount=100 --require-drive --requir
 
 El comando crea un `Payment` sintetico, lo encola, espera `Payment.complete`/`Invoice.ISSUED`, genera el PDF y reencola el mismo pago para comprobar idempotencia. Solo admite PostgreSQL local y rechaza configuraciones/URLs ARCA que parezcan productivas. La ejecucion consume numeracion de homologacion y puede crear un archivo y una fila reales en Drive/Sheets de prueba; esos efectos externos no se revierten automaticamente.
 
+Validacion registrada el 2026-09-01 para `fiebre`: estado final `complete`/`ISSUED`, comprobante de homologacion, un documento Drive, una fila Sheets y segunda pasada idempotente. La auditoria posterior no detecto documentos registrados faltantes, IDs duplicados ni filas desalineadas.
+
 La migracion `20260816100000_remove_payment_fiscal_fields` elimina de `Payment` las columnas fiscales y de documentos despues de copiar referencias Drive/PDF heredadas a `InvoiceDocument`. Fue aplicada y validada localmente el 2026-08-16 con backup previo. Antes de aplicarla en otro ambiente, generar un `pg_dump`, verificar el archivo y detener API/workers para regenerar Prisma Client sin bloqueos de Windows.
 
 ## 6. Arranque local
@@ -294,7 +296,7 @@ cd facturador-backend
 npm test
 ```
 
-Resultado: 42 tests correctos el 2026-09-01.
+Resultado: 43 tests correctos el 2026-09-01.
 
 Prisma:
 

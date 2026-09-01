@@ -88,11 +88,11 @@ Aceptacion: esquema, API y reglas soportan las cuatro capacidades progresivas de
 Objetivo: certificar el flujo principal antes de sumar canales.
 
 - [x] Probar deteccion de ventas Mercado Pago POS exclusivamente por polling/checkpoints con el tenant `fiebre`.
-- [ ] Probar idempotencia ante eventos duplicados y concurrencia.
-- [ ] Probar emision ARCA, CAE, numeracion, errores y reintentos. El happy path fue validado manualmente; faltan fallos y reintentos.
+- [x] Probar idempotencia ante eventos duplicados y concurrencia mediante segunda pasada integral y locks Redis por pago/slot.
+- [ ] Probar emision ARCA, CAE, numeracion, errores y reintentos. Emision, CAE y numeracion se validaron en homologacion el 2026-09-01; falta el circuito controlado de error y recuperacion.
 - [x] Validar que todo comprobante emitido en ARCA pueda generar un PDF descargable bajo demanda, sin persistencia local.
 - [x] Validar configuracion opcional por tenant de carpeta Drive y planilla Sheets con el tenant `fiebre`.
-- [ ] Validar que Sheets registre una fila por pago y la actualice entre `ERROR` y `OK` durante reintentos; validar que Drive reciba solo PDF de comprobantes facturados, sin duplicados.
+- [ ] Validar que Sheets registre una fila por pago y la actualice entre `ERROR` y `OK` durante reintentos; la segunda pasada y la auditoria del 2026-09-01 confirmaron una fila y un documento Drive para el caso sintetico, sin duplicados. Falta certificar `ERROR` -> `OK`.
 - [x] Implementar scheduler por modalidad y tenant con exclusion distribuida Redis por slot.
 - [x] Completar trazabilidad y acciones seguras de reproceso.
 - [ ] Incorporar tests automatizados de servicios y endpoints criticos.
@@ -202,8 +202,10 @@ Aceptacion: los flujos mobile acordados funcionan en Android/iOS y respetan las 
 ## 8. Validacion de esta linea base
 
 - `facturador-frontend`: `npm run build` correcto el 2026-08-26.
-- `facturador-backend`: 42 tests correctos, esquema Prisma valido y todos los `.js` de `src` y `prisma` aprobados por `node --check` el 2026-09-01.
+- `facturador-backend`: 43 tests correctos, esquema Prisma valido y todos los `.js` de `src` y `prisma` aprobados por `node --check` el 2026-09-01.
 - PostgreSQL y Redis locales, migraciones Prisma, datos demo, tenants y planes: reportados como operativos el 2026-08-14.
 - API, workers, frontend, login admin y descarga PDF: reportados como operativos el 2026-08-14.
 - La validacion integral del portal cliente queda diferida hasta reemplazar el prototipo estatico por una aplicacion conectada a `/portal`.
 - Las integraciones externas y el flujo completo MP -> ARCA -> Google conservan el estado de validacion especifico indicado en las fases siguientes.
+- `invoice:test-flow -- --tenant=fiebre --amount=100 --require-drive --require-sheets`: correcto el 2026-09-01 contra PostgreSQL local, ARCA homologacion y Google de test; genero `Invoice.ISSUED`, CAE, un documento Drive y una fila Sheets, y la segunda pasada fue idempotente.
+- `google:audit-deliveries -- --tenant=fiebre`: correcto el 2026-09-01, sin documentos registrados faltantes, IDs de pago duplicados ni filas Sheets desalineadas; permanecen recursos historicos externos no vinculados a la DB actual.
