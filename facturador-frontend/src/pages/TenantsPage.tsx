@@ -442,7 +442,7 @@ export function TenantsPage() {
                   <Link to={`/tenants/${tenant.slug}`} className="secondary-button tenant-card__link">
                     Ver detalle
                   </Link>
-                  <PermissionGate permission="tenants:manage">
+                  <PermissionGate permission="tenants:delete">
                     <button
                       type="button"
                       className="secondary-button secondary-button--danger"

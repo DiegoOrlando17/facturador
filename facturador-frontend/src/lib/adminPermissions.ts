@@ -5,7 +5,9 @@ export type AdminPermission =
   | "payments:manage"
   | "tenants:view"
   | "tenants:manage"
+  | "tenants:delete"
   | "integrations:manage"
+  | "tenant-users:manage"
   | "users:manage";
 
 const rolePermissions: Record<AdminRole, AdminPermission[]> = {
@@ -14,13 +16,18 @@ const rolePermissions: Record<AdminRole, AdminPermission[]> = {
     "payments:manage",
     "tenants:view",
     "tenants:manage",
+    "tenants:delete",
     "integrations:manage",
+    "tenant-users:manage",
     "users:manage",
   ],
   OPERATOR: [
     "dashboard:view",
     "payments:manage",
     "tenants:view",
+    "tenants:manage",
+    "integrations:manage",
+    "tenant-users:manage",
   ],
   VIEWER: [
     "dashboard:view",

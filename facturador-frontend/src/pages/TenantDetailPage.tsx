@@ -3077,7 +3077,7 @@ export function TenantDetailPage() {
 
             <div className="users-layout">
               <PermissionGate
-                permission="users:manage"
+                permission="tenant-users:manage"
                 fallback={
                   <div className="panel-state">
                     <strong>Solo lectura</strong>
@@ -3203,7 +3203,7 @@ export function TenantDetailPage() {
                         <span>{tenantUser.lastLoginAt ? `Ultimo ingreso ${formatDateTime(tenantUser.lastLoginAt)}` : "Sin ingresos registrados"}</span>
                         <span>{`Actualizado ${formatDateTime(tenantUser.updatedAt)}`}</span>
                       </div>
-                      <PermissionGate permission="users:manage">
+                      <PermissionGate permission="tenant-users:manage">
                         <button type="button" className="secondary-button" onClick={() => startUserEdit(tenantUser)}>
                           Editar acceso
                         </button>

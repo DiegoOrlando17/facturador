@@ -93,21 +93,23 @@ export function AppShell({ children }: { children: ReactNode }) {
             <small className="app-nav__badge">1</small>
           </NavLink>
           <span className="app-nav__group">Administracion interna</span>
-          <NavLink
-            to="/settings"
-            className={({ isActive }) => `app-nav__link${isActive ? " app-nav__link--active" : ""}`}
-          >
-            <AppIcon name="settings" />
-            <span>Configuracion</span>
-          </NavLink>
           {user?.role === "SUPERADMIN" ? (
-            <NavLink
-              to="/admins"
-              className={({ isActive }) => `app-nav__link${isActive ? " app-nav__link--active" : ""}`}
-            >
-              <AppIcon name="admins" />
-              <span>Admins</span>
-            </NavLink>
+            <>
+              <NavLink
+                to="/settings"
+                className={({ isActive }) => `app-nav__link${isActive ? " app-nav__link--active" : ""}`}
+              >
+                <AppIcon name="settings" />
+                <span>Configuracion</span>
+              </NavLink>
+              <NavLink
+                to="/admins"
+                className={({ isActive }) => `app-nav__link${isActive ? " app-nav__link--active" : ""}`}
+              >
+                <AppIcon name="admins" />
+                <span>Admins</span>
+              </NavLink>
+            </>
           ) : null}
         </nav>
 
