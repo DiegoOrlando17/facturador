@@ -22,6 +22,12 @@ export function AccountPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [passwordErrorMessage, setPasswordErrorMessage] = useState<string | null>(null);
+  const [passwordSuccessMessage, setPasswordSuccessMessage] = useState<string | null>(null);
 
   useEffect(() => {
     setName(user?.name ?? "");
@@ -55,6 +61,41 @@ export function AccountPage() {
       setErrorMessage(getApiErrorMessage(error, "No se pudieron actualizar tus datos."));
     } finally {
       setIsSaving(false);
+    }
+  }
+
+  async function handlePasswordChange(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!token) {
+      setPasswordErrorMessage("Tu sesion no esta disponible. Ingresa nuevamente.");
+      return;
+    }
+    if (newPassword.length < 8) {
+      setPasswordErrorMessage("La nueva contrasena debe tener al menos 8 caracteres.");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordErrorMessage("La confirmacion no coincide con la nueva contrasena.");
+      return;
+    }
+
+    setIsChangingPassword(true);
+    setPasswordErrorMessage(null);
+    setPasswordSuccessMessage(null);
+    try {
+      await apiRequest("/admin/me/password", {
+        method: "PATCH",
+        token,
+        body: { currentPassword, newPassword },
+      });
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+      setPasswordSuccessMessage("Tu contrasena se cambio correctamente.");
+    } catch (error) {
+      setPasswordErrorMessage(getApiErrorMessage(error, "No se pudo cambiar la contrasena."));
+    } finally {
+      setIsChangingPassword(false);
     }
   }
 
@@ -136,6 +177,36 @@ export function AccountPage() {
             <span><strong>Estado</strong>{user?.status ?? "Sin estado"}</span>
             <span><strong>Creada</strong>{user?.createdAt ? formatDateTime(user.createdAt) : "-"}</span>
           </div>
+        </article>
+
+        <article className="panel">
+          <div className="panel-heading">
+            <div>
+              <span className="eyebrow">Seguridad</span>
+              <h2>Cambiar contrasena</h2>
+            </div>
+          </div>
+          <form className="account-form" onSubmit={(event) => void handlePasswordChange(event)}>
+            <label className="field">
+              <span>Contrasena actual</span>
+              <input type="password" value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} disabled={isChangingPassword} autoComplete="current-password" />
+            </label>
+            <label className="field">
+              <span>Nueva contrasena</span>
+              <input type="password" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} disabled={isChangingPassword} autoComplete="new-password" />
+            </label>
+            <label className="field">
+              <span>Confirmar nueva contrasena</span>
+              <input type="password" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} disabled={isChangingPassword} autoComplete="new-password" />
+            </label>
+            <div className="tenant-form__actions">
+              <button type="submit" className="primary-button" disabled={isChangingPassword || !currentPassword || !newPassword || !confirmPassword}>
+                {isChangingPassword ? "Cambiando..." : "Cambiar contrasena"}
+              </button>
+            </div>
+            {passwordErrorMessage ? <p className="form-error">{passwordErrorMessage}</p> : null}
+            {passwordSuccessMessage ? <p className="form-success">{passwordSuccessMessage}</p> : null}
+          </form>
         </article>
       </section>
     </main>

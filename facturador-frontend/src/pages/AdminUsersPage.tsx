@@ -275,7 +275,7 @@ export function AdminUsersPage() {
               </select>
             </label>
             <label className="field">
-              <span>{editingUserId ? "Nueva contrasena opcional" : "Contrasena inicial"}</span>
+              <span>{editingUserId ? "Restablecer contrasena (opcional)" : "Contrasena inicial"}</span>
               <input
                 type="password"
                 value={form.password}

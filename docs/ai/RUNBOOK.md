@@ -306,7 +306,7 @@ cd facturador-backend
 npm test
 ```
 
-Resultado: 50 tests correctos el 2026-09-01. La suite incluye pruebas HTTP aisladas de los endpoints admin de reproceso y entrega Google; usa dobles en memoria y no accede a DB, Redis, Mercado Pago, ARCA ni Google.
+Resultado: 53 tests correctos el 2026-09-01. La suite incluye pruebas HTTP aisladas de los endpoints admin de reproceso y entrega Google y protecciones del ultimo superadmin; usa dobles en memoria y no accede a DB, Redis, Mercado Pago, ARCA ni Google.
 
 Prisma:
 

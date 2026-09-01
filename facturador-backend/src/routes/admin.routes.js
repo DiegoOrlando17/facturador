@@ -4,6 +4,7 @@ import { assertAdminPermission, requireAdminAuth, requireAdminPermission } from 
 import { ADMIN_PERMISSIONS } from "../domain/permissions.js";
 import {
   authenticateAdminUser,
+  changeOwnAdminPassword,
   createManagedAdminUser,
   listAdminUsers,
   updateManagedAdminUser,
@@ -277,7 +278,7 @@ router.patch("/users/:id", requireAdminPermission(ADMIN_PERMISSIONS.MANAGE_ADMIN
       password: req.body.password,
       role: req.body.role,
       status: req.body.status,
-    });
+    }, req.adminAuth.adminUser.id);
 
     return res.json(normalizeJsonBigInts(user));
   } catch (error) {
@@ -701,6 +702,18 @@ router.get("/tenants/:slug/integrations", async (req, res) => {
     return res.json(normalizeJsonBigInts(integrations));
   } catch (error) {
     return res.status(error.statusCode || 400).json({ error: error.message || "No se pudieron listar integraciones" });
+  }
+});
+
+router.patch("/me/password", async (req, res) => {
+  try {
+    const result = await changeOwnAdminPassword(req.adminAuth.adminUser.id, {
+      currentPassword: req.body.currentPassword,
+      newPassword: req.body.newPassword,
+    });
+    return res.json(result);
+  } catch (error) {
+    return res.status(400).json({ error: error.message || "No se pudo cambiar la contrasena" });
   }
 });
 

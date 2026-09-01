@@ -1,5 +1,6 @@
 import { db } from "../models/db.js";
 import { hashPassword, verifyPassword } from "../utils/password.js";
+import { assertManagedAdminUpdate } from "../domain/adminUserPolicy.js";
 
 const VALID_ADMIN_ROLES = new Set(["SUPERADMIN", "OPERATOR", "VIEWER"]);
 const VALID_ADMIN_STATUSES = new Set(["ACTIVE", "DISABLED"]);
@@ -105,7 +106,15 @@ export async function createManagedAdminUser({ name = null, email, password, rol
   });
 }
 
-export async function updateManagedAdminUser(id, { name, email, role, status, password }) {
+export async function updateManagedAdminUser(id, { name, email, role, status, password }, actorId) {
+  const targetId = BigInt(id);
+  const targetUser = await db.adminUser.findUnique({ where: { id: targetId } });
+  if (!targetUser) {
+    const error = new Error("Administrador no encontrado");
+    error.statusCode = 404;
+    throw error;
+  }
+
   const data = {};
 
   if (name !== undefined) {
@@ -126,16 +135,45 @@ export async function updateManagedAdminUser(id, { name, email, role, status, pa
     data.status = normalizeStatus(status);
   }
 
+  if (role !== undefined || status !== undefined) {
+    const activeSuperadminCount = await db.adminUser.count({
+      where: { role: "SUPERADMIN", status: "ACTIVE" },
+    });
+    assertManagedAdminUpdate({
+      actorId,
+      targetUser,
+      nextRole: data.role,
+      nextStatus: data.status,
+      activeSuperadminCount,
+    });
+  }
+
   if (password !== undefined && String(password || "").length > 0) {
     data.passwordHash = await hashPassword(password);
   }
 
   const adminUser = await db.adminUser.update({
-    where: { id: BigInt(id) },
+    where: { id: targetId },
     data,
   });
 
   return normalizeAdminJson(adminUser);
+}
+
+export async function changeOwnAdminPassword(id, { currentPassword, newPassword }) {
+  const adminUser = await findAdminUserById(BigInt(id));
+  if (!adminUser) throw new Error("Administrador no encontrado");
+
+  const currentPasswordOk = await verifyPassword(currentPassword, adminUser.passwordHash);
+  if (!currentPasswordOk) throw new Error("La contrasena actual es incorrecta");
+
+  const passwordHash = await hashPassword(newPassword);
+  await db.adminUser.update({
+    where: { id: adminUser.id },
+    data: { passwordHash },
+  });
+
+  return { ok: true };
 }
 
 export async function authenticateAdminUser(email, password) {

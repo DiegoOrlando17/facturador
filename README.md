@@ -40,6 +40,8 @@ La configuracion completa, las variables de entorno y las precauciones para inte
 
 El panel `Configuracion` permite a `SUPERADMIN` crear y editar planes, precio, moneda, ciclo, estado, servicios habilitados y limites opcionales. Dejar un limite vacio conserva el valor comercial como no definido.
 
+El panel de administradores permite asignar roles, activar o desactivar cuentas y restablecer passwords. Cada administrador puede cambiar su propia password desde `Mi cuenta`, confirmando primero la actual.
+
 ## Validacion
 
 ```powershell

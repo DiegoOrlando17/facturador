@@ -39,4 +39,6 @@ Ultima revision: 2026-08-22
 - Tokens admin y tenant tienen firma HMAC y expiracion configurable.
 - Logout sigue siendo logico: no existe revocacion server-side ni refresh token.
 - Deshabilitar el usuario o tenant invalida efectivamente la siguiente request autenticada porque el middleware consulta la base.
-- Reset de password, revocacion explicita, rotacion de secretos y rate limiting permanecen pendientes de la fase de seguridad operativa.
+- Cada administrador puede cambiar su password validando el actual; `SUPERADMIN` puede restablecer el de otros administradores sin conocerlo.
+- Un superadmin no puede deshabilitarse ni quitarse su propio rol, y el sistema conserva al menos un `SUPERADMIN` activo.
+- Revocacion explicita de sesiones, rotacion de secretos y rate limiting permanecen pendientes de la fase de seguridad operativa. Cambiar una password no revoca tokens ya emitidos antes de su expiracion.

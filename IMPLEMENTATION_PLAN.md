@@ -107,7 +107,7 @@ Objetivo: resolver altas, configuracion e incidentes habituales sin acceder a DB
 
 - [ ] Validar manualmente los flujos ya construidos y corregir contratos inconsistentes.
 - [x] Completar planes: editor admin de servicios, limites opcionales, precio, moneda, ciclo y estado sobre la politica versionada vigente.
-- [ ] Completar administradores, roles y cambio/restablecimiento de password.
+- [x] Completar administradores, roles y cambio/restablecimiento de password, protegiendo la cuenta operadora y el ultimo superadmin activo.
 - [ ] Mostrar auditoria de acciones sensibles.
 - [ ] Convertir alertas en una cola operativa accionable.
 - [ ] Agregar salud de integraciones, workers y colas.
@@ -202,7 +202,7 @@ Aceptacion: los flujos mobile acordados funcionan en Android/iOS y respetan las 
 ## 8. Validacion de esta linea base
 
 - `facturador-frontend`: `npm run build` correcto el 2026-09-01, incluido el editor admin de politicas y limites de planes.
-- `facturador-backend`: 50 tests correctos, incluidos endpoints administrativos criticos de reproceso y entrega Google; esquema Prisma valido y todos los `.js` de `src` y `prisma` aprobados por `node --check` el 2026-09-01.
+- `facturador-backend`: 53 tests correctos, incluidos endpoints administrativos criticos y protecciones de administradores; esquema Prisma valido y todos los `.js` de `src` y `prisma` aprobados por `node --check` el 2026-09-01.
 - PostgreSQL y Redis locales, migraciones Prisma, datos demo, tenants y planes: reportados como operativos el 2026-08-14.
 - API, workers, frontend, login admin y descarga PDF: reportados como operativos el 2026-08-14.
 - La validacion integral del portal cliente queda diferida hasta reemplazar el prototipo estatico por una aplicacion conectada a `/portal`.
