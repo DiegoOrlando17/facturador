@@ -36,6 +36,8 @@ function createDependencies(overrides = {}) {
     getAdminPaymentDetail: async (paymentId) => ({ id: paymentId, tenantId: 11n }),
     reprocessPaymentAsAdmin: async (_payment, _admin, step) => ({ queued: true, step, jobId: 99n }),
     deliverPaymentToGoogleAsAdmin: async () => ({ queued: true, jobId: 100n }),
+    issuePaymentAsAdmin: async () => ({ queued: true, step: "afip" }),
+    cancelInvoiceAsAdmin: async () => ({ queued: true, creditNoteId: 200n, status: "QUEUED" }),
     ...overrides,
   };
 }
@@ -65,6 +67,25 @@ test("endpoints administrativos de pagos exigen permiso de operacion", async () 
       assert.equal(viewer.response.status, 403);
       assert.equal(viewer.json.error, "Permiso admin insuficiente");
     }
+  });
+});
+
+test("emision y anulacion administrativa requieren permiso y confirmacion explicita", async () => {
+  await withTestApi(createDependencies(), async (baseUrl) => {
+    const issue = await post(baseUrl, "/payments/12/issue");
+    assert.equal(issue.response.status, 202);
+    assert.equal(issue.json.step, "afip");
+
+    const missingConfirmation = await post(baseUrl, "/payments/12/credit-note", { body: {} });
+    assert.equal(missingConfirmation.response.status, 400);
+    assert.match(missingConfirmation.json.error, /ANULAR/);
+
+    const cancellation = await post(baseUrl, "/payments/12/credit-note", { body: { confirmation: "ANULAR" } });
+    assert.equal(cancellation.response.status, 202);
+    assert.equal(cancellation.json.creditNoteId, "200");
+
+    const viewer = await post(baseUrl, "/payments/12/credit-note", { role: "VIEWER", body: { confirmation: "ANULAR" } });
+    assert.equal(viewer.response.status, 403);
   });
 });
 

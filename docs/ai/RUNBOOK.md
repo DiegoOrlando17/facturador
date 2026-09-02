@@ -322,6 +322,15 @@ Resultado: 59 tests correctos el 2026-09-01. La suite incluye pruebas HTTP aisla
 
 Si API y workers se despliegan en procesos o contenedores separados, la deteccion local puede mostrar workers no visibles. Interpretar esa señal junto con los conteos y el movimiento de las colas.
 
+### Acciones fiscales administrativas
+
+- `POST /admin/payments/:id/issue` encola la emision de una factura pendiente asociada a un pago y reutiliza las protecciones fiscales existentes.
+- `POST /admin/payments/:id/credit-note` con `{ "confirmation": "ANULAR" }` crea o reutiliza una nota de credito de anulacion total y la envia a la cola `credit-notes`.
+- Ambas acciones requieren `admin.operate` y generan auditoria; la nota de credito requiere el entitlement `creditNotes`.
+- `npm run start:workers` incluye `creditNote.worker.js`. Reiniciar el launcher despues de desplegar este cambio.
+
+No validar notas de credito contra ARCA productiva. Usar un tenant con certificado, URLs y punto de venta de homologacion, una factura de homologacion emitida y plan elegible. La implementacion y el SOAP asociado tienen cobertura automatizada, pero la emision integral de una nota de credito queda pendiente de validacion manual controlada en homologacion.
+
 Prisma:
 
 ```powershell

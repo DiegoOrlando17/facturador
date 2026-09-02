@@ -66,6 +66,7 @@ import { normalizeTenantSchedule } from "../domain/tenantScheduler.js";
 import { getTenantSubscriptionPolicy } from "../services/subscriptionPolicy.service.js";
 import { buildTenantGoogleAuthUrl, mergeGoogleTenantIntegrationConfig } from "../services/tenantGoogle.service.js";
 import { createAdminPaymentActionsRouter } from "./adminPaymentActions.routes.js";
+import { cancelInvoiceAsAdmin, issuePaymentAsAdmin } from "../services/adminFiscalAction.service.js";
 import { listAdminAuditLogs } from "../services/adminAudit.service.js";
 import { claimOperationalAlert, listOperationalAlerts, releaseOperationalAlert } from "../services/operationalAlert.service.js";
 
@@ -230,6 +231,8 @@ router.use(createAdminPaymentActionsRouter({
   getAdminPaymentDetail,
   reprocessPaymentAsAdmin,
   deliverPaymentToGoogleAsAdmin,
+  issuePaymentAsAdmin,
+  cancelInvoiceAsAdmin,
 }));
 
 router.patch("/me", async (req, res) => {

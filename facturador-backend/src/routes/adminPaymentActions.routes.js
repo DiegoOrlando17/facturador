@@ -18,6 +18,8 @@ export function createAdminPaymentActionsRouter({
   getAdminPaymentDetail,
   reprocessPaymentAsAdmin,
   deliverPaymentToGoogleAsAdmin,
+  issuePaymentAsAdmin,
+  cancelInvoiceAsAdmin,
 }) {
   const router = Router();
   const requireOperate = requireAdminPermission(ADMIN_PERMISSIONS.OPERATE);
@@ -66,6 +68,31 @@ export function createAdminPaymentActionsRouter({
       }));
     } catch (error) {
       return res.status(400).json({ error: error.message || "No se pudo solicitar la entrega Google" });
+    }
+  });
+
+  router.post("/payments/:id/issue", requireOperate, async (req, res) => {
+    try {
+      const paymentId = toBigIntId(req.params.id, "paymentId");
+      const payment = await getAdminPaymentDetail(paymentId);
+      if (!payment) return res.status(404).json({ error: "Pago no encontrado" });
+      const result = await issuePaymentAsAdmin(payment, req.adminAuth.adminUser);
+      return res.status(202).json(normalizeJsonBigInts({ ok: true, paymentId, ...result }));
+    } catch (error) {
+      return res.status(400).json({ error: error.message || "No se pudo solicitar la emision" });
+    }
+  });
+
+  router.post("/payments/:id/credit-note", requireOperate, async (req, res) => {
+    try {
+      const paymentId = toBigIntId(req.params.id, "paymentId");
+      const payment = await getAdminPaymentDetail(paymentId);
+      if (!payment) return res.status(404).json({ error: "Pago no encontrado" });
+      if (req.body.confirmation !== "ANULAR") throw new Error("Debes confirmar la anulacion escribiendo ANULAR");
+      const result = await cancelInvoiceAsAdmin(payment, req.adminAuth.adminUser);
+      return res.status(result.queued ? 202 : 200).json(normalizeJsonBigInts({ ok: true, paymentId, ...result }));
+    } catch (error) {
+      return res.status(400).json({ error: error.message || "No se pudo solicitar la nota de credito" });
     }
   });
 

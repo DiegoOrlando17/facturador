@@ -85,6 +85,42 @@ export async function getInvoiceByPaymentId(tenantId, paymentId, { includeDocume
   });
 }
 
+export async function getInvoiceById(tenantId, invoiceId, { includeRelated = false } = {}) {
+  return db.invoice.findUnique({
+    where: { invoice_id_tenantId: { id: invoiceId, tenantId } },
+    include: includeRelated ? { relatedInvoice: true } : undefined,
+  });
+}
+
+export async function ensureCreditNoteForInvoice(tenantId, invoice) {
+  return db.$transaction(async (tx) => {
+    const existing = await tx.invoice.findFirst({
+      where: { tenantId, relatedInvoiceId: invoice.id, type: "CREDIT_NOTE" },
+      orderBy: { createdAt: "asc" },
+    });
+    if (existing) return existing;
+
+    const creditNote = await tx.invoice.create({
+      data: {
+        tenantId,
+        relatedInvoiceId: invoice.id,
+        type: "CREDIT_NOTE",
+        source: "MANUAL",
+        status: "QUEUED",
+        amount: invoice.amount,
+        currency: invoice.currency,
+        customer: invoice.customer,
+        customerDocType: invoice.customerDocType,
+        customerDocNumber: invoice.customerDocNumber,
+      },
+    });
+    await tx.invoiceEvent.create({
+      data: { tenantId, invoiceId: creditNote.id, type: "CREATED", message: "Nota de credito de anulacion total creada" },
+    });
+    return creditNote;
+  }, { isolationLevel: "Serializable" });
+}
+
 export async function logInvoiceEvent(tenantId, invoiceId, type, message = null, payload = null) {
   return db.invoiceEvent.create({
     data: {

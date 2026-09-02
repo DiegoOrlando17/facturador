@@ -37,6 +37,11 @@ type PaymentDetailResponse = {
     status: string;
     subscriptions: unknown[];
   };
+  invoice?: {
+    id: string;
+    status: string;
+    creditNotes?: Array<{ id: string; status: string; cbteNro: string | null; cae: string | null; error: string | null }>;
+  } | null;
   events: Array<{
     id: string;
     tenantId: string;
@@ -75,6 +80,8 @@ export function PaymentDetailPage() {
   const [reprocessErrorMessage, setReprocessErrorMessage] = useState<string | null>(null);
   const [reprocessSuccessMessage, setReprocessSuccessMessage] = useState<string | null>(null);
   const [pdfErrorMessage, setPdfErrorMessage] = useState<string | null>(null);
+  const [isFiscalActionPending, setIsFiscalActionPending] = useState(false);
+  const [cancellationConfirmation, setCancellationConfirmation] = useState("");
   const {
     data: payment,
     errorMessage,
@@ -170,6 +177,29 @@ export function PaymentDetailPage() {
       setReprocessErrorMessage(getApiErrorMessage(error, "No se pudo solicitar la entrega a Google."));
     } finally {
       setIsDeliveringGoogle(false);
+    }
+  }
+
+  async function handleFiscalAction(action: "issue" | "credit-note") {
+    if (!id || !token) return;
+    setIsFiscalActionPending(true);
+    setReprocessErrorMessage(null);
+    setReprocessSuccessMessage(null);
+    try {
+      const result = await apiRequest<{ queued: boolean; status?: string }>(`/admin/payments/${id}/${action}`, {
+        method: "POST",
+        token,
+        body: action === "credit-note" ? { confirmation: cancellationConfirmation } : {},
+      });
+      setReprocessSuccessMessage(action === "issue"
+        ? "Emision fiscal encolada correctamente."
+        : result.queued ? "Nota de credito encolada correctamente." : "La nota de credito ya estaba creada o emitida.");
+      setCancellationConfirmation("");
+      await reload();
+    } catch (error) {
+      setReprocessErrorMessage(getApiErrorMessage(error, "No se pudo solicitar la accion fiscal."));
+    } finally {
+      setIsFiscalActionPending(false);
     }
   }
 
@@ -281,6 +311,11 @@ export function PaymentDetailPage() {
                 }
               >
                 <div className="reprocess-actions">
+                  {!payment.cae ? (
+                    <button type="button" className="primary-button" disabled={isFiscalActionPending} onClick={() => void handleFiscalAction("issue")}>
+                      {isFiscalActionPending ? "Encolando..." : "Emitir ahora"}
+                    </button>
+                  ) : null}
                   <button
                     type="button"
                     className="primary-button"
@@ -318,6 +353,39 @@ export function PaymentDetailPage() {
                         : "Registrar error en Sheets"}
                   </button>
                 </div>
+                {payment.cae ? (
+                  <div className="danger-zone-form">
+                    <strong>Anulacion fiscal</strong>
+                    <span>La anulacion total crea una nota de credito asociada en ARCA. No modifica ni elimina la factura original.</span>
+                    {payment.invoice?.creditNotes?.[0] ? (
+                      <>
+                        <span>{`Nota de credito ${payment.invoice.creditNotes[0].status}${payment.invoice.creditNotes[0].cbteNro ? ` - ${payment.invoice.creditNotes[0].cbteNro}` : ""}`}</span>
+                        {payment.invoice.creditNotes[0].error ? <span className="form-error">{payment.invoice.creditNotes[0].error}</span> : null}
+                        {payment.invoice.creditNotes[0].status === "FAILED" ? (
+                          <>
+                            <label className="field">
+                              <span>Escribi ANULAR para reintentar</span>
+                              <input value={cancellationConfirmation} onChange={(event) => setCancellationConfirmation(event.target.value)} disabled={isFiscalActionPending} />
+                            </label>
+                            <button type="button" className="secondary-button secondary-button--danger" disabled={isFiscalActionPending || cancellationConfirmation !== "ANULAR"} onClick={() => void handleFiscalAction("credit-note")}>
+                              {isFiscalActionPending ? "Encolando..." : "Reintentar nota de credito"}
+                            </button>
+                          </>
+                        ) : null}
+                      </>
+                    ) : (
+                      <>
+                        <label className="field">
+                          <span>Escribi ANULAR para confirmar</span>
+                          <input value={cancellationConfirmation} onChange={(event) => setCancellationConfirmation(event.target.value)} disabled={isFiscalActionPending} />
+                        </label>
+                        <button type="button" className="secondary-button secondary-button--danger" disabled={isFiscalActionPending || cancellationConfirmation !== "ANULAR"} onClick={() => void handleFiscalAction("credit-note")}>
+                          {isFiscalActionPending ? "Encolando..." : "Crear nota de credito"}
+                        </button>
+                      </>
+                    )}
+                  </div>
+                ) : null}
                 {reprocessErrorMessage ? <p className="form-error">{reprocessErrorMessage}</p> : null}
                 {reprocessSuccessMessage ? <p className="form-success">{reprocessSuccessMessage}</p> : null}
               </PermissionGate>

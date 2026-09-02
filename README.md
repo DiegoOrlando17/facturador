@@ -48,6 +48,8 @@ La seccion `Alertas` funciona como cola operativa: permite tomar o liberar casos
 
 La seccion `Integraciones` muestra diagnosticos reales y de solo lectura para configuraciones de tenants, API, PostgreSQL, Redis, workers y colas BullMQ. Sus alcances y limitaciones estan detallados en el runbook.
 
+Desde el detalle de un pago, un operador puede encolar una factura pendiente o solicitar la anulacion total de una factura emitida mediante una nota de credito asociada. La anulacion exige escribir `ANULAR`, un plan con `creditNotes` y el worker `creditNote.worker.js` activo.
+
 ## Validacion
 
 ```powershell

@@ -345,6 +345,27 @@ Consecuencias:
 - corregir la entidad afectada elimina naturalmente la alerta de la cola;
 - no existe un estado manual `RESOLVED` que pueda ocultar una incidencia vigente.
 
+## D-020 - Anulacion fiscal como nota de credito asociada y asincronica
+
+Estado: vigente
+
+Decision: representar la anulacion total de una factura emitida mediante una unica `Invoice.CREDIT_NOTE` relacionada, procesada por una cola y worker independientes. La factura original permanece inmutable.
+
+Contexto: el dominio ya anticipaba notas de credito, pero el worker fiscal solo emitia facturas ligadas a pagos y el SOAP no incluia comprobantes asociados. Reutilizar el tipo de factura o cambiar su estado seria fiscalmente incorrecto.
+
+Alternativas consideradas: marcar la factura como cancelada localmente; reutilizar el worker de pagos; emitir sin asociar; crear un flujo fiscal separado con `CbtesAsoc`.
+
+Rationale: ARCA autoriza un nuevo comprobante fiscal y exige asociarlo al original. Una cola separada mantiene responsabilidades claras, secuencia propia por tipo e idempotencia independiente del estado operativo del pago.
+
+Consecuencias:
+
+- la anulacion admin es total y requiere confirmacion `ANULAR`, permiso operativo y entitlement `creditNotes`;
+- se soportan los pares factura/nota `1/3`, `6/8`, `11/13` y `51/53`;
+- una nota fallida puede reencolarse y una emitida nunca vuelve a ARCA;
+- `creditNote.worker.js` debe ejecutarse junto con los workers existentes;
+- la certificacion integral debe realizarse en homologacion antes de habilitar esta accion sobre comprobantes productivos;
+- notas parciales, multiples notas sobre una factura y facturacion manual sin pago quedan fuera de este alcance.
+
 ## Decisiones pendientes
 
 No estan aprobadas; deben resolverse antes de las fases que dependen de ellas.

@@ -71,7 +71,7 @@ El comando `invoice:test-flow` permite crear un pago sintetico en PostgreSQL loc
 - Portal web: prototipo estatico; no es todavia una interfaz real sobre `/portal`.
 - Nucleo Mercado Pago/ARCA/PDF/Drive/Sheets: happy path validado manualmente con el tenant `fiebre` el 2026-08-26; faltan escenarios integrales de error, reintento y concurrencia.
 - Landing, alta autoservicio, cobro recurrente, OCR y mobile: pendientes.
-- Facturacion con confirmacion, manual y notas de credito: pendientes de dominio y flujo completo.
+- Facturacion con confirmacion y manual: pendientes de flujo completo. El admin puede emitir una factura pendiente asociada a un pago y solicitar una anulacion total mediante nota de credito relacionada; falta certificar esta ultima integralmente en homologacion.
 - Webhooks de Mercado Pago y Payway: retirados del codigo y fuera de alcance.
 
 ## Reglas de negocio ya materializadas

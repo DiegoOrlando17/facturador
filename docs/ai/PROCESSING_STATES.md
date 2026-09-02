@@ -52,3 +52,13 @@ Los auto-reintentos solo toman `afip_pending`, `pdf_pending`, `drive_pending` y 
 - Paso `post`: valido cuando `Invoice.ISSUED` ya tiene CAE, numero y vencimiento.
 - La seleccion automatica debe basarse primero en `Invoice.status`; `Payment.status` solo indica el punto operativo observado.
 - No se permite volver a emitir una factura `ISSUED`; anulaciones futuras se representan mediante una `CREDIT_NOTE` relacionada.
+
+## Anulacion mediante nota de credito
+
+- La factura original debe estar `ISSUED` y conservar CAE, tipo, punto de venta y numero validos.
+- La anulacion administrativa es total y crea una `Invoice` de tipo `CREDIT_NOTE`, fuente `MANUAL`, sin modificar ni eliminar la factura original.
+- El tenant debe tener el entitlement `creditNotes`.
+- El tipo fiscal se deriva de la factura: `1 -> 3`, `6 -> 8`, `11 -> 13`, `51 -> 53`.
+- La solicitud ARCA incluye `CbtesAsoc` con tipo, punto de venta y numero de la factura original.
+- La nota usa su propia secuencia por punto de venta y tipo, y transita `QUEUED -> ISSUING -> ISSUED/FAILED`.
+- Solicitudes repetidas reutilizan la misma nota; una nota `ISSUED` no vuelve a ARCA y un job fallido se reemplaza antes de reencolar.

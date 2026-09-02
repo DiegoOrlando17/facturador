@@ -216,7 +216,12 @@ function formatNroCbte(nroComprobante, ptoVta) {
   return `${pv.toString().padStart(5, "0")}-${nroComprobante.toString().padStart(8, "0")}`;
 }
 
-export async function createInvoiceAFIP(cbteNro, paymentTotal, afipCfg) {
+export function buildAssociatedVoucherXml(associatedInvoice) {
+  if (!associatedInvoice) return "";
+  return `<ar:CbtesAsoc><ar:CbteAsoc><ar:Tipo>${Number(associatedInvoice.cbteTipo)}</ar:Tipo><ar:PtoVta>${Number(associatedInvoice.ptoVta)}</ar:PtoVta><ar:Nro>${Number(associatedInvoice.cbteNro)}</ar:Nro></ar:CbteAsoc></ar:CbtesAsoc>`;
+}
+
+export async function createInvoiceAFIP(cbteNro, paymentTotal, afipCfg, { associatedInvoice = null } = {}) {
   try {
     const merged = normalizeAfipConfig(afipCfg);
     if (!merged.CUIT) {
@@ -262,6 +267,7 @@ export async function createInvoiceAFIP(cbteNro, paymentTotal, afipCfg) {
               <ar:ImpTrib>0.00</ar:ImpTrib>
               <ar:MonId>PES</ar:MonId>
               <ar:MonCotiz>1.00</ar:MonCotiz>
+              ${buildAssociatedVoucherXml(associatedInvoice)}
               <ar:Iva>
                 <ar:AlicIva>
                     <ar:Id>5</ar:Id>

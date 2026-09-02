@@ -12,6 +12,7 @@ import { decryptJson } from "../utils/crypto.js";
 import { buildPaymentAttentionWhere, isPaymentAttentionState } from "../domain/paymentAttention.js";
 import { paymentsQueue } from "../queues/payments.queue.js";
 import { invoicesQueue } from "../queues/invoices.queue.js";
+import { creditNotesQueue } from "../queues/creditNotes.queue.js";
 import { classifyQueueHealth } from "../domain/operationalHealth.js";
 
 const DEFAULT_PAGE = 1;
@@ -28,11 +29,13 @@ const WORKER_FILES = [
   "retry.worker.js",
   "mercadopago.worker.js",
   "audit.worker.js",
+  "creditNote.worker.js",
 ];
 
 const invoiceListInclude = {
   include: {
     documents: true,
+    creditNotes: { orderBy: [{ createdAt: "desc" }] },
   },
 };
 
@@ -398,10 +401,11 @@ async function getQueueHealth(name, queue) {
 
 export async function getAdminOperationalHealth() {
   const tenantCount = await db.tenant.count();
-  const [services, payments, invoices, ...integrations] = await Promise.all([
+  const [services, payments, invoices, creditNotes, ...integrations] = await Promise.all([
     buildOperationalServices(),
     getQueueHealth("Cola de pagos", paymentsQueue),
     getQueueHealth("Cola de facturas", invoicesQueue),
+    getQueueHealth("Cola de notas de credito", creditNotesQueue),
     ...["MERCADOPAGO", "AFIP", "DRIVE", "SHEETS"].map((provider) =>
       buildProviderOperationalHealth(provider, tenantCount)
     ),
@@ -411,7 +415,7 @@ export async function getAdminOperationalHealth() {
     checkedAt: new Date(),
     integrations,
     infrastructure: services,
-    queues: [payments, invoices],
+    queues: [payments, invoices, creditNotes],
   };
 }
 
