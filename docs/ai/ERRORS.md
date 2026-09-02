@@ -140,3 +140,30 @@ El flujo post-ARCA trataba Drive y Sheets como pasos obligatorios. Si el tenant 
 - `facturador-backend/src/workers/invoice.worker.js`
 - `facturador-backend/src/services/tenantGoogle.service.js`
 - `facturador-backend/src/services/tenantConfig.service.js`
+## Transaction already closed al inicializar InvoiceSequence
+
+Area: Node | Prisma | ARCA
+Status: solved
+Last seen: 2026-09-02
+
+### Symptoms
+
+La primera factura o nota de credito de un tipo fiscal falla al crear `InvoiceSequence` porque la transaccion interactiva supera los 5000 ms.
+
+### Root cause
+
+La consulta remota del ultimo comprobante a ARCA se ejecutaba dentro de una transaccion Prisma abierta.
+
+### Fix
+
+Consultar a ARCA antes de abrir la transaccion y limitar la seccion transaccional al bloqueo y la inicializacion de la secuencia.
+
+### First checks next time
+
+1. Confirmar que el error ocurre al crear una secuencia fiscal inexistente.
+2. Revisar la latencia de `getLastInvoiceAFIP`.
+3. Verificar que la consulta remota no se haya movido nuevamente dentro de `$transaction`.
+
+### Related files
+
+- `facturador-backend/src/models/InvoiceSequence.js`

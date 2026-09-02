@@ -4080,6 +4080,10 @@ button:disabled {
   overflow: hidden;
 }
 
+.section-table-card--scrollable {
+  overflow-x: auto;
+}
+
 .clients-page .section-table-card {
   border-color: #dde6f2;
   border-radius: 8px;
@@ -4129,6 +4133,17 @@ button:disabled {
 .section-table__row strong {
   color: #13233f;
   font-size: 0.86rem;
+}
+
+.section-payment-link {
+  color: #075ec9;
+  font-size: 0.86rem;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.section-payment-link:hover {
+  text-decoration: underline;
 }
 
 .section-table__row span {

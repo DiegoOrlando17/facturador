@@ -764,7 +764,7 @@ export function BillingSectionPage() {
         </button>
       </section>
 
-      <section className="section-table-card">
+      <section className="section-table-card section-table-card--scrollable">
         <div className="section-table section-table--billing">
           <div className="section-table__head">
             <span>Fecha pago</span><span>Comprobante</span><span>Cliente</span><span>Proveedor</span><span>Monto</span><span>Etapa actual</span><span>Ultimo error</span><span>Accion</span>
@@ -776,7 +776,13 @@ export function BillingSectionPage() {
           ) : payments && payments.items.length > 0 ? payments.items.map((payment) => (
             <div key={payment.id} className="section-table__row">
               <span>{formatDateTime(payment.createdAt)}</span>
-              <strong>{getPaymentTitle(payment)}</strong>
+              <Link
+                to={`/payments/${payment.id}`}
+                className="section-payment-link"
+                aria-label={`Abrir pago ${getPaymentTitle(payment)}`}
+              >
+                {getPaymentTitle(payment)}
+              </Link>
               <span>{payment.tenant?.name ?? payment.customer ?? "-"}</span>
               <span className="section-service-name">
                 <span className="integration-logo-frame"><SectionIcon name={getPaymentProviderIcon(payment.provider)} /></span>
@@ -785,7 +791,7 @@ export function BillingSectionPage() {
               <span>{formatCurrency(payment.amount)}</span>
               <span><StatusBadge tone={getPaymentStatusTone(payment.status)}>{getPaymentStageLabel(payment)}</StatusBadge></span>
               <span className={payment.error ? "section-danger-text" : ""}>{getPaymentStageDetail(payment)}</span>
-              <Link to={`/payments/${payment.id}`} className="section-mini-button">Ver</Link>
+              <Link to={`/payments/${payment.id}`} className="section-mini-button">Abrir</Link>
             </div>
           )) : (
             <div className="section-table__state">

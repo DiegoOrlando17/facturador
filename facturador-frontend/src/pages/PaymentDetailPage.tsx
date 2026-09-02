@@ -360,6 +360,7 @@ export function PaymentDetailPage() {
                     {payment.invoice?.creditNotes?.[0] ? (
                       <>
                         <span>{`Nota de credito ${payment.invoice.creditNotes[0].status}${payment.invoice.creditNotes[0].cbteNro ? ` - ${payment.invoice.creditNotes[0].cbteNro}` : ""}`}</span>
+                        {payment.invoice.creditNotes[0].cae ? <span>{`CAE ${payment.invoice.creditNotes[0].cae}`}</span> : null}
                         {payment.invoice.creditNotes[0].error ? <span className="form-error">{payment.invoice.creditNotes[0].error}</span> : null}
                         {payment.invoice.creditNotes[0].status === "FAILED" ? (
                           <>

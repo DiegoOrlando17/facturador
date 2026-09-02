@@ -42,6 +42,7 @@ const invoiceListInclude = {
 const invoiceDetailInclude = {
   include: {
     documents: true,
+    creditNotes: { orderBy: [{ createdAt: "desc" }] },
     events: {
       orderBy: [{ createdAt: "desc" }],
       take: 50,
