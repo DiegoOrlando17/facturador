@@ -18,7 +18,7 @@ Todas las tiers incluyen la descarga desde el portal del PDF de cada comprobante
 ## Repositorio y estructura
 
 - `facturador-backend/`: API y workers Node.js.
-- `facturador-frontend/`: aplicacion React que hoy contiene principalmente el panel admin y un prototipo estatico del portal cliente.
+- `facturador-frontend/`: aplicacion React con panel admin y portal cliente autenticado conectado a `/portal`.
 - `docs/ai/SCOPE.md`: fuente del alcance funcional.
 - `IMPLEMENTATION_PLAN.md`: estado y secuencia de trabajo vigente.
 - `docs/ai/`: contexto, decisiones, runbook, errores y prompts compartidos.
@@ -71,7 +71,7 @@ El comando `invoice:test-flow` permite crear un pago sintetico en PostgreSQL loc
 - Portal web: prototipo estatico; no es todavia una interfaz real sobre `/portal`.
 - Nucleo Mercado Pago/ARCA/PDF/Drive/Sheets: happy path validado manualmente con el tenant `fiebre` el 2026-08-26; faltan escenarios integrales de error, reintento y concurrencia.
 - Landing, alta autoservicio, cobro recurrente, OCR y mobile: pendientes.
-- Facturacion con confirmacion y manual: pendientes de flujo completo. El admin puede emitir una factura pendiente asociada a un pago y solicitar una anulacion total mediante nota de credito relacionada; falta certificar esta ultima integralmente en homologacion.
+- Facturacion con confirmacion y manual: implementadas en portal mediante `Invoice` separado, permisos y entitlements. La confirmacion puede emitir inmediatamente o programar hasta 30 dias; la factura manual no crea pagos sinteticos y usa un worker propio. Falta certificar integralmente estos flujos y las notas de credito en homologacion.
 - Webhooks de Mercado Pago y Payway: retirados del codigo y fuera de alcance.
 
 ## Reglas de negocio ya materializadas

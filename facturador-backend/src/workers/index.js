@@ -12,6 +12,7 @@ const workers = [
   "mercadopago.worker.js",
   "audit.worker.js",
   "creditNote.worker.js",
+  "manualInvoice.worker.js",
 ];
 
 if (config.ENABLE_WORKERS === "true") {

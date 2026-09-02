@@ -364,7 +364,27 @@ Consecuencias:
 - una nota fallida puede reencolarse y una emitida nunca vuelve a ARCA;
 - `creditNote.worker.js` debe ejecutarse junto con los workers existentes;
 - la certificacion integral debe realizarse en homologacion antes de habilitar esta accion sobre comprobantes productivos;
-- notas parciales, multiples notas sobre una factura y facturacion manual sin pago quedan fuera de este alcance.
+- notas parciales y multiples notas sobre una factura quedan fuera de este alcance; la facturacion manual sin pago se implementa por separado segun D-021.
+
+## D-021 - Confirmacion por tenant y facturacion manual sin pagos sinteticos
+
+Estado: vigente
+
+Decision: guardar la modalidad fiscal del tenant como `INVOICE_MODE=automatic|confirmation` en su configuracion Mercado Pago. En confirmacion, cada venta crea una `Invoice.PENDING_CONFIRMATION`; un usuario autorizado puede emitirla inmediatamente o programarla hasta 30 dias. Las facturas manuales son `Invoice.source=MANUAL`, no tienen `paymentId` y se emiten mediante una cola y worker propios.
+
+Contexto: el worker fiscal existente dependia de `Payment`, pero el dominio aprobado permite comprobantes sin pago y exige separar el cobro de la factura. La politica comercial de vencimiento automatico no esta definida.
+
+Alternativas consideradas: crear pagos sinteticos; ampliar el worker de pagos con ramas manuales; usar un worker fiscal separado para comprobantes sin pago.
+
+Rationale: evitar pagos ficticios preserva el dominio y los reportes de cobros. La programacion explicita es auditable y no inventa una regla de vencimiento comercial.
+
+Consecuencias:
+
+- `approver` recibe solo `tenant.confirmInvoices`; `owner/admin` administran modalidad, manuales y notas de credito;
+- la confirmacion diferida usa un job BullMQ demorado con maximo de 30 dias;
+- no existe emision automatica por vencimiento hasta aprobar una politica comercial;
+- `manualInvoice.worker.js` debe estar activo y validarse en homologacion;
+- los limites `manualInvoicesMonthly` se aplican cuando dejan de ser `null`.
 
 ## Decisiones pendientes
 

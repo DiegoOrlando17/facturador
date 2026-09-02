@@ -10,6 +10,8 @@ import {
   getTenantPortalReportsTimeseries,
   listTenantPortalPaymentsForExport,
   listTenantPortalPayments,
+  getTenantPortalProfile,
+  updateTenantPortalProfile,
 } from "../services/tenantPortal.service.js";
 import {
   getTenantIntegrationConfig,
@@ -17,7 +19,7 @@ import {
   tryGetTenantIntegrationConfig,
 } from "../services/tenantConfig.service.js";
 import { buildPaymentsCsv } from "../services/csvExport.service.js";
-import { generateInvoicePdfForPayment, getInvoicePdfFilename } from "../services/invoicePdf.service.js";
+import { generateInvoicePdfById, generateInvoicePdfForPayment, getInvoicePdfFilename } from "../services/invoicePdf.service.js";
 import {
   createTenantOnboardingSubmission,
   listTenantOnboardingSubmissions,
@@ -28,6 +30,7 @@ import { toBigIntId } from "../utils/bigint.js";
 import { mergeGoogleTenantIntegrationConfig } from "../services/tenantGoogle.service.js";
 import { getTenantSubscriptionPolicy } from "../services/subscriptionPolicy.service.js";
 import { ENTITLEMENTS, hasEntitlement } from "../domain/planPolicy.js";
+import { cancelTenantInvoice, confirmTenantInvoice, createManualTenantInvoice, getTenantInvoice, getTenantInvoiceSettings, listTenantInvoices, updateTenantInvoiceSettings } from "../services/tenantInvoice.service.js";
 
 const router = Router();
 const TESTABLE_PROVIDERS = new Set(["MERCADOPAGO", "AFIP", "DRIVE", "SHEETS"]);
@@ -202,12 +205,62 @@ router.get("/integrations", async (req, res) => {
   }
 });
 
+router.get("/invoices", async (req, res) => {
+  try { return res.json(normalizeJsonBigInts(await listTenantInvoices(req.tenantAuth.tenantId, req.query))); }
+  catch (error) { return res.status(400).json({ error: error.message || "No se pudieron listar comprobantes" }); }
+});
+router.get("/invoices/settings", async (req, res) => {
+  try { return res.json(normalizeJsonBigInts(await getTenantInvoiceSettings(req.tenantAuth.tenantId))); }
+  catch (error) { return res.status(400).json({ error: error.message || "No se pudo obtener la modalidad" }); }
+});
+router.put("/invoices/settings", requireTenantPermission(TENANT_PERMISSIONS.MANAGE_INVOICES), async (req, res) => {
+  try { return res.json(await updateTenantInvoiceSettings(req.tenantAuth.tenantId, req.body.mode)); }
+  catch (error) { return res.status(400).json({ error: error.message || "No se pudo guardar la modalidad" }); }
+});
+router.post("/invoices/manual", requireTenantPermission(TENANT_PERMISSIONS.MANAGE_INVOICES), async (req, res) => {
+  try { return res.status(201).json(normalizeJsonBigInts(await createManualTenantInvoice(req.tenantAuth.tenantId, req.tenantAuth.tenantUser, req.body))); }
+  catch (error) { return res.status(400).json({ error: error.message || "No se pudo crear la factura manual" }); }
+});
+router.get("/invoices/:id", async (req, res) => {
+  try { const invoice = await getTenantInvoice(req.tenantAuth.tenantId, toBigIntId(req.params.id, "invoiceId")); return invoice ? res.json(normalizeJsonBigInts(invoice)) : res.status(404).json({ error: "Comprobante no encontrado" }); }
+  catch (error) { return res.status(400).json({ error: error.message || "No se pudo obtener el comprobante" }); }
+});
+router.post("/invoices/:id/confirm", requireTenantPermission(TENANT_PERMISSIONS.CONFIRM_INVOICES), async (req, res) => {
+  try { return res.json(normalizeJsonBigInts(await confirmTenantInvoice(req.tenantAuth.tenantId, toBigIntId(req.params.id, "invoiceId"), req.tenantAuth.tenantUser, { issueAt: req.body?.issueAt }))); }
+  catch (error) { return res.status(400).json({ error: error.message || "No se pudo confirmar el comprobante" }); }
+});
+router.post("/invoices/:id/credit-note", requireTenantPermission(TENANT_PERMISSIONS.MANAGE_INVOICES), async (req, res) => {
+  try { if (req.body.confirmation !== "ANULAR") throw new Error("Debes confirmar escribiendo ANULAR"); return res.status(202).json(normalizeJsonBigInts(await cancelTenantInvoice(req.tenantAuth.tenantId, toBigIntId(req.params.id, "invoiceId"), req.tenantAuth.tenantUser))); }
+  catch (error) { return res.status(400).json({ error: error.message || "No se pudo solicitar la nota de credito" }); }
+});
+router.get("/invoices/:id/pdf", async (req, res) => {
+  try { const { invoice, pdfBuffer } = await generateInvoicePdfById(req.tenantAuth.tenantId, toBigIntId(req.params.id, "invoiceId")); res.setHeader("Content-Type", "application/pdf"); res.setHeader("Content-Disposition", `attachment; filename="${String(invoice.cbteNro || "comprobante").replace(/[^\d-]/g, "")}.pdf"`); return res.send(pdfBuffer); }
+  catch (error) { return res.status(400).json({ error: error.message || "No se pudo obtener el PDF" }); }
+});
+
 router.get("/subscription", async (req, res) => {
   try {
     const subscription = await getTenantSubscriptionPolicy(req.tenantAuth.tenantId);
     return res.json(normalizeJsonBigInts(subscription));
   } catch (error) {
     return res.status(400).json({ error: error.message || "No se pudo obtener la suscripcion" });
+  }
+});
+
+router.get("/profile", async (req, res) => {
+  try {
+    return res.json(normalizeJsonBigInts(await getTenantPortalProfile(req.tenantAuth.tenantId)));
+  } catch (error) {
+    return res.status(400).json({ error: error.message || "No se pudo obtener el perfil fiscal" });
+  }
+});
+
+router.put("/profile", requireTenantPermission(TENANT_PERMISSIONS.MANAGE_PROFILE), async (req, res) => {
+  try {
+    const profile = await updateTenantPortalProfile(req.tenantAuth.tenantId, req.body);
+    return res.json(normalizeJsonBigInts(profile));
+  } catch (error) {
+    return res.status(400).json({ error: error.message || "No se pudo guardar el perfil fiscal" });
   }
 });
 

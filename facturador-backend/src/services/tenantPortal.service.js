@@ -4,6 +4,8 @@ import {
   findTenantUserById,
   listTenantIntegrations,
   resolveTenantIdBySlug,
+  getTenantProfile,
+  upsertTenantProfile,
 } from "./tenantConfig.service.js";
 import {
   getAdminDashboardSummary,
@@ -113,4 +115,51 @@ export async function listTenantPortalPaymentsForExport(tenantId, filters = {}) 
     tenantId,
     ...filters,
   });
+}
+
+export function validateTenantProfileInput(body = {}) {
+  const cuit = String(body.cuit || "").replace(/\D/g, "");
+  if (cuit && cuit.length !== 11) {
+    throw new Error("El CUIT debe tener 11 digitos");
+  }
+
+  for (const field of ["contactEmail", "responsibleEmail"]) {
+    const value = String(body[field] || "").trim();
+    if (value && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+      throw new Error(`${field} no tiene un formato valido`);
+    }
+  }
+
+  return body;
+}
+
+function presentTenantProfile(profile) {
+  if (!profile) return null;
+  return {
+    id: profile.id,
+    tenantId: profile.tenantId,
+    legalName: profile.legalName,
+    tradeName: profile.tradeName,
+    cuit: profile.cuit,
+    ivaCondition: profile.ivaCondition,
+    fiscalAddress: profile.fiscalAddress,
+    contactEmail: profile.contactEmail,
+    contactPhone: profile.contactPhone,
+    responsibleName: profile.responsibleName,
+    responsibleEmail: profile.responsibleEmail,
+    approvalStatus: profile.approvalStatus,
+    reviewNotes: profile.reviewNotes,
+    reviewedAt: profile.reviewedAt,
+    createdAt: profile.createdAt,
+    updatedAt: profile.updatedAt,
+  };
+}
+
+export async function getTenantPortalProfile(tenantId) {
+  return presentTenantProfile(await getTenantProfile(tenantId));
+}
+
+export async function updateTenantPortalProfile(tenantId, body) {
+  validateTenantProfileInput(body);
+  return presentTenantProfile(await upsertTenantProfile(tenantId, body));
 }

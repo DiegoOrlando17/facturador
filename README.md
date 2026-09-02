@@ -5,7 +5,7 @@ Monorepo del SaaS multitenant para convertir ventas de Mercado Pago POS en compr
 ## Estructura
 
 - `facturador-backend/`: API Express, workers BullMQ, Prisma y servicios de integracion.
-- `facturador-frontend/`: panel web React/Vite y prototipo del portal cliente.
+- `facturador-frontend/`: panel administrativo y portal cliente React/Vite.
 - `docs/ai/`: contexto, decisiones, operacion y contratos tecnicos vigentes.
 - `IMPLEMENTATION_PLAN.md`: alcance, estado y orden de implementacion.
 
@@ -60,7 +60,11 @@ La seccion `Reportes` resume cantidad, importe y ticket promedio para un rango d
 
 La seccion `Integraciones` muestra Mercado Pago, ARCA, Drive y Sheets. Los roles tenant `owner/admin` pueden probar conexiones y, cuando el plan incluye Google, configurar los IDs de carpeta y planilla sin acceder ni modificar credenciales OAuth. La autorizacion OAuth inicial permanece a cargo de un administrador del sistema.
 
-Perfil fiscal y onboarding se incorporaran en los siguientes cortes de la Fase 4.
+La seccion `Datos fiscales` permite a `owner/admin` guardar borradores o enviar el perfil completo a revision. El portal muestra el estado de aprobacion y las observaciones administrativas; editar un perfil aprobado lo devuelve a revision. `approver/viewer` conservan acceso de solo lectura.
+
+La seccion `Onboarding` permite enviar datos comerciales, fecha inicial y enlaces documentales sin incluir credenciales, y consultar aprobaciones, rechazos y observaciones.
+
+`Comprobantes` separa el recurso fiscal de los pagos. Segun el plan y rol, permite elegir modalidad automatica o con confirmacion, emitir ahora o programar hasta 30 dias, crear facturas manuales, descargar PDF y solicitar una nota de credito total escribiendo `ANULAR`. `approver` puede confirmar pendientes; las acciones de configuracion, facturacion manual y anulacion quedan limitadas a `owner/admin`.
 
 ## Validacion
 

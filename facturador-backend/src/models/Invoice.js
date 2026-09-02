@@ -52,7 +52,7 @@ export function hydratePaymentWithInvoice(payment) {
   };
 }
 
-export async function ensureAutomaticInvoiceForPayment(tenantId, payment) {
+export async function ensureAutomaticInvoiceForPayment(tenantId, payment, { confirmationRequired = false } = {}) {
   return db.invoice.upsert({
     where: {
       invoice_paymentId_tenantId: {
@@ -66,8 +66,8 @@ export async function ensureAutomaticInvoiceForPayment(tenantId, payment) {
       tenantId,
       paymentId: payment.id,
       type: "INVOICE",
-      source: "AUTOMATIC",
-      status: "QUEUED",
+      source: confirmationRequired ? "CONFIRMATION" : "AUTOMATIC",
+      status: confirmationRequired ? "PENDING_CONFIRMATION" : "QUEUED",
       ...paymentSnapshot(payment),
     },
   });
@@ -82,6 +82,16 @@ export async function getInvoiceByPaymentId(tenantId, paymentId, { includeDocume
       },
     },
     include: includeDocuments ? { documents: true } : undefined,
+  });
+}
+
+export async function markInvoiceQueued(tenantId, invoiceId, previousStatus) {
+  assertInvoiceTransition(previousStatus, "QUEUED");
+  return db.$transaction(async (tx) => {
+    const result = await tx.invoice.updateMany({ where: { id: invoiceId, tenantId, status: previousStatus }, data: { status: "QUEUED", error: null } });
+    if (result.count !== 1) throw stateConflict(`Invoice ${invoiceId} cambio de estado concurrentemente`);
+    await tx.invoiceEvent.create({ data: { tenantId, invoiceId, type: "STATUS_CHANGED", message: "Comprobante encolado para emision" } });
+    return tx.invoice.findUnique({ where: { invoice_id_tenantId: { id: invoiceId, tenantId } } });
   });
 }
 

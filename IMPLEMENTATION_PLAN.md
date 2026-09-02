@@ -119,15 +119,15 @@ Aceptacion: las incidencias conocidas de onboarding, integraciones y facturacion
 
 Objetivo: reemplazar el prototipo estatico por una aplicacion funcional y responsive.
 
-- [ ] Integrar login y sesion de `TenantUser`.
-- [ ] Conectar dashboard, pagos, reportes, PDF, integraciones y onboarding existentes.
-- [ ] Permitir configurar y mostrar el estado de la carpeta Drive y la planilla Sheets del cliente.
-- [ ] Implementar perfil fiscal y estado de aprobacion.
-- [ ] Implementar facturas como recurso separado cuando se apruebe el dominio.
-- [ ] Aplicar permisos por usuario y entitlements por plan.
-- [ ] Implementar modalidad con confirmacion y emision diferida.
-- [ ] Permitir notas de credito para operaciones canceladas, con controles.
-- [ ] Implementar facturacion manual segun plan.
+- [x] Integrar login y sesion de `TenantUser`.
+- [x] Conectar dashboard, pagos, reportes, PDF, integraciones y onboarding existentes.
+- [x] Permitir configurar y mostrar el estado de la carpeta Drive y la planilla Sheets del cliente.
+- [x] Implementar perfil fiscal y estado de aprobacion.
+- [x] Implementar facturas como recurso separado cuando se apruebe el dominio.
+- [x] Aplicar permisos por usuario y entitlements por plan.
+- [x] Implementar modalidad con confirmacion y emision diferida.
+- [x] Permitir notas de credito para operaciones canceladas, con controles.
+- [x] Implementar facturacion manual segun plan.
 - [ ] Validar responsive, accesibilidad, estados vacios y errores.
 
 Aceptacion: un cliente puede completar onboarding, revisar ventas, operar lo permitido por su tier y descargar todo comprobante emitido; desde la tier 3 puede configurar opcionalmente su destino Drive/Sheets sin asistencia tecnica.
@@ -211,3 +211,4 @@ Aceptacion: los flujos mobile acordados funcionan en Android/iOS y respetan las 
 - `invoice:test-flow -- --tenant=fiebre --amount=100 --require-drive --require-sheets --verify-error-recovery`: correcto el 2026-09-01; verifico `afip_pending`/`FAILED`, fila Sheets `ERROR`, recuperacion `complete`/`ISSUED`, CAE, actualizacion de la misma fila a `OK`, un documento Drive y segunda pasada idempotente.
 - `google:audit-deliveries -- --tenant=fiebre`: correcto el 2026-09-01, sin documentos registrados faltantes, IDs de pago duplicados ni filas Sheets desalineadas; permanecen recursos historicos externos no vinculados a la DB actual.
 - Panel admin y Fase 3: cierre funcional confirmado el 2026-09-02 tras validar navegacion de pagos, acciones administrativas, visibilidad de errores y anulacion fiscal mediante nota de credito en homologacion; una falla de inicializacion de secuencia fue recuperada desde el panel y la nota finalizo `ISSUED` con numero y CAE.
+- Portal cliente Fase 4: login, dashboard, pagos/PDF, reportes/CSV, integraciones Google, perfil fiscal, onboarding, facturas separadas, confirmacion inmediata/diferida, notas de credito y facturacion manual implementados el 2026-09-02. Build frontend, esquema Prisma y 71 tests backend correctos; falta validacion manual responsive/accesibilidad y certificacion fiscal de los nuevos flujos en homologacion antes de cerrar la fase.

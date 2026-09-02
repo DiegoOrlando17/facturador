@@ -18,6 +18,8 @@ import { createInvoiceAFIP, normalizeAfipConfig } from "../services/afip.service
 import { getTenantIntegrationConfig } from "../services/tenantConfig.service.js";
 import { logPaymentEvent } from "../services/paymentEvent.service.js";
 import { syncPaymentToSheets } from "../services/paymentSheets.service.js";
+import { getTenantSubscriptionPolicy } from "../services/subscriptionPolicy.service.js";
+import { ENTITLEMENTS, hasEntitlement } from "../domain/planPolicy.js";
 import { buildControlledAfipError } from "../domain/controlledAfipTest.js";
 
 async function recordAfipFailureInSheets(tenantId, payment, errorMessage) {
@@ -60,7 +62,17 @@ const worker = new Worker("payments", async (job) => {
 
         if (!["pending", "processing", "afip_pending"].includes(payment.status)) return;
 
-        invoice = await ensureAutomaticInvoiceForPayment(tenantId, payment);
+        const [subscription, mpConfig] = await Promise.all([
+            getTenantSubscriptionPolicy(tenantId),
+            getTenantIntegrationConfig(tenantId, "MERCADOPAGO"),
+        ]);
+        const confirmationRequired = String(mpConfig.INVOICE_MODE || "automatic").toLowerCase() === "confirmation"
+            && hasEntitlement(subscription?.policy, ENTITLEMENTS.CLIENT_APPROVAL);
+        invoice = await ensureAutomaticInvoiceForPayment(tenantId, payment, { confirmationRequired });
+        if (invoice.status === "PENDING_CONFIRMATION") {
+            await logPaymentEvent(tenantId, payment.id, "invoice_requested", "Comprobante pendiente de confirmacion del cliente", { invoiceId: invoice.id.toString() });
+            return;
+        }
 
         if (invoice.status === "ISSUED" && invoice.cae && invoice.cbteNro && invoice.caeVto) {
             await updatePaymentStatus(tenantId, payment.id, "processing");

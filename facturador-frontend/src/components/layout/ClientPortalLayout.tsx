@@ -5,10 +5,11 @@ import { AppIcon, type AppIconName } from "@/components/ui/AppIcon";
 const navigation: Array<{ label: string; icon: AppIconName; to?: string }> = [
   { label: "Inicio", icon: "home", to: "/portal-cliente" },
   { label: "Pagos y facturas", icon: "payments", to: "/portal-cliente/pagos" },
+  { label: "Comprobantes", icon: "invoice", to: "/portal-cliente/comprobantes" },
   { label: "Reportes", icon: "reports", to: "/portal-cliente/reportes" },
-  { label: "Datos fiscales", icon: "tax" },
+  { label: "Datos fiscales", icon: "tax", to: "/portal-cliente/perfil-fiscal" },
   { label: "Integraciones", icon: "integrations", to: "/portal-cliente/integraciones" },
-  { label: "Onboarding", icon: "onboarding" },
+  { label: "Onboarding", icon: "onboarding", to: "/portal-cliente/onboarding" },
 ];
 
 export function ClientPortalLayout() {

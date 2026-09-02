@@ -35,6 +35,8 @@ Los auto-reintentos solo toman `afip_pending`, `pdf_pending`, `drive_pending` y 
 | `ISSUED` | ARCA autorizo y se guardaron CAE y numeracion. | Ninguna |
 | `FAILED` | Emision fallida y reintentable. | `QUEUED`, `ISSUING` |
 
+La modalidad con confirmacion crea la factura en `PENDING_CONFIRMATION`; una confirmacion autorizada la mueve a `QUEUED` y crea un job inmediato o diferido. Las facturas `MANUAL` nacen en `QUEUED`, no tienen `paymentId` y se procesan en la cola `manual-invoices`.
+
 ## Idempotencia y concurrencia
 
 1. Un pago se identifica por `(tenantId, provider, provider_payment_id)`.

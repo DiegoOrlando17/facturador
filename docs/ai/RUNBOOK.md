@@ -265,7 +265,7 @@ cd facturador-frontend
 npm run dev
 ```
 
-`ENABLE_WORKERS=true` es necesario para que el launcher cree los workers. El launcher vigente inicia payment, invoice, retry, polling de Mercado Pago y audit.
+`ENABLE_WORKERS=true` es necesario para que el launcher cree los workers. El launcher vigente inicia payment, invoice, retry, polling de Mercado Pago, audit, notas de credito y facturas manuales.
 
 La deteccion de ventas Mercado Pago POS se realiza exclusivamente por polling/checkpoints. No existe un endpoint de webhook para este flujo y Payway no forma parte del producto.
 
@@ -306,7 +306,7 @@ cd facturador-backend
 npm test
 ```
 
-Resultado: 59 tests correctos el 2026-09-01. La suite incluye pruebas HTTP aisladas de endpoints admin, protecciones, auditoria, asignacion de alertas y clasificacion de colas; usa dobles en memoria y no accede a DB, Redis, Mercado Pago, ARCA ni Google.
+Resultado: 71 tests correctos el 2026-09-02. La suite incluye endpoints admin, permisos tenant, protecciones, auditoria, estados fiscales, programacion diferida y validaciones de facturacion manual; no ejecuta emisiones ni escrituras en Mercado Pago, ARCA o Google.
 
 ### Salud operativa admin
 
@@ -328,8 +328,11 @@ Si API y workers se despliegan en procesos o contenedores separados, la deteccio
 - `POST /admin/payments/:id/credit-note` con `{ "confirmation": "ANULAR" }` crea o reutiliza una nota de credito de anulacion total y la envia a la cola `credit-notes`.
 - Ambas acciones requieren `admin.operate` y generan auditoria; la nota de credito requiere el entitlement `creditNotes`.
 - `npm run start:workers` incluye `creditNote.worker.js`. Reiniciar el launcher despues de desplegar este cambio.
+- `npm run start:workers` incluye `manualInvoice.worker.js`; sin este proceso las facturas manuales quedan en `QUEUED`.
 
 No validar notas de credito contra ARCA productiva. Usar un tenant con certificado, URLs y punto de venta de homologacion, una factura de homologacion emitida y plan elegible. La implementacion y el SOAP asociado tienen cobertura automatizada, pero la emision integral de una nota de credito queda pendiente de validacion manual controlada en homologacion.
+
+La modalidad con confirmacion guarda `INVOICE_MODE=confirmation` en la configuracion Mercado Pago del tenant. Una venta crea `Invoice.PENDING_CONFIRMATION`; confirmar desde el portal la pasa a `QUEUED` y crea un job inmediato o diferido hasta 30 dias. La factura manual usa la cola `manual-invoices` y no crea un `Payment` sintetico. Validar ambos flujos solamente en homologacion antes de habilitarlos en produccion.
 
 Prisma:
 

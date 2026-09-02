@@ -13,6 +13,9 @@ export const TENANT_PERMISSIONS = Object.freeze({
   READ: "tenant.read",
   TEST_INTEGRATIONS: "tenant.testIntegrations",
   MANAGE_INTEGRATIONS: "tenant.manageIntegrations",
+  MANAGE_PROFILE: "tenant.manageProfile",
+  CONFIRM_INVOICES: "tenant.confirmInvoices",
+  MANAGE_INVOICES: "tenant.manageInvoices",
   SUBMIT_ONBOARDING: "tenant.submitOnboarding",
 });
 
@@ -25,7 +28,7 @@ const ADMIN_ROLE_PERMISSIONS = Object.freeze({
 const TENANT_ROLE_PERMISSIONS = Object.freeze({
   owner: new Set(Object.values(TENANT_PERMISSIONS)),
   admin: new Set(Object.values(TENANT_PERMISSIONS)),
-  approver: new Set([TENANT_PERMISSIONS.READ]),
+  approver: new Set([TENANT_PERMISSIONS.READ, TENANT_PERMISSIONS.CONFIRM_INVOICES]),
   viewer: new Set([TENANT_PERMISSIONS.READ]),
 });
 
