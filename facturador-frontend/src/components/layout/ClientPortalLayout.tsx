@@ -5,7 +5,7 @@ import { AppIcon, type AppIconName } from "@/components/ui/AppIcon";
 const navigation: Array<{ label: string; icon: AppIconName; to?: string }> = [
   { label: "Inicio", icon: "home", to: "/portal-cliente" },
   { label: "Pagos y facturas", icon: "payments", to: "/portal-cliente/pagos" },
-  { label: "Reportes", icon: "reports" },
+  { label: "Reportes", icon: "reports", to: "/portal-cliente/reportes" },
   { label: "Datos fiscales", icon: "tax" },
   { label: "Integraciones", icon: "integrations" },
   { label: "Onboarding", icon: "onboarding" },

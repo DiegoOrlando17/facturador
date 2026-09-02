@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useTenantAuth } from "@/app/TenantAuthContext";
 import { AppIcon } from "@/components/ui/AppIcon";
-import { ApiError, apiRequest, getApiErrorMessage } from "@/lib/api";
+import { ApiError, apiBlobRequest, apiRequest, getApiErrorMessage } from "@/lib/api";
 import { formatCurrency, formatDateTime } from "@/lib/formatters";
 
 type PortalPayment = {
@@ -43,7 +43,9 @@ export function ClientPaymentsPage() {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+  const [isExporting, setIsExporting] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [exportErrorMessage, setExportErrorMessage] = useState("");
 
   const loadPayments = useCallback(async () => {
     if (!token) return;
@@ -68,12 +70,48 @@ export function ClientPaymentsPage() {
 
   useEffect(() => { void loadPayments(); }, [loadPayments]);
 
+  async function exportCsv() {
+    if (!token) return;
+    setIsExporting(true);
+    setExportErrorMessage("");
+    const params = new URLSearchParams();
+    if (search.trim()) params.set("search", search.trim());
+    if (status) params.set("status", status);
+    try {
+      const suffix = params.size ? `?${params}` : "";
+      const blob = await apiBlobRequest(`/portal/payments/export.csv${suffix}`, { token, skipAuthHandling: true });
+      const objectUrl = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = objectUrl;
+      link.download = `pagos-${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(objectUrl);
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 401) {
+        invalidateSession();
+        navigate("/portal-cliente/login", { replace: true });
+        return;
+      }
+      setExportErrorMessage(getApiErrorMessage(error, "No se pudo exportar el CSV."));
+    } finally {
+      setIsExporting(false);
+    }
+  }
+
   return (
     <main className="client-main client-payments-page">
       <header className="app-topbar">
         <div><strong>Pagos y facturas</strong><span>Consulta los cobros y comprobantes de tu empresa.</span></div>
-        <button type="button" className="secondary-button topbar-refresh-button" onClick={() => void loadPayments()} disabled={isLoading}><AppIcon name="refresh" /><span>Actualizar</span></button>
+        <div className="app-topbar__actions">
+          <button type="button" className="secondary-button" onClick={() => void exportCsv()} disabled={isExporting}><AppIcon name="download" />{isExporting ? "Exportando..." : "Exportar CSV"}</button>
+          <button type="button" className="secondary-button topbar-refresh-button" onClick={() => void loadPayments()} disabled={isLoading}><AppIcon name="refresh" /><span>Actualizar</span></button>
+        </div>
       </header>
+
+      {exportErrorMessage ? <p className="form-error" role="alert">{exportErrorMessage}</p> : null}
+      <p className="client-export-note">La exportacion respeta la busqueda y el estado seleccionados, con un maximo de 10.000 filas.</p>
 
       <section className="section-toolbar" aria-label="Filtros de pagos">
         <label className="section-search"><AppIcon name="search" /><input type="search" value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} placeholder="Buscar pago, comprobante o cliente" /></label>

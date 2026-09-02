@@ -15,6 +15,7 @@ import { ClientPortalPage } from "@/pages/ClientPortalPage";
 import { ClientLoginPage } from "@/pages/ClientLoginPage";
 import { ClientPaymentDetailPage } from "@/pages/ClientPaymentDetailPage";
 import { ClientPaymentsPage } from "@/pages/ClientPaymentsPage";
+import { ClientReportsPage } from "@/pages/ClientReportsPage";
 import { LoginPage } from "@/pages/LoginPage";
 import { PaymentDetailPage } from "@/pages/PaymentDetailPage";
 import { SettingsPage } from "@/pages/SettingsPage";
@@ -36,6 +37,7 @@ export const router = createBrowserRouter([
         { index: true, element: <ClientPortalPage /> },
         { path: "pagos", element: <ClientPaymentsPage /> },
         { path: "pagos/:id", element: <ClientPaymentDetailPage /> },
+        { path: "reportes", element: <ClientReportsPage /> },
       ],
     }],
   },

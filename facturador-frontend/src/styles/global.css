@@ -3681,6 +3681,21 @@ button:disabled {
   height: 18px;
 }
 
+.client-export-note { margin: -12px 0 18px; color: #617089; font-size: 0.8rem; }
+.client-report-filters { display: flex; align-items: end; gap: 16px; margin-bottom: 22px; padding: 18px; border: 1px solid #dfe7f1; border-radius: 10px; background: #fbfdff; }
+.client-report-filters .field { flex: 1; margin: 0; }
+.client-report-filters input, .client-report-filters select { width: 100%; min-height: 42px; padding: 0 12px; border: 1px solid #d6e0ed; border-radius: 7px; background: #fff; }
+.client-report-kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-bottom: 22px; }
+.client-report-kpis article { display: grid; gap: 6px; padding: 20px; border: 1px solid #dfe7f1; border-radius: 10px; background: #fff; }
+.client-report-kpis span, .client-report-kpis small { color: #617089; }
+.client-report-kpis strong { color: #12213b; font-size: 1.5rem; }
+.client-report-table .section-table__head, .client-report-table .section-table__row { grid-template-columns: 1.4fr 0.7fr 1fr; }
+
+@media (max-width: 760px) {
+  .client-report-filters { align-items: stretch; flex-direction: column; }
+  .client-report-kpis { grid-template-columns: 1fr; }
+}
+
 .admin-alert-card {
   background: #fff8ea;
 }
