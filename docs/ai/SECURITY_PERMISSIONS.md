@@ -24,6 +24,8 @@ Ultima revision: 2026-08-22
 | Eliminar tenants | Si | No | No |
 | Revelar secretos | Si | No | No |
 
+Todos los roles admin pueden consultar el historial de auditoria. Los campos con nombres asociados a tokens, secretos, claves, passwords o certificados se reemplazan por `[REDACTED]` antes de responder.
+
 ## Portal tenant
 
 | Capacidad vigente | owner | admin | approver | viewer |

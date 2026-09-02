@@ -42,6 +42,8 @@ El panel `Configuracion` permite a `SUPERADMIN` crear y editar planes, precio, m
 
 El panel de administradores permite asignar roles, activar o desactivar cuentas y restablecer passwords. Cada administrador puede cambiar su propia password desde `Mi cuenta`, confirmando primero la actual.
 
+La seccion `Auditoria` muestra las acciones administrativas registradas, con filtros por tenant y accion. Los datos sensibles se ocultan en el backend antes de enviarse al navegador.
+
 ## Validacion
 
 ```powershell

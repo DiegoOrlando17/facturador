@@ -65,6 +65,7 @@ import { normalizeTenantSchedule } from "../domain/tenantScheduler.js";
 import { getTenantSubscriptionPolicy } from "../services/subscriptionPolicy.service.js";
 import { buildTenantGoogleAuthUrl, mergeGoogleTenantIntegrationConfig } from "../services/tenantGoogle.service.js";
 import { createAdminPaymentActionsRouter } from "./adminPaymentActions.routes.js";
+import { listAdminAuditLogs } from "../services/adminAudit.service.js";
 
 const router = Router();
 
@@ -702,6 +703,19 @@ router.get("/tenants/:slug/integrations", async (req, res) => {
     return res.json(normalizeJsonBigInts(integrations));
   } catch (error) {
     return res.status(error.statusCode || 400).json({ error: error.message || "No se pudieron listar integraciones" });
+  }
+});
+
+router.get("/audit", requireAdminPermission(ADMIN_PERMISSIONS.READ), async (req, res) => {
+  try {
+    const result = await listAdminAuditLogs({
+      tenantSlug: req.query.tenant,
+      action: req.query.action,
+      take: req.query.take,
+    });
+    return res.json(normalizeJsonBigInts(result));
+  } catch (error) {
+    return res.status(500).json({ error: error.message || "No se pudo cargar la auditoria" });
   }
 });
 

@@ -14,6 +14,7 @@ import { LoginPage } from "@/pages/LoginPage";
 import { PaymentDetailPage } from "@/pages/PaymentDetailPage";
 import { SettingsPage } from "@/pages/SettingsPage";
 import { TenantDetailPage } from "@/pages/TenantDetailPage";
+import { AuditPage } from "@/pages/AuditPage";
 
 export const router = createBrowserRouter([
   {
@@ -51,6 +52,10 @@ export const router = createBrowserRouter([
       {
         path: "alerts",
         element: <AlertsSectionPage />,
+      },
+      {
+        path: "audit",
+        element: <AuditPage />,
       },
       {
         path: "account",
