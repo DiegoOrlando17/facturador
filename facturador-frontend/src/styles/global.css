@@ -3664,6 +3664,23 @@ button:disabled {
 .client-status-grid small, .client-empty-state { color: #617089; }
 .client-login-page .login-logo svg { fill: none; stroke: currentColor; }
 
+.client-payments-table .section-table__head,
+.client-payments-table .section-table__row {
+  grid-template-columns: 1.15fr 1.2fr 1.2fr 0.8fr 1fr 0.55fr;
+}
+
+.client-payment-detail-page .primary-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.client-payment-detail-page .primary-button svg {
+  width: 18px;
+  height: 18px;
+}
+
 .admin-alert-card {
   background: #fff8ea;
 }

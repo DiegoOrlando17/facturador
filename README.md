@@ -54,7 +54,7 @@ Desde el detalle de un pago, un operador puede encolar una factura pendiente o s
 
 `/portal-cliente/login` permite ingresar con identificador de empresa, email y password de `TenantUser`. La sesion del cliente se almacena de forma independiente de la sesion administrativa y protege `/portal-cliente`.
 
-El dashboard inicial consume datos reales del tenant autenticado y muestra importes y pagos procesados, pendientes o con alertas. Las secciones de pagos, reportes, perfil fiscal, integraciones y onboarding se incorporaran en los siguientes cortes de la Fase 4.
+El dashboard inicial consume datos reales del tenant autenticado y muestra importes y pagos procesados, pendientes o con alertas. La seccion `Pagos y facturas` permite buscar y filtrar operaciones, abrir su detalle, revisar la trazabilidad y descargar el PDF cuando ARCA ya emitio el comprobante. Reportes, perfil fiscal, integraciones y onboarding se incorporaran en los siguientes cortes de la Fase 4.
 
 ## Validacion
 

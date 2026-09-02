@@ -28,6 +28,7 @@ type RequestOptions = {
 
 type BlobRequestOptions = {
   token?: string | null;
+  skipAuthHandling?: boolean;
 };
 
 export function subscribeToUnauthorized(handler: () => void) {
@@ -120,7 +121,7 @@ export async function apiBlobRequest(path: string, options: BlobRequestOptions =
     const payload = (await response.json().catch(() => null)) as { error?: string } | null;
     const message = payload?.error ?? "Ocurrio un error al comunicarse con la API.";
 
-    if (response.status === 401 && options.token) {
+    if (response.status === 401 && options.token && !options.skipAuthHandling) {
       notifyUnauthorized();
     }
 
