@@ -7,7 +7,7 @@ const navigation: Array<{ label: string; icon: AppIconName; to?: string }> = [
   { label: "Pagos y facturas", icon: "payments", to: "/portal-cliente/pagos" },
   { label: "Reportes", icon: "reports", to: "/portal-cliente/reportes" },
   { label: "Datos fiscales", icon: "tax" },
-  { label: "Integraciones", icon: "integrations" },
+  { label: "Integraciones", icon: "integrations", to: "/portal-cliente/integraciones" },
   { label: "Onboarding", icon: "onboarding" },
 ];
 

@@ -11,7 +11,11 @@ import {
   listTenantPortalPaymentsForExport,
   listTenantPortalPayments,
 } from "../services/tenantPortal.service.js";
-import { getTenantIntegrationConfig } from "../services/tenantConfig.service.js";
+import {
+  getTenantIntegrationConfig,
+  replaceTenantIntegrationConfig,
+  tryGetTenantIntegrationConfig,
+} from "../services/tenantConfig.service.js";
 import { buildPaymentsCsv } from "../services/csvExport.service.js";
 import { generateInvoicePdfForPayment, getInvoicePdfFilename } from "../services/invoicePdf.service.js";
 import {
@@ -21,9 +25,13 @@ import {
 import { testIntegrationConnection } from "../services/integrationTest.service.js";
 import { createTenantToken } from "../utils/tenantToken.js";
 import { toBigIntId } from "../utils/bigint.js";
+import { mergeGoogleTenantIntegrationConfig } from "../services/tenantGoogle.service.js";
+import { getTenantSubscriptionPolicy } from "../services/subscriptionPolicy.service.js";
+import { ENTITLEMENTS, hasEntitlement } from "../domain/planPolicy.js";
 
 const router = Router();
-const TESTABLE_PROVIDERS = new Set(["MERCADOPAGO", "AFIP"]);
+const TESTABLE_PROVIDERS = new Set(["MERCADOPAGO", "AFIP", "DRIVE", "SHEETS"]);
+const TENANT_CONFIGURABLE_PROVIDERS = new Set(["DRIVE", "SHEETS"]);
 
 function normalizeJsonBigInts(value) {
   if (typeof value === "bigint") {
@@ -194,11 +202,60 @@ router.get("/integrations", async (req, res) => {
   }
 });
 
+router.get("/subscription", async (req, res) => {
+  try {
+    const subscription = await getTenantSubscriptionPolicy(req.tenantAuth.tenantId);
+    return res.json(normalizeJsonBigInts(subscription));
+  } catch (error) {
+    return res.status(400).json({ error: error.message || "No se pudo obtener la suscripcion" });
+  }
+});
+
+router.put("/integrations/:provider", requireTenantPermission(TENANT_PERMISSIONS.MANAGE_INTEGRATIONS), async (req, res) => {
+  try {
+    const provider = String(req.params.provider || "").trim().toUpperCase();
+    if (!TENANT_CONFIGURABLE_PROVIDERS.has(provider)) {
+      throw new Error("El portal solo permite configurar destinos de Drive y Sheets");
+    }
+
+    const subscription = await getTenantSubscriptionPolicy(req.tenantAuth.tenantId);
+    if (!hasEntitlement(subscription?.policy, ENTITLEMENTS.GOOGLE_DRIVE_SHEETS)) {
+      return res.status(403).json({ error: "Tu plan no incluye Google Drive y Sheets" });
+    }
+
+    const existing = await tryGetTenantIntegrationConfig(req.tenantAuth.tenantId, provider);
+    if (!existing?.REFRESH_TOKEN) {
+      throw new Error("Un administrador debe conectar Google por OAuth antes de configurar el destino");
+    }
+
+    const config = mergeGoogleTenantIntegrationConfig(provider, existing, req.body?.config);
+    const row = await replaceTenantIntegrationConfig(req.tenantAuth.tenantId, provider, config, { enabled: true });
+    return res.json(normalizeJsonBigInts({
+      id: row.id,
+      tenantId: row.tenantId,
+      provider: row.provider,
+      enabled: row.enabled,
+      config: provider === "DRIVE"
+        ? { DRIVE_FOLDER_ID: config.DRIVE_FOLDER_ID ?? null }
+        : { SHEETS_ID: config.SHEETS_ID ?? null, SHEET_NAME: config.SHEET_NAME ?? "Hoja1" },
+    }));
+  } catch (error) {
+    return res.status(400).json({ error: error.message || "No se pudo guardar la integracion" });
+  }
+});
+
 router.post("/integrations/:provider/test", requireTenantPermission(TENANT_PERMISSIONS.TEST_INTEGRATIONS), async (req, res) => {
   try {
     const provider = String(req.params.provider || "").trim().toUpperCase();
     if (!TESTABLE_PROVIDERS.has(provider)) {
       throw new Error(`Test de conexion no implementado para ${provider}`);
+    }
+
+    if (provider === "DRIVE" || provider === "SHEETS") {
+      const subscription = await getTenantSubscriptionPolicy(req.tenantAuth.tenantId);
+      if (!hasEntitlement(subscription?.policy, ENTITLEMENTS.GOOGLE_DRIVE_SHEETS)) {
+        return res.status(403).json({ ok: false, provider, error: "Tu plan no incluye Google Drive y Sheets" });
+      }
     }
 
     const config = await getTenantIntegrationConfig(req.tenantAuth.tenantId, provider);

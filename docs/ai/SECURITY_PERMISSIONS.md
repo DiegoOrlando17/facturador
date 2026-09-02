@@ -32,6 +32,7 @@ Todos los roles admin pueden consultar el historial de auditoria. Los campos con
 | --- | --- | --- | --- | --- |
 | Dashboard, pagos, reportes, PDF e integraciones enmascaradas | Si | Si | Si | Si |
 | Probar integraciones | Si | Si | No | No |
+| Configurar destinos Drive/Sheets sin modificar credenciales OAuth | Si | Si | No | No |
 | Enviar onboarding | Si | Si | No | No |
 
 `approver` queda en solo lectura hasta implementar la aprobacion formal de comprobantes. En ese momento se agregara una capacidad especifica; no heredara permisos administrativos generales.

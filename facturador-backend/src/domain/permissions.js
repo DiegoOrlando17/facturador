@@ -12,6 +12,7 @@ export const ADMIN_PERMISSIONS = Object.freeze({
 export const TENANT_PERMISSIONS = Object.freeze({
   READ: "tenant.read",
   TEST_INTEGRATIONS: "tenant.testIntegrations",
+  MANAGE_INTEGRATIONS: "tenant.manageIntegrations",
   SUBMIT_ONBOARDING: "tenant.submitOnboarding",
 });
 

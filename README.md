@@ -56,7 +56,11 @@ Desde el detalle de un pago, un operador puede encolar una factura pendiente o s
 
 El dashboard inicial consume datos reales del tenant autenticado y muestra importes y pagos procesados, pendientes o con alertas. La seccion `Pagos y facturas` permite buscar y filtrar operaciones, abrir su detalle, revisar la trazabilidad, descargar el PDF cuando ARCA ya emitio el comprobante y exportar hasta 10.000 pagos filtrados en CSV.
 
-La seccion `Reportes` resume cantidad, importe y ticket promedio para un rango de fechas, con evolucion agrupada por dia, semana o mes. Perfil fiscal, integraciones y onboarding se incorporaran en los siguientes cortes de la Fase 4.
+La seccion `Reportes` resume cantidad, importe y ticket promedio para un rango de fechas, con evolucion agrupada por dia, semana o mes.
+
+La seccion `Integraciones` muestra Mercado Pago, ARCA, Drive y Sheets. Los roles tenant `owner/admin` pueden probar conexiones y, cuando el plan incluye Google, configurar los IDs de carpeta y planilla sin acceder ni modificar credenciales OAuth. La autorizacion OAuth inicial permanece a cargo de un administrador del sistema.
+
+Perfil fiscal y onboarding se incorporaran en los siguientes cortes de la Fase 4.
 
 ## Validacion
 

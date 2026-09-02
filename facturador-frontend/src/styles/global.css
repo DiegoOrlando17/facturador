@@ -3696,6 +3696,19 @@ button:disabled {
   .client-report-kpis { grid-template-columns: 1fr; }
 }
 
+.client-integrations-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+.client-integration-card { display: flex; flex-direction: column; gap: 18px; }
+.client-integration-card__heading { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: start; gap: 12px; }
+.client-integration-card__heading h2 { margin: 0 0 4px; font-size: 1.05rem; }
+.client-integration-card__heading p { margin: 0; color: #617089; font-size: 0.84rem; }
+.client-integration-config { display: grid; gap: 12px; }
+.client-integration-config .field { margin: 0; }
+.client-integration-card__footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: auto; color: #617089; font-size: 0.8rem; }
+
+@media (max-width: 900px) {
+  .client-integrations-grid { grid-template-columns: 1fr; }
+}
+
 .admin-alert-card {
   background: #fff8ea;
 }
