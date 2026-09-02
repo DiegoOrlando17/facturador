@@ -16,6 +16,7 @@ import {
   getAdminReportsSummary,
   getAdminReportsTimeseries,
   getAdminTenantSummary,
+  getAdminOperationalHealth,
   listAdminPaymentsForExport,
   listAdminPayments,
 } from "../services/adminMonitor.service.js";
@@ -704,6 +705,14 @@ router.get("/tenants/:slug/integrations", async (req, res) => {
     return res.json(normalizeJsonBigInts(integrations));
   } catch (error) {
     return res.status(error.statusCode || 400).json({ error: error.message || "No se pudieron listar integraciones" });
+  }
+});
+
+router.get("/health", requireAdminPermission(ADMIN_PERMISSIONS.READ), async (_req, res) => {
+  try {
+    return res.json(normalizeJsonBigInts(await getAdminOperationalHealth()));
+  } catch (error) {
+    return res.status(500).json({ error: error.message || "No se pudo consultar la salud operativa" });
   }
 });
 

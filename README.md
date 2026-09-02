@@ -46,6 +46,8 @@ La seccion `Auditoria` muestra las acciones administrativas registradas, con fil
 
 La seccion `Alertas` funciona como cola operativa: permite tomar o liberar casos, filtrar alertas sin asignar o propias y abrir directamente el pago, onboarding, perfil o integracion que origina el problema. La alerta desaparece solo cuando se corrige su causa real.
 
+La seccion `Integraciones` muestra diagnosticos reales y de solo lectura para configuraciones de tenants, API, PostgreSQL, Redis, workers y colas BullMQ. Sus alcances y limitaciones estan detallados en el runbook.
+
 ## Validacion
 
 ```powershell

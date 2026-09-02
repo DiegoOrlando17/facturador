@@ -806,22 +806,44 @@ export function BillingSectionPage() {
 }
 
 export function IntegrationsSectionPage() {
-  const clientRows = [
-    ["Mercado Pago", "mp", "Operativo", "1 cliente configurado", "Hace 1 min", "success"],
-    ["ARCA", "arca", "Operativo", "Ultimo CAE hace 8 min", "Hace 8 min", "success"],
-    ["Google Drive", "drive", "Operativo", "Ultima subida hace 4 min", "Hace 4 min", "success"],
-    ["Google Sheets", "sheets", "Operativo", "Ultima escritura hace 4 min", "Hace 4 min", "success"],
-  ] as const;
-  const infraRows = [
-    ["Backend", "railway", "Operativo", "API admin responde", "Hace 2 min", "success"],
-    ["Database", "postgresql", "Operativo", "Consultas disponibles", "Hace 2 min", "success"],
-    ["Redis", "redis", "Operativo", "Cache y colas disponibles", "Hace 2 min", "success"],
-    ["Workers", "railway", "Revisar", "Ultimo job procesado no informado", "Sin dato", "warning"],
-  ] as const;
+  type HealthStatus = "healthy" | "attention" | "setup_pending";
+  type HealthResponse = {
+    checkedAt: string;
+    integrations: Array<{ provider: string; status: HealthStatus; enabledCount: number; configuredCount: number; needsAttentionCount: number; missingCount: number }>;
+    infrastructure: Array<{ name: string; status: HealthStatus; detail: string }>;
+    queues: Array<{ name: string; status: HealthStatus; detail: string; counts: { waiting: number; active: number; delayed: number; failed: number } | null }>;
+  };
+
+  const { token } = useAuth();
+  const { data, errorMessage, isLoading, reload } = useApiResource<HealthResponse>("/admin/health", {
+    enabled: Boolean(token),
+    fallbackErrorMessage: "No se pudo consultar la salud operativa.",
+  });
+  const providerPresentation: Record<string, { label: string; icon: SectionIconName }> = {
+    MERCADOPAGO: { label: "Mercado Pago", icon: "mp" },
+    AFIP: { label: "ARCA", icon: "arca" },
+    DRIVE: { label: "Google Drive", icon: "drive" },
+    SHEETS: { label: "Google Sheets", icon: "sheets" },
+  };
+  const infrastructureIcons: Record<string, SectionIconName> = {
+    Backend: "railway",
+    Database: "postgresql",
+    Redis: "redis",
+    Workers: "railway",
+    "Mercado Pago": "mp",
+    ARCA: "arca",
+    "Cola de pagos": "redis",
+    "Cola de facturas": "redis",
+  };
+  const getTone = (status: HealthStatus): Tone => status === "healthy" ? "success" : status === "attention" ? "warning" : "muted";
+  const getLabel = (status: HealthStatus) => status === "healthy" ? "Operativo" : status === "attention" ? "Revisar" : "Sin configurar";
 
   return (
     <main className="admin-section-page">
-      <SectionHeader title="Integraciones" detail="Separa conexiones de clientes de salud tecnica del sistema." />
+      <SectionHeader title="Integraciones" detail="Estado real de conexiones, infraestructura, workers y colas." actions={<button type="button" className="section-button section-button--soft" onClick={() => void reload()}>Verificar ahora</button>} />
+      {isLoading ? <section className="section-table-card"><div className="section-table__state">Verificando servicios...</div></section> : null}
+      {errorMessage ? <section className="section-table-card"><div className="section-table__state section-table__state--danger">{errorMessage}</div></section> : null}
+      {data ? <>
       <section className="section-table-card">
         <div className="section-subheading">
           <h2>Integraciones de clientes</h2>
@@ -831,13 +853,16 @@ export function IntegrationsSectionPage() {
           <div className="section-table__head">
             <span>Servicio</span><span>Estado</span><span>Detalle</span><span>Ultima actividad</span><span>Accion</span>
           </div>
-          {clientRows.map(([name, icon, status, detail, last, tone]) => (
-            <div key={name} className="section-table__row">
-              <strong className="section-service-name"><span className="integration-logo-frame"><SectionIcon name={icon as SectionIconName} /></span>{name}</strong>
-              <span><StatusBadge tone={tone}>{status}</StatusBadge></span><span>{detail}</span><span>{last}</span>
-              <button type="button" className="section-mini-button">Ver clientes</button>
+          {data.integrations.map((item) => {
+            const presentation = providerPresentation[item.provider] ?? { label: item.provider, icon: "integrations" as SectionIconName };
+            return <div key={item.provider} className="section-table__row">
+              <strong className="section-service-name"><span className="integration-logo-frame"><SectionIcon name={presentation.icon} /></span>{presentation.label}</strong>
+              <span><StatusBadge tone={getTone(item.status)}>{getLabel(item.status)}</StatusBadge></span>
+              <span>{`${item.configuredCount}/${item.enabledCount} habilitadas configuradas; ${item.needsAttentionCount} requieren atencion`}</span>
+              <span>{formatDateTime(data.checkedAt)}</span>
+              <Link to="/tenants?attention=1" className="section-mini-button">Ver clientes</Link>
             </div>
-          ))}
+          })}
         </div>
       </section>
       <section className="section-table-card">
@@ -849,11 +874,11 @@ export function IntegrationsSectionPage() {
           <div className="section-table__head">
             <span>Servicio</span><span>Estado</span><span>Detalle</span><span>Ultima actividad</span><span>Accion</span>
           </div>
-          {infraRows.map(([name, icon, status, detail, last, tone]) => (
-            <div key={name} className="section-table__row">
-              <strong className="section-service-name"><span className="integration-logo-frame"><SectionIcon name={icon as SectionIconName} /></span>{name}</strong>
-              <span><StatusBadge tone={tone}>{status}</StatusBadge></span><span>{detail}</span><span>{last}</span>
-              <button type="button" className="section-mini-button">Ver salud</button>
+          {[...data.infrastructure, ...data.queues].map((item) => (
+            <div key={item.name} className="section-table__row">
+              <strong className="section-service-name"><span className="integration-logo-frame"><SectionIcon name={infrastructureIcons[item.name] ?? "integrations"} /></span>{item.name}</strong>
+              <span><StatusBadge tone={getTone(item.status)}>{getLabel(item.status)}</StatusBadge></span><span>{item.detail}</span><span>{formatDateTime(data.checkedAt)}</span>
+              <button type="button" className="section-mini-button" onClick={() => void reload()}>Verificar</button>
             </div>
           ))}
         </div>
@@ -861,6 +886,7 @@ export function IntegrationsSectionPage() {
         <div><strong>¿Necesitas conectar un servicio?</strong><p>Consulta nuestra guia de integraciones o contacta a soporte.</p></div>
         {false ? <button type="button" className="section-button section-button--soft">Ver guia</button> : null}
       </section>
+      </> : null}
     </main>
   );
 }

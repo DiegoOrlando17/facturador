@@ -10,6 +10,9 @@ import { normalizeAfipConfig } from "./afip.service.js";
 import { normalizeMpConfig } from "./mercadopago.service.js";
 import { decryptJson } from "../utils/crypto.js";
 import { buildPaymentAttentionWhere, isPaymentAttentionState } from "../domain/paymentAttention.js";
+import { paymentsQueue } from "../queues/payments.queue.js";
+import { invoicesQueue } from "../queues/invoices.queue.js";
+import { classifyQueueHealth } from "../domain/operationalHealth.js";
 
 const DEFAULT_PAGE = 1;
 const DEFAULT_PAGE_SIZE = 20;
@@ -377,6 +380,39 @@ async function buildOperationalServices() {
     mercadopago,
     afip,
   ];
+}
+
+async function getQueueHealth(name, queue) {
+  try {
+    const counts = await withTimeout(queue.getJobCounts("waiting", "active", "delayed", "failed"));
+    return { name, ...classifyQueueHealth(counts) };
+  } catch (error) {
+    return {
+      name,
+      status: "attention",
+      detail: error.message || "No se pudo consultar la cola",
+      counts: null,
+    };
+  }
+}
+
+export async function getAdminOperationalHealth() {
+  const tenantCount = await db.tenant.count();
+  const [services, payments, invoices, ...integrations] = await Promise.all([
+    buildOperationalServices(),
+    getQueueHealth("Cola de pagos", paymentsQueue),
+    getQueueHealth("Cola de facturas", invoicesQueue),
+    ...["MERCADOPAGO", "AFIP", "DRIVE", "SHEETS"].map((provider) =>
+      buildProviderOperationalHealth(provider, tenantCount)
+    ),
+  ]);
+
+  return {
+    checkedAt: new Date(),
+    integrations,
+    infrastructure: services,
+    queues: [payments, invoices],
+  };
 }
 
 function getPaymentEventPresentation(event) {

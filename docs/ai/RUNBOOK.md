@@ -306,7 +306,21 @@ cd facturador-backend
 npm test
 ```
 
-Resultado: 57 tests correctos el 2026-09-01. La suite incluye pruebas HTTP aisladas de endpoints admin, protecciones del ultimo superadmin, sanitizacion de auditoria y estados de asignacion de alertas; usa dobles en memoria y no accede a DB, Redis, Mercado Pago, ARCA ni Google.
+Resultado: 59 tests correctos el 2026-09-01. La suite incluye pruebas HTTP aisladas de endpoints admin, protecciones, auditoria, asignacion de alertas y clasificacion de colas; usa dobles en memoria y no accede a DB, Redis, Mercado Pago, ARCA ni Google.
+
+### Salud operativa admin
+
+`GET /admin/health` y la seccion web `Integraciones` ejecutan diagnosticos de solo lectura:
+
+- PostgreSQL: `SELECT 1`;
+- Redis: conexion y `PING`;
+- BullMQ: conteos `waiting`, `active`, `delayed` y `failed` de las colas de pagos y facturas;
+- workers: procesos visibles desde la maquina o contenedor de la API;
+- Mercado Pago: `GET /users/me`, sin crear ni modificar recursos;
+- ARCA: disponibilidad HTTP del web service, sin solicitar CAE ni emitir comprobantes;
+- Drive/Sheets: conteo de configuraciones por tenant, sin llamadas que creen o modifiquen archivos o filas.
+
+Si API y workers se despliegan en procesos o contenedores separados, la deteccion local puede mostrar workers no visibles. Interpretar esa señal junto con los conteos y el movimiento de las colas.
 
 Prisma:
 
