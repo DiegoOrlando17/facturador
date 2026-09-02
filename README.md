@@ -44,6 +44,8 @@ El panel de administradores permite asignar roles, activar o desactivar cuentas 
 
 La seccion `Auditoria` muestra las acciones administrativas registradas, con filtros por tenant y accion. Los datos sensibles se ocultan en el backend antes de enviarse al navegador.
 
+La seccion `Alertas` funciona como cola operativa: permite tomar o liberar casos, filtrar alertas sin asignar o propias y abrir directamente el pago, onboarding, perfil o integracion que origina el problema. La alerta desaparece solo cuando se corrige su causa real.
+
 ## Validacion
 
 ```powershell

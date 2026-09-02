@@ -146,6 +146,10 @@ type DashboardResponse = {
       slug: string;
       name: string;
     };
+    assignment?: {
+      adminUser: { id: string; name: string | null; email: string; role: string } | null;
+      assignedAt: string;
+    } | null;
   }>;
 };
 
@@ -862,14 +866,40 @@ export function IntegrationsSectionPage() {
 }
 
 export function AlertsSectionPage() {
-  const { token } = useAuth();
-  const { data, errorMessage, isLoading, reload } = useApiResource<DashboardResponse>("/admin/dashboard", {
+  const { token, user, can } = useAuth();
+  const [queueFilter, setQueueFilter] = useState<"all" | "unassigned" | "mine">("all");
+  const [updatingAlertId, setUpdatingAlertId] = useState<string | null>(null);
+  const [actionErrorMessage, setActionErrorMessage] = useState<string | null>(null);
+  const { data, errorMessage, isLoading, reload } = useApiResource<{
+    items: NonNullable<DashboardResponse["attentionItems"]>;
+    total: number;
+  }>("/admin/alerts", {
     enabled: Boolean(token),
     fallbackErrorMessage: "No se pudieron cargar las alertas operativas.",
   });
-  const rows = data?.attentionItems ?? [];
+  const allRows = data?.items ?? [];
+  const rows = allRows.filter((item) => queueFilter === "all"
+    || (queueFilter === "unassigned" && !item.assignment)
+    || (queueFilter === "mine" && item.assignment?.adminUser?.id === user?.id));
   const criticalCount = rows.filter((item) => item.priority === "danger").length;
   const warningCount = rows.filter((item) => item.priority === "warning").length;
+
+  async function updateAssignment(itemId: string, shouldClaim: boolean) {
+    if (!token) return;
+    setUpdatingAlertId(itemId);
+    setActionErrorMessage(null);
+    try {
+      await apiRequest(`/admin/alerts/${encodeURIComponent(itemId)}/claim`, {
+        method: shouldClaim ? "POST" : "DELETE",
+        token,
+      });
+      await reload();
+    } catch (error) {
+      setActionErrorMessage(getApiErrorMessage(error, "No se pudo actualizar la asignacion."));
+    } finally {
+      setUpdatingAlertId(null);
+    }
+  }
 
   return (
     <main className="admin-section-page">
@@ -878,7 +908,12 @@ export function AlertsSectionPage() {
         detail="Problemas, errores y eventos que requieren atencion."
         actions={<button type="button" className="section-button section-button--soft" onClick={() => void reload()}>Actualizar</button>}
       />
-      <div className="section-tabs"><span className="section-tab section-tab--active">Todas <b>{rows.length}</b></span><span className="section-tab">Criticas <b>{criticalCount}</b></span><span className="section-tab">Advertencias <b>{warningCount}</b></span></div>
+      <div className="section-tabs">
+        <button type="button" className={`section-tab${queueFilter === "all" ? " section-tab--active" : ""}`} onClick={() => setQueueFilter("all")}>Todas <b>{allRows.length}</b></button>
+        <button type="button" className={`section-tab${queueFilter === "unassigned" ? " section-tab--active" : ""}`} onClick={() => setQueueFilter("unassigned")}>Sin asignar <b>{allRows.filter((item) => !item.assignment).length}</b></button>
+        <button type="button" className={`section-tab${queueFilter === "mine" ? " section-tab--active" : ""}`} onClick={() => setQueueFilter("mine")}>Mis alertas <b>{allRows.filter((item) => item.assignment?.adminUser?.id === user?.id).length}</b></button>
+        <span className="section-tab">Criticas <b>{criticalCount}</b></span><span className="section-tab">Advertencias <b>{warningCount}</b></span>
+      </div>
       <section className="section-table-card">
         <div className="section-table section-table--alerts">
           <div className="section-table__head">
@@ -893,14 +928,22 @@ export function AlertsSectionPage() {
               <span>{item.title}</span><strong>{item.tenant.name}</strong>
               <span><StatusBadge tone={item.priority === "danger" ? "danger" : item.priority === "warning" ? "warning" : "info"}>{item.priority === "danger" ? "Critica" : item.priority === "warning" ? "Advertencia" : "Informativa"}</StatusBadge></span>
               <span>{item.detail}</span>
-              <span>{item.type.startsWith("payment_") ? "Admin" : "Configuracion"}</span>
-              <Link to={item.actionPath} className="section-mini-button">{item.actionLabel}</Link>
+              <span>{item.assignment?.adminUser?.name ?? item.assignment?.adminUser?.email ?? "Sin asignar"}</span>
+              <span className="section-row-actions">
+                <Link to={item.actionPath} className="section-mini-button">{item.actionLabel}</Link>
+                {can("payments:manage") ? (
+                  <button type="button" className="section-mini-button" disabled={updatingAlertId === item.id} onClick={() => void updateAssignment(item.id, !item.assignment)}>
+                    {updatingAlertId === item.id ? "Guardando..." : item.assignment ? "Liberar" : "Tomar"}
+                  </button>
+                ) : null}
+              </span>
             </div>
           )) : (
             <div className="section-table__state">No hay alertas operativas pendientes.</div>
           )}
         </div>
       </section>
+      {actionErrorMessage ? <p className="form-error">{actionErrorMessage}</p> : null}
       <section className="section-help-card">
         <SectionIcon name="alert" />
         <div><strong>Las alertas criticas pueden afectar la facturacion automatica.</strong><p>Resolvelas cuanto antes para evitar interrupciones.</p></div>

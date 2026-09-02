@@ -638,12 +638,13 @@ function buildAttentionItem(type, tenant, detail = {}) {
   };
 }
 
-async function listAttentionItems() {
+export async function listAdminAttentionItems({ take = 100 } = {}) {
+  const normalizedTake = Math.min(Math.max(Number(take) || 100, 1), 100);
   const [pendingOnboarding, pendingProfiles, integrationsWithAttention, failedPayments] = await Promise.all([
     db.tenantOnboardingSubmission.findMany({
       where: { status: "pending" },
       orderBy: [{ createdAt: "desc" }],
-      take: 5,
+      take: normalizedTake,
       include: {
         tenant: {
           select: { id: true, slug: true, name: true },
@@ -655,7 +656,7 @@ async function listAttentionItems() {
         approvalStatus: "PENDING",
       },
       orderBy: [{ updatedAt: "desc" }],
-      take: 5,
+      take: normalizedTake,
       include: {
         tenant: {
           select: { id: true, slug: true, name: true, updatedAt: true },
@@ -668,7 +669,7 @@ async function listAttentionItems() {
         secretEnc: null,
       },
       orderBy: [{ updatedAt: "desc" }],
-      take: 5,
+      take: normalizedTake,
       include: {
         tenant: {
           select: { id: true, slug: true, name: true },
@@ -678,7 +679,7 @@ async function listAttentionItems() {
     db.payment.findMany({
       where: buildPaymentAttentionWhere(),
       orderBy: [{ updatedAt: "desc" }],
-      take: 5,
+      take: normalizedTake,
       include: {
         tenant: {
           select: { id: true, slug: true, name: true },
@@ -716,7 +717,7 @@ async function listAttentionItems() {
     ),
   ]
     .sort((left, right) => new Date(right.createdAt || 0).getTime() - new Date(left.createdAt || 0).getTime())
-    .slice(0, 8);
+    .slice(0, normalizedTake);
 }
 
 export async function getAdminDashboardSummary(filters = {}) {
@@ -795,7 +796,7 @@ export async function getAdminDashboardSummary(filters = {}) {
     }),
     buildProviderOperationalHealth("MERCADOPAGO", tenantCount),
     buildProviderOperationalHealth("AFIP", tenantCount),
-    listAttentionItems(),
+    listAdminAttentionItems({ take: 8 }),
     listRecentActivity(),
   ]);
 

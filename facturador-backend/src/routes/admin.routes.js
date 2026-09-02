@@ -66,6 +66,7 @@ import { getTenantSubscriptionPolicy } from "../services/subscriptionPolicy.serv
 import { buildTenantGoogleAuthUrl, mergeGoogleTenantIntegrationConfig } from "../services/tenantGoogle.service.js";
 import { createAdminPaymentActionsRouter } from "./adminPaymentActions.routes.js";
 import { listAdminAuditLogs } from "../services/adminAudit.service.js";
+import { claimOperationalAlert, listOperationalAlerts, releaseOperationalAlert } from "../services/operationalAlert.service.js";
 
 const router = Router();
 
@@ -703,6 +704,30 @@ router.get("/tenants/:slug/integrations", async (req, res) => {
     return res.json(normalizeJsonBigInts(integrations));
   } catch (error) {
     return res.status(error.statusCode || 400).json({ error: error.message || "No se pudieron listar integraciones" });
+  }
+});
+
+router.get("/alerts", async (_req, res) => {
+  try {
+    return res.json(normalizeJsonBigInts(await listOperationalAlerts()));
+  } catch (error) {
+    return res.status(500).json({ error: error.message || "No se pudieron cargar las alertas" });
+  }
+});
+
+router.post("/alerts/:key/claim", requireAdminPermission(ADMIN_PERMISSIONS.OPERATE), async (req, res) => {
+  try {
+    return res.json(await claimOperationalAlert(req.params.key, req.adminAuth.adminUser));
+  } catch (error) {
+    return res.status(error.statusCode || 400).json({ error: error.message || "No se pudo asignar la alerta" });
+  }
+});
+
+router.delete("/alerts/:key/claim", requireAdminPermission(ADMIN_PERMISSIONS.OPERATE), async (req, res) => {
+  try {
+    return res.json(await releaseOperationalAlert(req.params.key, req.adminAuth.adminUser));
+  } catch (error) {
+    return res.status(error.statusCode || 400).json({ error: error.message || "No se pudo liberar la alerta" });
   }
 });
 

@@ -325,6 +325,26 @@ Consecuencias:
 - el callback conserva carpeta Drive, spreadsheet y hoja existentes y reemplaza el refresh token cifrado en ambas integraciones;
 - el mecanismo global `GOOGLE_TOKEN_PATH`/`GOOGLE_TOKEN_B64` y el comando `google:new-token` fueron retirados; la autorizacion Google se administra exclusivamente por tenant.
 
+## D-019 - Alertas derivadas del estado real con asignacion en auditoria
+
+Estado: vigente
+
+Decision: calcular las alertas operativas desde pagos, perfiles, onboarding e integraciones vigentes y persistir solo los eventos de asignacion/liberacion en `TenantAuditLog`.
+
+Contexto: el dashboard ya detectaba condiciones que requieren atencion, pero las mostraba como una lista limitada y sin responsable. Persistir una segunda copia completa de cada alerta podia quedar desalineado del estado que la origina.
+
+Alternativas consideradas: crear una tabla de alertas sincronizada por workers; guardar estados de cerrado manual; derivar alertas y auditar solamente la atencion humana.
+
+Rationale: la causa real sigue siendo la fuente de verdad. Una alerta no puede cerrarse manualmente mientras el pago o la configuracion continuen con problemas, y la asignacion queda trazable sin una migracion ni un proceso de sincronizacion.
+
+Consecuencias:
+
+- `GET /admin/alerts` devuelve hasta cien condiciones activas con su ultima asignacion;
+- `OPERATOR` y `SUPERADMIN` pueden tomar o liberar una alerta; `VIEWER` conserva solo lectura;
+- tomar o liberar genera eventos `operational_alert_claimed` y `operational_alert_released`;
+- corregir la entidad afectada elimina naturalmente la alerta de la cola;
+- no existe un estado manual `RESOLVED` que pueda ocultar una incidencia vigente.
+
 ## Decisiones pendientes
 
 No estan aprobadas; deben resolverse antes de las fases que dependen de ellas.

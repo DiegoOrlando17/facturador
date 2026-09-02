@@ -109,7 +109,7 @@ Objetivo: resolver altas, configuracion e incidentes habituales sin acceder a DB
 - [x] Completar planes: editor admin de servicios, limites opcionales, precio, moneda, ciclo y estado sobre la politica versionada vigente.
 - [x] Completar administradores, roles y cambio/restablecimiento de password, protegiendo la cuenta operadora y el ultimo superadmin activo.
 - [x] Mostrar auditoria de acciones sensibles con actor, tenant, entidad, cambios sanitizados y filtros desde el panel admin.
-- [ ] Convertir alertas en una cola operativa accionable.
+- [x] Convertir alertas en una cola operativa accionable con asignacion auditable, filtros por responsable y acceso directo a la causa real.
 - [ ] Agregar salud de integraciones, workers y colas.
 - [ ] Agregar soporte para emitir, cancelar mediante nota de credito y reprocesar con seguridad.
 
@@ -202,7 +202,7 @@ Aceptacion: los flujos mobile acordados funcionan en Android/iOS y respetan las 
 ## 8. Validacion de esta linea base
 
 - `facturador-frontend`: `npm run build` correcto el 2026-09-01, incluido el editor admin de politicas y limites de planes.
-- `facturador-backend`: 55 tests correctos, incluidos endpoints administrativos criticos, protecciones de administradores y sanitizacion de auditoria; esquema Prisma valido y todos los `.js` de `src` y `prisma` aprobados por `node --check` el 2026-09-01.
+- `facturador-backend`: 57 tests correctos, incluidos endpoints administrativos criticos, protecciones de administradores, sanitizacion de auditoria y asignacion de alertas; esquema Prisma valido y todos los `.js` de `src` y `prisma` aprobados por `node --check` el 2026-09-01.
 - PostgreSQL y Redis locales, migraciones Prisma, datos demo, tenants y planes: reportados como operativos el 2026-08-14.
 - API, workers, frontend, login admin y descarga PDF: reportados como operativos el 2026-08-14.
 - La validacion integral del portal cliente queda diferida hasta reemplazar el prototipo estatico por una aplicacion conectada a `/portal`.

@@ -4510,6 +4510,17 @@ button:disabled {
   font-size: 0.84rem;
 }
 
+button.section-tab {
+  font: inherit;
+  cursor: pointer;
+}
+
+.section-row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
 .section-table-card > div:has(> strong) {
   display: none;
 }
