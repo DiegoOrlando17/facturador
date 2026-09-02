@@ -68,7 +68,15 @@ export async function getTenantPortalUserById(id) {
 }
 
 export async function getTenantPortalDashboard(tenantId) {
-  return getAdminDashboardSummary({ tenantId });
+  const summary = await getAdminDashboardSummary({ tenantId });
+  return buildTenantPortalDashboard(summary);
+}
+
+export function buildTenantPortalDashboard(summary) {
+  return {
+    payments: summary.payments,
+    filters: summary.filters,
+  };
 }
 
 export async function listTenantPortalPayments(tenantId, filters = {}) {

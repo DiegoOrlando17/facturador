@@ -3653,6 +3653,17 @@ button:disabled {
   grid-template-columns: 250px minmax(0, 1fr);
 }
 
+.client-sidebar .app-nav__link { width: 100%; border: 0; text-align: left; }
+.client-nav-link--pending { cursor: not-allowed; opacity: 0.52; }
+.client-status-card--error, .client-status-card--warning { margin-bottom: 22px; background: #fff8ea; }
+.client-status-card--error { background: #fff1f1; }
+.client-status-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+.client-status-grid article { display: grid; gap: 6px; padding: 16px; border: 1px solid #dfe7f1; border-radius: 8px; background: #fbfdff; }
+.client-status-grid span { color: #617089; font-size: 0.75rem; font-weight: 800; text-transform: uppercase; }
+.client-status-grid strong { color: #12213b; font-size: 1.45rem; }
+.client-status-grid small, .client-empty-state { color: #617089; }
+.client-login-page .login-logo svg { fill: none; stroke: currentColor; }
+
 .admin-alert-card {
   background: #fff8ea;
 }

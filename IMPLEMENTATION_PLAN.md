@@ -1,6 +1,6 @@
 # Plan de implementacion - Facturador
 
-Ultima revision: 2026-08-26
+Ultima revision: 2026-09-02
 
 ## 1. Objetivo
 
@@ -105,7 +105,7 @@ Aceptacion: un tenant demo completa MP -> ARCA y puede generar el PDF bajo deman
 
 Objetivo: resolver altas, configuracion e incidentes habituales sin acceder a DB o codigo.
 
-- [ ] Validar manualmente los flujos ya construidos y corregir contratos inconsistentes.
+- [x] Validar manualmente los flujos ya construidos y corregir contratos inconsistentes.
 - [x] Completar planes: editor admin de servicios, limites opcionales, precio, moneda, ciclo y estado sobre la politica versionada vigente.
 - [x] Completar administradores, roles y cambio/restablecimiento de password, protegiendo la cuenta operadora y el ultimo superadmin activo.
 - [x] Mostrar auditoria de acciones sensibles con actor, tenant, entidad, cambios sanitizados y filtros desde el panel admin.
@@ -210,3 +210,4 @@ Aceptacion: los flujos mobile acordados funcionan en Android/iOS y respetan las 
 - `invoice:test-flow -- --tenant=fiebre --amount=100 --require-drive --require-sheets`: correcto el 2026-09-01 contra PostgreSQL local, ARCA homologacion y Google de test; genero `Invoice.ISSUED`, CAE, un documento Drive y una fila Sheets, y la segunda pasada fue idempotente.
 - `invoice:test-flow -- --tenant=fiebre --amount=100 --require-drive --require-sheets --verify-error-recovery`: correcto el 2026-09-01; verifico `afip_pending`/`FAILED`, fila Sheets `ERROR`, recuperacion `complete`/`ISSUED`, CAE, actualizacion de la misma fila a `OK`, un documento Drive y segunda pasada idempotente.
 - `google:audit-deliveries -- --tenant=fiebre`: correcto el 2026-09-01, sin documentos registrados faltantes, IDs de pago duplicados ni filas Sheets desalineadas; permanecen recursos historicos externos no vinculados a la DB actual.
+- Panel admin y Fase 3: cierre funcional confirmado el 2026-09-02 tras validar navegacion de pagos, acciones administrativas, visibilidad de errores y anulacion fiscal mediante nota de credito en homologacion; una falla de inicializacion de secuencia fue recuperada desde el panel y la nota finalizo `ISSUED` con numero y CAE.

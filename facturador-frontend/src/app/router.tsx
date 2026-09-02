@@ -1,5 +1,6 @@
 import { createBrowserRouter } from "react-router-dom";
 import { ProtectedLayout } from "@/components/auth/ProtectedLayout";
+import { TenantProtectedLayout } from "@/components/auth/TenantProtectedLayout";
 import {
   AlertsSectionPage,
   BillingSectionPage,
@@ -10,6 +11,7 @@ import { DashboardPage } from "@/pages/DashboardPage";
 import { AccountPage } from "@/pages/AccountPage";
 import { AdminUsersPage } from "@/pages/AdminUsersPage";
 import { ClientPortalPage } from "@/pages/ClientPortalPage";
+import { ClientLoginPage } from "@/pages/ClientLoginPage";
 import { LoginPage } from "@/pages/LoginPage";
 import { PaymentDetailPage } from "@/pages/PaymentDetailPage";
 import { SettingsPage } from "@/pages/SettingsPage";
@@ -21,9 +23,11 @@ export const router = createBrowserRouter([
     path: "/login",
     element: <LoginPage />,
   },
+  { path: "/portal-cliente/login", element: <ClientLoginPage /> },
   {
     path: "/portal-cliente",
-    element: <ClientPortalPage />,
+    element: <TenantProtectedLayout />,
+    children: [{ index: true, element: <ClientPortalPage /> }],
   },
   {
     path: "/",

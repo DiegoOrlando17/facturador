@@ -50,6 +50,12 @@ La seccion `Integraciones` muestra diagnosticos reales y de solo lectura para co
 
 Desde el detalle de un pago, un operador puede encolar una factura pendiente o solicitar la anulacion total de una factura emitida mediante una nota de credito asociada. La anulacion exige escribir `ANULAR`, un plan con `creditNotes` y el worker `creditNote.worker.js` activo.
 
+## Portal del cliente
+
+`/portal-cliente/login` permite ingresar con identificador de empresa, email y password de `TenantUser`. La sesion del cliente se almacena de forma independiente de la sesion administrativa y protege `/portal-cliente`.
+
+El dashboard inicial consume datos reales del tenant autenticado y muestra importes y pagos procesados, pendientes o con alertas. Las secciones de pagos, reportes, perfil fiscal, integraciones y onboarding se incorporaran en los siguientes cortes de la Fase 4.
+
 ## Validacion
 
 ```powershell

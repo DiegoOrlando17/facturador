@@ -1,215 +1,138 @@
-import { AppIcon } from "@/components/ui/AppIcon";
+import { useCallback, useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useTenantAuth } from "@/app/TenantAuthContext";
+import { AppIcon, type AppIconName } from "@/components/ui/AppIcon";
+import { ApiError, apiRequest, getApiErrorMessage } from "@/lib/api";
+import { formatCurrency } from "@/lib/formatters";
 
-type ClientIconName =
-  | "home"
-  | "invoice"
-  | "payments"
-  | "clients"
-  | "tax"
-  | "integrations"
-  | "account"
-  | "settings"
-  | "logout"
-  | "refresh"
-  | "bell"
-  | "download"
-  | "check"
-  | "help";
+type PaymentSummary = {
+  total: number;
+  pending: number;
+  failed: number;
+  complete: number;
+  totalAmount: number;
+  statuses: Record<string, { count: number; amount: number }>;
+};
 
-function ClientIcon({ name }: { name: ClientIconName }) {
-  return <AppIcon name={name} />;
-}
+type DashboardResponse = { payments: PaymentSummary };
 
-const clientNav = [
-  ["Inicio", "home"],
-  ["Mis facturas", "invoice"],
-  ["Pagos", "payments"],
-  ["Clientes", "clients"],
-  ["Datos fiscales", "tax"],
-  ["Integraciones", "integrations"],
-  ["Estado de cuenta", "account"],
-  ["Configuracion", "settings"],
-] as const;
-
-const invoiceRows = [
-  ["B 0001-00001235", "14/05/2024", "Juan Perez", "$ 12.540", "Pagada"],
-  ["B 0001-00001234", "14/05/2024", "Maria Gomez", "$ 8.750", "Pagada"],
-  ["B 0001-00001233", "13/05/2024", "Cordoba SRL", "$ 15.230", "Pendiente"],
-  ["B 0001-00001232", "13/05/2024", "Lopez y Asociados", "$ 22.100", "Pagada"],
-] as const;
+const navigation: Array<{ label: string; icon: AppIconName; enabled: boolean }> = [
+  { label: "Inicio", icon: "home", enabled: true },
+  { label: "Pagos y facturas", icon: "payments", enabled: false },
+  { label: "Reportes", icon: "reports", enabled: false },
+  { label: "Datos fiscales", icon: "tax", enabled: false },
+  { label: "Integraciones", icon: "integrations", enabled: false },
+  { label: "Onboarding", icon: "onboarding", enabled: false },
+];
 
 export function ClientPortalPage() {
+  const navigate = useNavigate();
+  const { invalidateSession, logout, token, user } = useTenantAuth();
+  const [dashboard, setDashboard] = useState<DashboardResponse | null>(null);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
+  const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null);
+
+  const loadDashboard = useCallback(async () => {
+    if (!token) return;
+    setIsLoading(true);
+    setErrorMessage("");
+    try {
+      const response = await apiRequest<DashboardResponse>("/portal/dashboard", {
+        token,
+        skipAuthHandling: true,
+      });
+      setDashboard(response);
+      setLastUpdatedAt(new Date());
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 401) {
+        invalidateSession();
+        navigate("/portal-cliente/login", { replace: true });
+        return;
+      }
+      setErrorMessage(getApiErrorMessage(error, "No se pudo cargar el resumen."));
+    } finally {
+      setIsLoading(false);
+    }
+  }, [invalidateSession, navigate, token]);
+
+  useEffect(() => { void loadDashboard(); }, [loadDashboard]);
+
+  const payments = dashboard?.payments;
+  const displayName = user?.email.split("@")[0] || "cliente";
+  const initials = (user?.tenant?.name || user?.email || "FC").slice(0, 2).toUpperCase();
+
   return (
     <div className="client-portal-page">
       <aside className="client-sidebar">
         <div className="brand-lockup">
-          <span className="app-logo" aria-hidden="true">
-            <svg viewBox="0 0 48 56">
-              <path d="M12 4h22l10 10v34a4 4 0 0 1-4 4H12a4 4 0 0 1-4-4V8a4 4 0 0 1 4-4Z" />
-              <path d="M34 4v12h10" />
-              <path d="M17 28h10M17 38h7" />
-              <circle cx="35" cy="36" r="9" />
-              <path d="m31 36 3 3 6-7" />
-            </svg>
-          </span>
-          <div>
-            <strong>Facturador</strong>
-            <p>Portal del cliente</p>
-          </div>
+          <span className="app-logo"><AppIcon name="invoice" /></span>
+          <div><strong>Facturador</strong><p>Portal del cliente</p></div>
         </div>
-
         <nav className="app-nav" aria-label="Portal cliente">
-          {clientNav.map(([label, icon], index) => (
-            <a key={label} href="#inicio" className={`app-nav__link${index === 0 ? " app-nav__link--active" : ""}`}>
-              <ClientIcon name={icon} />
-              <span>{label}</span>
-            </a>
+          {navigation.map((item) => (
+            <button key={item.label} type="button" className={`app-nav__link${item.enabled ? " app-nav__link--active" : " client-nav-link--pending"}`} disabled={!item.enabled} title={item.enabled ? undefined : "Disponible en el proximo corte"}>
+              <AppIcon name={item.icon} /><span>{item.label}</span>
+            </button>
           ))}
         </nav>
-
-        <div className="client-plan-card">
-          <span>Plan actual</span>
-          <strong>Profesional</strong>
-          <small>Hasta el 12/06/2025</small>
-          <em>Activo</em>
-        </div>
         <div className="sidebar-user-card">
-          <span className="sidebar-user-card__avatar">DO</span>
-          <div>
-            <strong>Ferreteria del Centro</strong>
-            <small>Diego Orlando</small>
-          </div>
+          <span className="sidebar-user-card__avatar">{initials}</span>
+          <div><strong>{user?.tenant?.name ?? "Empresa"}</strong><small>{user?.email}</small></div>
         </div>
-        <button type="button" className="sidebar-logout-button">
-          <ClientIcon name="logout" />
-          <span>Cerrar sesion</span>
+        <button type="button" className="sidebar-logout-button" onClick={() => { logout(); navigate("/portal-cliente/login", { replace: true }); }}>
+          <AppIcon name="logout" /><span>Cerrar sesion</span>
         </button>
       </aside>
 
-      <main className="client-main" id="inicio">
+      <main className="client-main">
         <header className="app-topbar">
-          <div>
-            <strong>Hola, Diego <span aria-hidden="true">👋</span></strong>
-            <span>Este es el resumen de tu facturacion y pagos.</span>
-          </div>
+          <div><strong>Hola, {displayName}</strong><span>Este es el resumen real de tu facturacion.</span></div>
           <div className="app-topbar__actions">
-            <span className="topbar-sync">Ultima actualizacion: hace 2 min</span>
-            <button type="button" className="secondary-button topbar-refresh-button">
-              <ClientIcon name="refresh" />
-              <span>Actualizar</span>
-            </button>
-            <button type="button" className="notification-button" aria-label="Notificaciones">
-              <ClientIcon name="bell" />
-              <span>2</span>
+            <span className="topbar-sync">{lastUpdatedAt ? `Actualizado ${lastUpdatedAt.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" })}` : "Sin actualizar"}</span>
+            <button type="button" className="secondary-button topbar-refresh-button" onClick={() => void loadDashboard()} disabled={isLoading}>
+              <AppIcon name="refresh" /><span>{isLoading ? "Actualizando..." : "Actualizar"}</span>
             </button>
           </div>
         </header>
 
-        <section className="client-kpi-grid">
+        {errorMessage ? (
+          <section className="client-success-card client-status-card--error" role="alert">
+            <AppIcon name="alert" /><div><strong>No pudimos cargar el resumen</strong><p>{errorMessage}</p></div>
+            <button type="button" className="secondary-button" onClick={() => void loadDashboard()}>Reintentar</button>
+          </section>
+        ) : null}
+
+        <section className="client-kpi-grid" aria-busy={isLoading}>
           {[
-            ["payments", "Pagos recibidos hoy", "$ 78.540", "+22% vs ayer", "green"],
-            ["invoice", "Facturas emitidas hoy", "24", "+18% vs ayer", "blue"],
-            ["clients", "Pendientes de emision", "3", "Vencen en 2 dias", "orange"],
-            ["account", "Estado de cuenta", "$ -15.430", "Saldo actual", "violet"],
+            ["payments", "Importe procesado", formatCurrency(payments?.totalAmount), "Todos los pagos", "green"],
+            ["invoice", "Procesados", String(payments?.complete ?? 0), "Flujo completado", "blue"],
+            ["clock", "Pendientes", String(payments?.pending ?? 0), "Requieren procesamiento", "orange"],
+            ["alert", "Con alertas", String(payments?.failed ?? 0), "Requieren revision", "violet"],
           ].map(([icon, label, value, detail, tone]) => (
             <article key={label} className={`client-kpi-card client-kpi-card--${tone}`}>
-              <span><ClientIcon name={icon as ClientIconName} /></span>
-              <p>{label}</p>
-              <strong>{value}</strong>
-              <small>{detail}</small>
+              <span><AppIcon name={icon as AppIconName} /></span><p>{label}</p>
+              <strong>{isLoading && !dashboard ? "--" : value}</strong><small>{detail}</small>
             </article>
           ))}
         </section>
 
-        <section className="client-success-card">
-          <span><ClientIcon name="check" /></span>
-          <div>
-            <strong>Todo funciona correctamente!</strong>
-            <p>No tienes alertas pendientes. La facturacion automatica esta activa.</p>
-          </div>
-          <button type="button" className="secondary-button">Ver integraciones</button>
-        </section>
+        {!errorMessage && !isLoading ? (
+          <section className={`client-success-card${payments?.failed ? " client-status-card--warning" : ""}`}>
+            <span><AppIcon name={payments?.failed ? "alert" : "check"} /></span>
+            <div><strong>{payments?.failed ? "Hay operaciones para revisar" : "No hay alertas de facturacion"}</strong><p>{payments?.total ? `${payments.total} pagos registrados para tu empresa.` : "Todavia no hay pagos para mostrar."}</p></div>
+          </section>
+        ) : null}
 
         <section className="client-table-card">
-          <div className="admin-section-heading">
-            <h2>Ultimas facturas emitidas</h2>
-            <a href="#inicio">Ver todas</a>
-          </div>
-          <div className="client-invoices-table">
-            <div className="client-invoices-table__head">
-              <span>Factura</span>
-              <span>Fecha</span>
-              <span>Cliente</span>
-              <span>Importe</span>
-              <span>Estado</span>
-              <span>Accion</span>
+          <div className="admin-section-heading"><h2>Resumen por estado</h2><span>{payments?.total ?? 0} pagos</span></div>
+          {payments && Object.keys(payments.statuses).length > 0 ? (
+            <div className="client-status-grid">
+              {Object.entries(payments.statuses).map(([status, item]) => (
+                <article key={status}><span>{status.replace(/_/g, " ")}</span><strong>{item.count}</strong><small>{formatCurrency(item.amount)}</small></article>
+              ))}
             </div>
-            {invoiceRows.map(([number, date, client, amount, status]) => (
-              <div key={number} className="client-invoices-table__row">
-                <strong>{number}</strong>
-                <span>{date}</span>
-                <span>{client}</span>
-                <span>{amount}</span>
-                <span><small className={`status-pill status-pill--${status === "Pagada" ? "success" : "warning"}`}>{status}</small></span>
-                <span><button type="button" className="icon-button"><ClientIcon name="download" /></button></span>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        <section className="client-bottom-grid">
-          <article className="client-list-card">
-            <div className="admin-section-heading">
-              <h2>Pagos recientes</h2>
-              <a href="#inicio">Ver todas</a>
-            </div>
-            {[
-              ["Pago recibido - Mercado Pago", "Hoy, 14:32", "$ 25.430"],
-              ["Pago recibido - Transferencia", "Hoy, 11:20", "$ 18.750"],
-              ["Pago recibido - Tarjeta", "Ayer, 16:45", "$ 12.340"],
-            ].map(([title, date, amount]) => (
-              <div key={title} className="client-payment-row">
-                <span><ClientIcon name="payments" /></span>
-                <div>
-                  <strong>{title}</strong>
-                  <small>{date}</small>
-                </div>
-                <div>
-                  <strong>{amount}</strong>
-                  <small className="status-pill status-pill--success">Acreditado</small>
-                </div>
-              </div>
-            ))}
-          </article>
-
-          <article className="client-list-card">
-            <div className="admin-section-heading">
-              <h2>Integraciones</h2>
-              <a href="#inicio">Ver todas</a>
-            </div>
-            {[
-              ["Mercado Pago", "Ultima consulta hace 1 min"],
-              ["ARCA", "Ultimo CAE hace 8 min"],
-              ["Google Drive", "Ultima subida hace 4 min"],
-              ["Google Sheets", "Ultima escritura hace 4 min"],
-            ].map(([name, detail]) => (
-              <div key={name} className="client-integration-row">
-                <strong>{name}</strong>
-                <small className="status-pill status-pill--success">Conectado</small>
-                <span>{detail}</span>
-              </div>
-            ))}
-          </article>
-        </section>
-
-        <section className="client-help-card">
-          <span><ClientIcon name="help" /></span>
-          <div>
-            <strong>Necesitas ayuda?</strong>
-            <p>Accede a nuestra base de conocimientos o contacta a soporte.</p>
-          </div>
-          <button type="button" className="secondary-button">Ir a ayuda</button>
-          <button type="button" className="secondary-button">Contactar soporte</button>
+          ) : <p className="client-empty-state">{isLoading ? "Cargando actividad..." : "No hay actividad para mostrar."}</p>}
         </section>
       </main>
     </div>
