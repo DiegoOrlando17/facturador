@@ -25,8 +25,14 @@ import { PaymentDetailPage } from "@/pages/PaymentDetailPage";
 import { SettingsPage } from "@/pages/SettingsPage";
 import { TenantDetailPage } from "@/pages/TenantDetailPage";
 import { AuditPage } from "@/pages/AuditPage";
+import { LandingPage } from "@/pages/LandingPage";
+import { RegisterPage } from "@/pages/RegisterPage";
+import { TutorialsPage } from "@/pages/TutorialsPage";
 
 export const router = createBrowserRouter([
+  { path: "/", element: <LandingPage /> },
+  { path: "/registro", element: <RegisterPage /> },
+  { path: "/tutoriales", element: <TutorialsPage /> },
   {
     path: "/login",
     element: <LoginPage />,
@@ -50,7 +56,7 @@ export const router = createBrowserRouter([
     }],
   },
   {
-    path: "/",
+    path: "/admin",
     element: <ProtectedLayout />,
     children: [
       {

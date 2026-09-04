@@ -386,6 +386,25 @@ Consecuencias:
 - `manualInvoice.worker.js` debe estar activo y validarse en homologacion;
 - los limites `manualInvoicesMonthly` se aplican cuando dejan de ser `null`.
 
+## D-022 - Alta publica sin conceder capacidades antes del cobro
+
+Estado: vigente
+
+Decision: crear el tenant, perfil, owner y suscripcion en una unica transaccion. El owner permanece deshabilitado hasta verificar el contacto y la suscripcion nace `PAST_DUE` con proveedor pendiente, por lo que no concede entitlements.
+
+Contexto: la landing y el onboarding pueden implementarse antes de elegir proveedor de cobro y transporte de email, pero una simulacion de pago o activacion anticipada habilitaria operaciones fiscales sin respaldo comercial.
+
+Alternativas consideradas: bloquear por completo el registro; activar una prueba gratis implicita; acoplar el alta a un proveedor todavia no elegido.
+
+Rationale: permite avanzar y probar el autoservicio sin inventar condiciones comerciales ni estados financieros.
+
+Consecuencias:
+
+- produccion no expone tokens de verificacion y requiere transporte de email antes de publicar el alta;
+- el checkout y los webhooks deben activar, poner en mora, cancelar o reactivar la suscripcion de forma idempotente;
+- el catalogo publico muestra los valores configurados en `Plan`, incluidos precios pendientes;
+- el panel admin se sirve bajo `/admin` y `/` queda reservado al sitio publico.
+
 ## Decisiones pendientes
 
 No estan aprobadas; deben resolverse antes de las fases que dependen de ellas.

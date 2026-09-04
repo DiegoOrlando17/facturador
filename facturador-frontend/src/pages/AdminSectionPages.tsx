@@ -608,7 +608,7 @@ export function ClientsSectionPage() {
                   </small>
                 </span>
                 <span>{formatDateTime(tenant.updatedAt ?? tenant.createdAt)}</span>
-                <Link to={`/tenants/${tenant.slug}`} className="section-mini-button">Ver</Link>
+                <Link to={`/admin/tenants/${tenant.slug}`} className="section-mini-button">Ver</Link>
               </div>
             );
           }) : (
@@ -777,7 +777,7 @@ export function BillingSectionPage() {
             <div key={payment.id} className="section-table__row">
               <span>{formatDateTime(payment.createdAt)}</span>
               <Link
-                to={`/payments/${payment.id}`}
+                to={`/admin/payments/${payment.id}`}
                 className="section-payment-link"
                 aria-label={`Abrir pago ${getPaymentTitle(payment)}`}
               >
@@ -791,7 +791,7 @@ export function BillingSectionPage() {
               <span>{formatCurrency(payment.amount)}</span>
               <span><StatusBadge tone={getPaymentStatusTone(payment.status)}>{getPaymentStageLabel(payment)}</StatusBadge></span>
               <span className={payment.error ? "section-danger-text" : ""}>{getPaymentStageDetail(payment)}</span>
-              <Link to={`/payments/${payment.id}`} className="section-mini-button">Abrir</Link>
+              <Link to={`/admin/payments/${payment.id}`} className="section-mini-button">Abrir</Link>
             </div>
           )) : (
             <div className="section-table__state">

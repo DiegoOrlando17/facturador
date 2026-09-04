@@ -20,7 +20,7 @@ export function LoginPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const state = location.state as LocationState | null;
-  const redirectTo = state?.from?.pathname ?? "/";
+  const redirectTo = state?.from?.pathname ?? "/admin";
 
   if (isBootstrapping) {
     return null;

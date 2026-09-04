@@ -52,6 +52,10 @@ Desde el detalle de un pago, un operador puede encolar una factura pendiente o s
 
 ## Portal del cliente
 
+El sitio publico vive en `/`: presenta el alcance, el catalogo vigente, preguntas frecuentes y contacto. `/registro` crea de forma transaccional el tenant, su perfil inicial, el usuario owner deshabilitado y una suscripcion `PAST_DUE`; `/tutoriales` publica las guias de puesta en marcha y el portal incluye un checklist guiado.
+
+La verificacion devuelve el token en desarrollo para poder probar el circuito local. En produccion no lo expone y debe conectarse un transporte de email antes de publicar el registro. El cobro recurrente no se simula: `GET /public/billing` informa que sigue pendiente de proveedor y una suscripcion solo concede capacidades al quedar `ACTIVE`.
+
 `/portal-cliente/login` permite ingresar con identificador de empresa, email y password de `TenantUser`. La sesion del cliente se almacena de forma independiente de la sesion administrativa y protege `/portal-cliente`.
 
 El dashboard inicial consume datos reales del tenant autenticado y muestra importes y pagos procesados, pendientes o con alertas. La seccion `Pagos y facturas` permite buscar y filtrar operaciones, abrir su detalle, revisar la trazabilidad, descargar el PDF cuando ARCA ya emitio el comprobante y exportar hasta 10.000 pagos filtrados en CSV.

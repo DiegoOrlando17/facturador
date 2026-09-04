@@ -207,7 +207,7 @@ export function PaymentDetailPage() {
     <main className="shell shell--app">
       <section className="panel detail-header">
         <div>
-          <Link to={payment ? `/tenants/${payment.tenant.slug}` : "/tenants"} className="eyebrow">
+          <Link to={payment ? `/admin/tenants/${payment.tenant.slug}` : "/admin/tenants"} className="eyebrow">
             Volver al tenant
           </Link>
           <h2>{payment ? `Pago ${payment.id}` : "Detalle del pago"}</h2>

@@ -439,7 +439,7 @@ export function TenantsPage() {
                       ? `${tenant.integrations.needsAttentionCount} integraciones necesitan atencion.`
                       : "Sin alertas visibles en integraciones."}
                   </span>
-                  <Link to={`/tenants/${tenant.slug}`} className="secondary-button tenant-card__link">
+                  <Link to={`/admin/tenants/${tenant.slug}`} className="secondary-button tenant-card__link">
                     Ver detalle
                   </Link>
                   <PermissionGate permission="tenants:delete">

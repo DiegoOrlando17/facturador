@@ -18,6 +18,7 @@ export function ClientOnboardingPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const canSubmit = user?.role === "owner" || user?.role === "admin";
+  const latestSubmission = items[0];
 
   const unauthorized = useCallback(() => { invalidateSession(); navigate("/portal-cliente/login", { replace: true }); }, [invalidateSession, navigate]);
   const load = useCallback(async () => {
@@ -43,7 +44,13 @@ export function ClientOnboardingPage() {
   return <main className="client-main client-onboarding-page">
     <header className="app-topbar"><div><strong>Onboarding</strong><span>Envia informacion inicial y consulta su revision.</span></div><button className="secondary-button" type="button" onClick={() => void load()}>Actualizar</button></header>
     {errorMessage ? <p className="form-error" role="alert">{errorMessage}</p> : null}
-    {canSubmit ? <form className="panel client-onboarding-form" onSubmit={(event) => void submit(event)}>
+    <section className="panel client-onboarding-checklist"><div className="section-subheading"><span className="eyebrow">Tu puesta en marcha</span><h2>Checklist guiado</h2><p>Completa estos pasos antes de comenzar a procesar ventas.</p></div><div className="onboarding-list">
+      <button className="onboarding-item" type="button" onClick={() => navigate("/portal-cliente/perfil-fiscal")}><span className="onboarding-item__mark">1</span><span><strong>Completar perfil fiscal</strong><small>Carga CUIT, condicion de IVA, domicilio y contacto.</small></span></button>
+      <button className="onboarding-item" type="button" onClick={() => navigate("/portal-cliente/integraciones")}><span className="onboarding-item__mark">2</span><span><strong>Conectar integraciones</strong><small>Configura Mercado Pago, ARCA y los destinos habilitados por tu plan.</small></span></button>
+      <a className="onboarding-item" href="#onboarding-form"><span className={`onboarding-item__mark${latestSubmission ? " onboarding-item__mark--complete" : ""}`}>{latestSubmission ? "✓" : "3"}</span><span><strong>Enviar configuracion a revision</strong><small>{latestSubmission ? `Ultimo envio: ${latestSubmission.status}.` : "Informa la fecha inicial y adjunta enlaces no sensibles."}</small></span></a>
+      <span className="onboarding-item"><span className={`onboarding-item__mark${latestSubmission?.status === "approved" ? " onboarding-item__mark--complete" : ""}`}>{latestSubmission?.status === "approved" ? "✓" : "4"}</span><span><strong>Recibir aprobacion</strong><small>El equipo valida la configuracion antes de habilitar la operacion.</small></span></span>
+    </div></section>
+    {canSubmit ? <form id="onboarding-form" className="panel client-onboarding-form" onSubmit={(event) => void submit(event)}>
       <div className="section-subheading"><h2>Nuevo envio</h2><p>No incluyas passwords, tokens ni certificados. Las credenciales se configuran por canales protegidos.</p></div>
       <div className="client-profile-form__grid">
         <label className="field"><span>Actividad comercial</span><input value={business.activity} onChange={(event) => setBusiness((value) => ({ ...value, activity: event.target.value }))} /></label>

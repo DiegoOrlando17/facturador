@@ -1232,7 +1232,7 @@ export function TenantDetailPage() {
       setSaveSuccessMessage(`Tenant ${updatedTenant.name} actualizado correctamente.`);
 
       if (updatedTenant.slug !== slug) {
-        navigate(`/tenants/${updatedTenant.slug}`, { replace: true });
+        navigate(`/admin/tenants/${updatedTenant.slug}`, { replace: true });
         return;
       }
 
@@ -2134,7 +2134,7 @@ export function TenantDetailPage() {
                         {payment.status === "complete" ? "Completado" : payment.status === "failed" ? "Error" : "Pendiente"}
                       </small>
                     </span>
-                    <Link to={`/payments/${payment.id}`} className="section-mini-button">Ver</Link>
+                    <Link to={`/admin/payments/${payment.id}`} className="section-mini-button">Ver</Link>
                   </div>
                 ))}
                 {overviewPayments.length === 0 ? (
@@ -2920,7 +2920,7 @@ export function TenantDetailPage() {
                           </a>
                         ) : null}
                         {payment.error ? <span className="payment-card__error">{payment.error}</span> : null}
-                        <Link to={`/payments/${payment.id}`}>Ver detalle</Link>
+                        <Link to={`/admin/payments/${payment.id}`}>Ver detalle</Link>
                       </div>
                     </article>
                   ))}

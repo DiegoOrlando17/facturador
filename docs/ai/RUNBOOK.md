@@ -2,7 +2,9 @@
 
 Ultima revision: 2026-08-26
 
-Estado: monorepo consolidado y validaciones estaticas correctas al 2026-08-26. PostgreSQL, Redis, migraciones, datos demo, API, workers, frontend, login admin y descarga PDF fueron validados manualmente con anterioridad. La validacion del portal cliente se difiere hasta implementar su frontend conectado a `/portal`; las integraciones externas mantienen sus validaciones especificas pendientes.
+Estado: monorepo consolidado. PostgreSQL, Redis, migraciones, datos demo, API, workers, frontend, login admin, portal cliente y descarga PDF fueron validados manualmente. Las integraciones externas mantienen sus validaciones especificas pendientes.
+
+Alta publica: aplicar la migracion `20260904120000_public_registration` antes de habilitar `/registro`. En desarrollo, la API devuelve el token de verificacion para probar el circuito local. En `NODE_ENV=production` nunca lo expone; el alta no debe publicarse hasta conectar un transporte de email. El proveedor de cobro recurrente sigue pendiente y las nuevas suscripciones se crean `PAST_DUE`, sin capacidades operativas.
 
 ## 1. Requisitos
 

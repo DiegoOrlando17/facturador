@@ -300,6 +300,7 @@ export async function deleteTenantWithData(slug, _options = {}) {
     deleted.subscriptions = (await tx.subscription.deleteMany({ where: { tenantId: tenant.id } })).count;
     deleted.tenantNotes = (await tx.tenantNote.deleteMany({ where: { tenantId: tenant.id } })).count;
     deleted.onboardingSubmissions = (await tx.tenantOnboardingSubmission.deleteMany({ where: { tenantId: tenant.id } })).count;
+    deleted.contactVerifications = (await tx.contactVerification.deleteMany({ where: { tenantId: tenant.id } })).count;
     deleted.auditLogs = (await tx.tenantAuditLog.deleteMany({ where: { tenantId: tenant.id } })).count;
     await tx.tenant.delete({ where: { id: tenant.id } });
     deleted.tenants = 1;

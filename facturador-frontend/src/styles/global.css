@@ -4656,3 +4656,30 @@ button.section-tab {
     padding: 18px;
   }
 }
+.marketing-page { min-height: 100vh; background: #f7f8f4; color: #18231e; }
+.marketing-nav { max-width: 1180px; margin: auto; padding: 24px; display: flex; align-items: center; justify-content: space-between; gap: 24px; }
+.marketing-nav > div, .marketing-actions, .marketing-footer { display: flex; align-items: center; gap: 18px; }
+.marketing-nav a, .marketing-footer a { color: inherit; text-decoration: none; }
+.marketing-brand { font-size: 1.3rem; font-weight: 800; }
+.marketing-hero { max-width: 1180px; margin: 40px auto 80px; padding: 56px 24px; display: grid; grid-template-columns: 1.5fr 0.8fr; gap: 54px; align-items: center; }
+.marketing-hero h1, .tutorial-hero h1 { max-width: 850px; margin: 12px 0 20px; font-size: clamp(2.6rem, 6vw, 5.4rem); line-height: .98; letter-spacing: -.055em; }
+.marketing-hero p, .tutorial-hero p { max-width: 680px; color: #526159; font-size: 1.16rem; }
+.marketing-hero aside { padding: 30px; border-radius: 24px; color: white; background: #174f3b; box-shadow: var(--shadow); }
+.marketing-hero aside li { margin: 18px 0; }
+.marketing-section, .tutorial-grid { max-width: 1180px; margin: 0 auto; padding: 72px 24px; }
+.marketing-section > h2 { max-width: 720px; font-size: clamp(2rem, 4vw, 3.4rem); line-height: 1.05; }
+.marketing-benefits, .marketing-plans, .tutorial-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+.marketing-benefits article, .marketing-plans article, .tutorial-grid article { padding: 28px; background: white; border: 1px solid #dde5df; border-radius: 20px; }
+.marketing-plans { grid-template-columns: repeat(4, 1fr); }
+.marketing-plans article { display: flex; flex-direction: column; gap: 10px; }
+.marketing-plans ul { flex: 1; padding-left: 20px; color: #526159; }
+.marketing-cta { margin: 50px auto; max-width: 1132px; padding: 52px; text-align: center; border-radius: 28px; background: #e0eee6; }
+.marketing-footer { max-width: 1180px; margin: auto; padding: 32px 24px; border-top: 1px solid #d8e0da; }
+.public-form-page { min-height: 100vh; display: grid; place-items: center; padding: 32px; background: #eef3ef; }
+.public-form-card { width: min(100%, 560px); padding: 36px; display: grid; gap: 18px; border-radius: 24px; background: white; box-shadow: var(--shadow); }
+.public-form-card > a { color: var(--primary); text-decoration: none; }
+.public-consent { display: flex; gap: 10px; align-items: flex-start; }
+.tutorial-hero { max-width: 1180px; margin: auto; padding: 72px 24px 20px; }
+.tutorial-grid { grid-template-columns: repeat(2, 1fr); }
+.tutorial-grid li { margin: 12px 0; }
+@media (max-width: 900px) { .marketing-hero, .marketing-benefits, .marketing-plans, .tutorial-grid { grid-template-columns: 1fr; } .marketing-nav > div { gap: 10px; } .marketing-nav > div > a:not(.primary-button) { display: none; } .marketing-hero { margin-top: 0; padding-top: 30px; } }

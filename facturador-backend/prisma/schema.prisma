@@ -131,6 +131,22 @@ model Tenant {
   notes                 TenantNote[]
   onboardingSubmissions TenantOnboardingSubmission[]
   profile               TenantProfile?
+  contactVerifications  ContactVerification[]
+}
+
+model ContactVerification {
+  id        BigInt   @id @default(autoincrement())
+  tenantId  BigInt
+  email     String
+  tokenHash String   @unique
+  expiresAt DateTime
+  verifiedAt DateTime?
+  createdAt DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId, email])
+  @@index([expiresAt])
 }
 
 model TenantProfile {

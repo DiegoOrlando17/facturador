@@ -72,7 +72,7 @@ export function AuditPage() {
                       <small>{formatDateTime(entry.createdAt)}</small>
                     </div>
                     <div>
-                      {entry.tenant ? <Link to={`/tenants/${entry.tenant.slug}`}>{entry.tenant.name}</Link> : <span>Sin tenant</span>}
+                      {entry.tenant ? <Link to={`/admin/tenants/${entry.tenant.slug}`}>{entry.tenant.name}</Link> : <span>Sin tenant</span>}
                       <span>{`${entry.entityType}${entry.entityId ? ` #${entry.entityId}` : ""}`}</span>
                     </div>
                     <details><summary>Ver cambios</summary><pre>{`Antes\n${formatJson(entry.before)}\n\nDespues\n${formatJson(entry.after)}`}</pre></details>

@@ -8,7 +8,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const location = useLocation();
   const [lastDashboardUpdate, setLastDashboardUpdate] = useState<Date | null>(null);
   const displayName = user?.name?.split(" ")[0] || user?.email?.split("@")[0] || "Diego";
-  const showTopbar = location.pathname === "/";
+  const showTopbar = location.pathname === "/admin";
 
   useEffect(() => {
     function handleDashboardUpdated(event: Event) {
@@ -30,7 +30,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   return (
     <div className="app-shell">
       <aside className="app-sidebar">
-        <Link to="/" className="brand-lockup">
+        <Link to="/admin" className="brand-lockup">
           <span className="app-logo" aria-hidden="true">
             <svg viewBox="0 0 48 56">
               <path d="M12 4h22l10 10v34a4 4 0 0 1-4 4H12a4 4 0 0 1-4-4V8a4 4 0 0 1 4-4Z" />
@@ -49,7 +49,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <nav className="app-nav" aria-label="Principal">
           <span className="app-nav__group">Operacion diaria</span>
           <NavLink
-            to="/"
+            to="/admin"
             end
             className={({ isActive }) => `app-nav__link${isActive ? " app-nav__link--active" : ""}`}
           >
@@ -57,35 +57,35 @@ export function AppShell({ children }: { children: ReactNode }) {
             <span>Inicio</span>
           </NavLink>
           <NavLink
-            to="/tenants"
+            to="/admin/tenants"
             className={({ isActive }) => `app-nav__link${isActive && !location.search.includes("attention=1") ? " app-nav__link--active" : ""}`}
           >
             <AppIcon name="clients" />
             <span>Clientes</span>
           </NavLink>
           <NavLink
-            to="/tenants?attention=1"
+            to="/admin/tenants?attention=1"
             className={({ isActive }) => `app-nav__link${isActive && location.search.includes("attention=1") ? " app-nav__link--active" : ""}`}
           >
             <AppIcon name="onboarding" />
             <span>Altas</span>
           </NavLink>
           <NavLink
-            to="/billing"
+            to="/admin/billing"
             className={({ isActive }) => `app-nav__link${isActive ? " app-nav__link--active" : ""}`}
           >
             <AppIcon name="invoice" />
             <span>Facturacion</span>
           </NavLink>
           <NavLink
-            to="/integrations"
+            to="/admin/integrations"
             className={({ isActive }) => `app-nav__link${isActive ? " app-nav__link--active" : ""}`}
           >
             <AppIcon name="integrations" />
             <span>Integraciones</span>
           </NavLink>
           <NavLink
-            to="/alerts"
+            to="/admin/alerts"
             className={({ isActive }) => `app-nav__link${isActive ? " app-nav__link--active" : ""}`}
           >
             <AppIcon name="bell" />
@@ -94,7 +94,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           </NavLink>
           <span className="app-nav__group">Administracion interna</span>
           <NavLink
-            to="/audit"
+            to="/admin/audit"
             className={({ isActive }) => `app-nav__link${isActive ? " app-nav__link--active" : ""}`}
           >
             <AppIcon name="shield" />
@@ -103,14 +103,14 @@ export function AppShell({ children }: { children: ReactNode }) {
           {user?.role === "SUPERADMIN" ? (
             <>
               <NavLink
-                to="/settings"
+                to="/admin/settings"
                 className={({ isActive }) => `app-nav__link${isActive ? " app-nav__link--active" : ""}`}
               >
                 <AppIcon name="settings" />
                 <span>Configuracion</span>
               </NavLink>
               <NavLink
-                to="/admins"
+                to="/admin/admins"
                 className={({ isActive }) => `app-nav__link${isActive ? " app-nav__link--active" : ""}`}
               >
                 <AppIcon name="admins" />

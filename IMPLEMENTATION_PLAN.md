@@ -60,7 +60,7 @@ Objetivo: poder modificar el sistema sin depender de supuestos heredados.
 - [x] Crear archivos de ejemplo de entorno sin secretos y validar las variables necesarias para el entorno local.
 - [x] Levantar PostgreSQL y Redis locales; aplicar migraciones y ejecutar seed/demo.
 - [x] Validar manualmente API, workers y panel admin en el entorno local.
-- [ ] Validar integralmente la API del portal junto con el portal cliente web cuando se implemente su conexion.
+- [x] Validar integralmente la API del portal junto con el portal cliente web; validacion manual confirmada por el usuario el 2026-09-04.
 - [x] Confirmar que documentos historicos siguen vigentes y clasificarlos en `docs/ai/DOCUMENT_STATUS.md` como fuentes vigentes, referencias tecnicas o referencias historicas.
 - [x] Retirar el codigo, endpoints, colas, configuracion y dependencias obsoletos de webhooks y Payway.
 - [x] Unificar backend, frontend y documentacion en un unico repositorio Git, sin gitlinks ni metadatos Git anidados.
@@ -128,7 +128,7 @@ Objetivo: reemplazar el prototipo estatico por una aplicacion funcional y respon
 - [x] Implementar modalidad con confirmacion y emision diferida.
 - [x] Permitir notas de credito para operaciones canceladas, con controles.
 - [x] Implementar facturacion manual segun plan.
-- [ ] Validar responsive, accesibilidad, estados vacios y errores.
+- [x] Validar responsive, accesibilidad, estados vacios y errores; validacion manual confirmada por el usuario el 2026-09-04.
 
 Aceptacion: un cliente puede completar onboarding, revisar ventas, operar lo permitido por su tier y descargar todo comprobante emitido; desde la tier 3 puede configurar opcionalmente su destino Drive/Sheets sin asistencia tecnica.
 
@@ -136,12 +136,12 @@ Aceptacion: un cliente puede completar onboarding, revisar ventas, operar lo per
 
 Objetivo: convertir el sistema operable en un producto contratable.
 
-- [ ] Construir landing publica con alcance, tiers, precios, FAQ y contacto.
-- [ ] Implementar registro, creacion de tenant y verificacion de identidad/contacto.
+- [x] Construir landing publica con alcance, tiers, precios configurables, FAQ y contacto.
+- [ ] Implementar registro, creacion de tenant y verificacion de identidad/contacto. El alta transaccional y la verificacion por token estan implementadas; falta transporte de email productivo.
 - [ ] Integrar debito automatico y sincronizacion segura del estado de suscripcion segun el mecanismo soportado por el proveedor elegido.
 - [ ] Aplicar alta, mora, cancelacion y reactivacion de forma segura.
-- [ ] Publicar tutoriales de Mercado Pago, ARCA, Drive/Sheets y uso del portal.
-- [ ] Incorporar checklist guiado de onboarding.
+- [x] Publicar tutoriales de Mercado Pago, ARCA, Drive/Sheets y uso del portal.
+- [x] Incorporar checklist guiado de onboarding.
 
 Aceptacion: un prospecto puede entender, contratar e iniciar el onboarding; el estado de cobro gobierna el acceso de manera auditable.
 
@@ -183,11 +183,11 @@ Aceptacion: los flujos mobile acordados funcionan en Android/iOS y respetan las 
 
 ## 6. Orden inmediato recomendado
 
-1. Definir nombres comerciales, precios y limites cuantitativos cuando exista la decision comercial.
-2. Iniciar Fase 2 certificando el nucleo MP -> ARCA con homologacion y recursos de prueba.
-3. Validar idempotencia, errores, reintentos y entregas PDF/Drive/Sheets.
-4. Validar el lock distribuido Redis al operar multiples replicas del scheduler.
-5. No iniciar OCR, landing de cobro o mobile hasta estabilizar el nucleo fiscal.
+1. Definir nombres comerciales, precios y limites cuantitativos.
+2. Elegir proveedor de cobro recurrente y transporte de email transaccional.
+3. Conectar checkout/webhooks, alta, mora, cancelacion y reactivacion con idempotencia.
+4. Validar el alta autoservicio completa en staging antes de habilitarla publicamente.
+5. No iniciar OCR o mobile hasta cerrar la operacion comercial y productiva.
 
 ## 7. Riesgos principales
 
