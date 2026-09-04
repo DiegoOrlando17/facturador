@@ -3,6 +3,7 @@ import { PrismaClient } from "@prisma/client";
 import { resolvePlanPolicy } from "../domain/planPolicy.js";
 import { normalizePublicRegistration } from "../domain/publicRegistration.js";
 import { hashPassword } from "../utils/password.js";
+import { isMercadoPagoBillingConfigured } from "./mercadoPagoBilling.service.js";
 
 const prisma = new PrismaClient();
 const VERIFICATION_TTL_MS = 24 * 60 * 60 * 1000;
@@ -36,7 +37,7 @@ export async function registerPublicTenant(payload, { exposeVerificationToken = 
     const tenant = await tx.tenant.create({ data: { name: data.businessName, slug: data.slug, status: "ACTIVE" } });
     await tx.tenantProfile.create({ data: { tenantId: tenant.id, tradeName: data.businessName, contactEmail: data.email, responsibleEmail: data.email } });
     await tx.tenantUser.create({ data: { tenantId: tenant.id, email: data.email, role: "owner", passwordHash, status: "DISABLED" } });
-    await tx.subscription.create({ data: { tenantId: tenant.id, planId: plan.id, status: "PAST_DUE", billingProvider: "PENDING_SELECTION" } });
+    await tx.subscription.create({ data: { tenantId: tenant.id, planId: plan.id, status: "PAST_DUE", billingProvider: "MERCADOPAGO" } });
     await tx.contactVerification.create({ data: { tenantId: tenant.id, email: data.email, tokenHash: tokenHash(token), expiresAt: new Date(Date.now() + VERIFICATION_TTL_MS) } });
     return tenant;
   });
@@ -57,5 +58,6 @@ export async function verifyPublicContact(token) {
 }
 
 export function getBillingAvailability() {
-  return { available: false, provider: null, reason: "El proveedor de cobro recurrente todavia no fue definido. La cuenta queda pendiente de activacion comercial." };
+  const available = isMercadoPagoBillingConfigured();
+  return { available, provider: "MERCADOPAGO", pricingCurrency: "USD", chargeCurrency: "ARS", exchangeRate: "BNA_BILLETE_VENDEDOR", reason: available ? null : "Falta configurar MP_BILLING_ACCESS_TOKEN." };
 }

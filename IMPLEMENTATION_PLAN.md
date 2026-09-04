@@ -41,9 +41,8 @@ Desde la tier inicial, todo comprobante emitido en ARCA debe poder descargarse c
 Estas definiciones deben cerrarse durante la Fase 1 y registrarse en `docs/ai/DECISIONS.md`:
 
 1. Politica detallada de confirmacion: vencimiento, aprobacion, rechazo y emision diferida; el scheduler automatico/programado ya fue definido en D-014.
-2. Flujo de cobro recurrente con Mercado Pago Suscripciones.
-3. Estrategia mobile: PWA primero o aplicaciones dedicadas.
-4. Proveedor OCR, formatos, retencion de archivos y revision humana obligatoria.
+2. Estrategia mobile: PWA primero o aplicaciones dedicadas.
+3. Proveedor OCR, formatos, retencion de archivos y revision humana obligatoria.
 
 ## 5. Camino de implementacion
 
@@ -137,8 +136,8 @@ Objetivo: convertir el sistema operable en un producto contratable.
 
 - [x] Construir landing publica con alcance, tiers, precios configurables, FAQ y contacto.
 - [ ] Implementar registro, creacion de tenant y verificacion de identidad/contacto. El alta transaccional y la verificacion por token estan implementadas; falta transporte de email productivo.
-- [ ] Integrar debito automatico y sincronizacion segura del estado de suscripcion segun el mecanismo soportado por el proveedor elegido.
-- [ ] Aplicar alta, mora, cancelacion y reactivacion de forma segura.
+- [x] Integrar Mercado Pago Suscripciones mediante checkout alojado y sincronizacion consultada contra la API ante webhooks; precios USD convertidos a ARS con vendedor billete BNA.
+- [x] Aplicar alta, mora, pausa, cancelacion y reactivacion de forma segura; falta certificacion con credenciales de prueba y staging.
 - [x] Publicar tutoriales de Mercado Pago, ARCA, Drive/Sheets y uso del portal.
 - [x] Incorporar checklist guiado de onboarding.
 
@@ -183,10 +182,9 @@ Aceptacion: los flujos mobile acordados funcionan en Android/iOS y respetan las 
 ## 6. Orden inmediato recomendado
 
 1. Definir transporte de email transaccional.
-2. Crear y vincular los cuatro planes en Mercado Pago Suscripciones.
-3. Conectar checkout/webhooks, alta, mora, cancelacion y reactivacion con idempotencia.
-4. Validar el alta autoservicio completa en staging antes de habilitarla publicamente.
-5. No iniciar OCR o mobile hasta cerrar la operacion comercial y productiva.
+2. Configurar credenciales de prueba y webhook de Mercado Pago Suscripciones.
+3. Validar alta, mora, pausa, cancelacion, reactivacion y actualizacion mensual de importe en staging.
+4. No iniciar OCR o mobile hasta cerrar la operacion comercial y productiva.
 
 ## 7. Riesgos principales
 

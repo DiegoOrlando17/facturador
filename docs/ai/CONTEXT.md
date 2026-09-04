@@ -70,7 +70,7 @@ El comando `invoice:test-flow` permite crear un pago sintetico en PostgreSQL loc
 - Portal API: login, dashboard, pagos, exportacion, PDF, reportes, integraciones y onboarding.
 - Portal web: conectado a `/portal`; sus flujos y validacion manual de responsive, accesibilidad, estados vacios y errores fueron confirmados el 2026-09-04.
 - Nucleo Mercado Pago/ARCA/PDF/Drive/Sheets: happy path validado manualmente con el tenant `fiebre` el 2026-08-26; faltan escenarios integrales de error, reintento y concurrencia.
-- Landing, catalogo publico, alta transaccional, verificacion por token, tutoriales y checklist guiado: implementados. Falta transporte productivo de email y la integracion de cobro recurrente; OCR y mobile siguen pendientes.
+- Landing, catalogo publico, alta transaccional, verificacion por token, tutoriales y checklist guiado: implementados. El cobro recurrente usa Mercado Pago Suscripciones en ARS, convirtiendo precios USD con vendedor billete BNA y sincronizando estados mediante consulta API ante webhooks. Falta transporte productivo de email y certificacion de billing en staging; OCR y mobile siguen pendientes.
 - Facturacion con confirmacion y manual: implementadas en portal mediante `Invoice` separado, permisos y entitlements. La confirmacion puede emitir inmediatamente o programar hasta 30 dias; la factura manual no crea pagos sinteticos y usa un worker propio. Falta certificar integralmente estos flujos y las notas de credito en homologacion.
 - Webhooks de Mercado Pago y Payway: retirados del codigo y fuera de alcance.
 

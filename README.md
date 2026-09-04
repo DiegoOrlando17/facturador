@@ -56,7 +56,7 @@ Desde el detalle de un pago, un operador puede encolar una factura pendiente o s
 
 El sitio publico vive en `/`: presenta el alcance, el catalogo vigente, preguntas frecuentes y contacto. `/registro` crea de forma transaccional el tenant, su perfil inicial, el usuario owner deshabilitado y una suscripcion `PAST_DUE`; `/tutoriales` publica las guias de puesta en marcha y el portal incluye un checklist guiado.
 
-La verificacion devuelve el token en desarrollo para poder probar el circuito local. En produccion no lo expone y debe conectarse un transporte de email antes de publicar el registro. El cobro recurrente no se simula: `GET /public/billing` informa que sigue pendiente de proveedor y una suscripcion solo concede capacidades al quedar `ACTIVE`.
+La verificacion devuelve el token en desarrollo para poder probar el circuito local. En produccion no lo expone y debe conectarse un transporte de email antes de publicar el registro. El cobro recurrente usa Mercado Pago Suscripciones: los precios USD se convierten a ARS con vendedor billete BNA y una suscripcion solo concede capacidades al quedar `ACTIVE`.
 
 `/portal-cliente/login` permite ingresar con identificador de empresa, email y password de `TenantUser`. La sesion del cliente se almacena de forma independiente de la sesion administrativa y protege `/portal-cliente`.
 

@@ -10,6 +10,7 @@ const navigation: Array<{ label: string; icon: AppIconName; to?: string }> = [
   { label: "Datos fiscales", icon: "tax", to: "/portal-cliente/perfil-fiscal" },
   { label: "Integraciones", icon: "integrations", to: "/portal-cliente/integraciones" },
   { label: "Onboarding", icon: "onboarding", to: "/portal-cliente/onboarding" },
+  { label: "Plan y suscripcion", icon: "invoice", to: "/portal-cliente/suscripcion" },
 ];
 
 export function ClientPortalLayout() {

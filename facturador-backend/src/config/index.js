@@ -17,6 +17,13 @@ export const config = {
     POS_ID: process.env.MP_POS_ID
   },
 
+  BILLING: {
+    MP_ACCESS_TOKEN: process.env.MP_BILLING_ACCESS_TOKEN,
+    MP_API_URL: process.env.MP_BILLING_API_URL || "https://api.mercadopago.com",
+    BACK_URL: process.env.BILLING_BACK_URL || "http://localhost:5173/portal-cliente",
+    BNA_URL: process.env.BNA_EXCHANGE_RATE_URL || "https://www.bna.com.ar/Personas",
+  },
+
   AFIP: {
     TRA_B64: process.env.AFIP_TRA_B64,
     TRACMS_B64: process.env.AFIP_TRACMS_B64,

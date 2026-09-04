@@ -12,10 +12,10 @@ import {
 const policy = resolvePlanPolicy(PLAN_CATALOG[0]);
 
 test("realtime respeta el intervalo minimo", () => {
-  const schedule = normalizeTenantSchedule({ POLLING_MODE: "realtime", POLLING_INTERVAL_MS: 5000 }, policy);
+  const schedule = normalizeTenantSchedule({ POLLING_MODE: "realtime", POLLING_INTERVAL_MS: 15000 }, policy);
   const first = evaluateTenantSchedule(schedule, {}, DateTime.fromISO("2026-08-22T12:00:00Z"));
-  const early = evaluateTenantSchedule(schedule, first.runtime, DateTime.fromISO("2026-08-22T12:00:04Z"));
-  const due = evaluateTenantSchedule(schedule, first.runtime, DateTime.fromISO("2026-08-22T12:00:05Z"));
+  const early = evaluateTenantSchedule(schedule, first.runtime, DateTime.fromISO("2026-08-22T12:00:14Z"));
+  const due = evaluateTenantSchedule(schedule, first.runtime, DateTime.fromISO("2026-08-22T12:00:15Z"));
 
   assert.equal(first.shouldRun, true);
   assert.match(first.slotKey, /^realtime\|\d+$/);

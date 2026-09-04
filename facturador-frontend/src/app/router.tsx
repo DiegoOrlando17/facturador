@@ -28,6 +28,7 @@ import { AuditPage } from "@/pages/AuditPage";
 import { LandingPage } from "@/pages/LandingPage";
 import { RegisterPage } from "@/pages/RegisterPage";
 import { TutorialsPage } from "@/pages/TutorialsPage";
+import { ClientSubscriptionPage } from "@/pages/ClientSubscriptionPage";
 
 export const router = createBrowserRouter([
   { path: "/", element: <LandingPage /> },
@@ -52,6 +53,7 @@ export const router = createBrowserRouter([
         { path: "perfil-fiscal", element: <ClientFiscalProfilePage /> },
         { path: "onboarding", element: <ClientOnboardingPage /> },
         { path: "comprobantes", element: <ClientInvoicesPage /> },
+        { path: "suscripcion", element: <ClientSubscriptionPage /> },
       ],
     }],
   },

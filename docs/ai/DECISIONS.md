@@ -423,7 +423,8 @@ Consecuencias:
 - Inteligente incluye hasta 500 documentos OCR mensuales;
 - realtime aplica un intervalo tecnico minimo de 15 segundos;
 - los consumos extraordinarios se resolveran mediante oferta personalizada y futura politica de uso razonable;
-- deben crearse y persistirse los IDs de los cuatro planes externos de Mercado Pago.
+- cada alta crea un `preapproval` sin plan asociado para conservar `external_reference`, precio convertido y trazabilidad por tenant;
+- Mercado Pago cobra en ARS al vendedor billete BNA vigente al crear el checkout; tras cada pago aprobado se actualiza el importe del ciclo siguiente con una nueva cotizacion.
 
 ## Decisiones pendientes
 
@@ -431,7 +432,6 @@ No estan aprobadas; deben resolverse antes de las fases que dependen de ellas.
 
 | ID | Pregunta | Bloquea |
 | --- | --- | --- |
-| P-005 | Contrato final de checkout y webhooks de Mercado Pago Suscripciones | Registro y suscripciones comerciales |
 | P-006 | PWA versus apps dedicadas y alcance de cada app | Mobile |
 | P-007 | Proveedor OCR, formatos, limites y retencion | OCR |
 | P-009 | Storage productivo de PDFs y documentos | Produccion, OCR y backups |

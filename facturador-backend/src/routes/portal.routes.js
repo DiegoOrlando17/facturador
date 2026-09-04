@@ -31,6 +31,7 @@ import { mergeGoogleTenantIntegrationConfig } from "../services/tenantGoogle.ser
 import { getTenantSubscriptionPolicy } from "../services/subscriptionPolicy.service.js";
 import { ENTITLEMENTS, hasEntitlement } from "../domain/planPolicy.js";
 import { cancelTenantInvoice, confirmTenantInvoice, createManualTenantInvoice, getTenantInvoice, getTenantInvoiceSettings, listTenantInvoices, updateTenantInvoiceSettings } from "../services/tenantInvoice.service.js";
+import { changeMercadoPagoSubscriptionStatus, createMercadoPagoCheckout, getTenantBillingSubscription } from "../services/mercadoPagoBilling.service.js";
 
 const router = Router();
 const TESTABLE_PROVIDERS = new Set(["MERCADOPAGO", "AFIP", "DRIVE", "SHEETS"]);
@@ -246,6 +247,10 @@ router.get("/subscription", async (req, res) => {
     return res.status(400).json({ error: error.message || "No se pudo obtener la suscripcion" });
   }
 });
+
+router.get("/subscription/billing", async (req, res) => { try { return res.json(normalizeJsonBigInts(await getTenantBillingSubscription(req.tenantAuth.tenantId))); } catch (error) { return res.status(400).json({ error: error.message || "No se pudo obtener la suscripcion" }); } });
+router.post("/subscription/checkout", requireTenantPermission(TENANT_PERMISSIONS.MANAGE_PROFILE), async (req, res) => { try { return res.status(201).json(normalizeJsonBigInts(await createMercadoPagoCheckout(req.tenantAuth.tenantId))); } catch (error) { return res.status(400).json({ error: error.message || "No se pudo iniciar el checkout" }); } });
+router.post("/subscription/:action", requireTenantPermission(TENANT_PERMISSIONS.MANAGE_PROFILE), async (req, res) => { try { return res.json(normalizeJsonBigInts(await changeMercadoPagoSubscriptionStatus(req.tenantAuth.tenantId, req.params.action))); } catch (error) { return res.status(400).json({ error: error.message || "No se pudo actualizar la suscripcion" }); } });
 
 router.get("/profile", async (req, res) => {
   try {
