@@ -22,6 +22,17 @@ test("los limites comerciales indefinidos no se inventan", () => {
   const policy = resolvePlanPolicy(PLAN_CATALOG[0]);
   assert.equal(policy.limits.monthlyInvoices, null);
   assert.equal(policy.processing.maxRunsPerDay, null);
+  assert.equal(policy.processing.minRealtimeIntervalMs, 15000);
+  assert.equal(resolvePlanPolicy(PLAN_CATALOG[3]).limits.ocrDocumentsMonthly, 500);
+});
+
+test("el catalogo publica nombres y precios mensuales en USD", () => {
+  assert.deepEqual(PLAN_CATALOG.map(({ name, price, currency, billingCycle }) => ({ name, price, currency, billingCycle })), [
+    { name: "Esencial", price: 50, currency: "USD", billingCycle: "monthly" },
+    { name: "Control", price: 75, currency: "USD", billingCycle: "monthly" },
+    { name: "Profesional", price: 100, currency: "USD", billingCycle: "monthly" },
+    { name: "Inteligente", price: 125, currency: "USD", billingCycle: "monthly" },
+  ]);
 });
 
 test("acepta featuresJson plano heredado", () => {

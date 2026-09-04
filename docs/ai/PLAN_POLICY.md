@@ -29,7 +29,7 @@ Ultima revision: 2026-08-22
   "processing": {
     "allowedModes": ["realtime", "scheduled"],
     "defaultMode": "realtime",
-    "minRealtimeIntervalMs": null,
+    "minRealtimeIntervalMs": 15000,
     "maxRunsPerDay": null
   }
 }
@@ -44,7 +44,7 @@ Ultima revision: 2026-08-22
 3. El resolver acepta temporalmente el JSON plano anterior y los planes heredados `A/B`.
 4. Nuevas verificaciones deben usar `resolvePlanPolicy` y `hasEntitlement`; no deben leer claves de `featuresJson` directamente.
 5. Antes de ejecutar un modo, el scheduler debe comprobar `processing.allowedModes` y sus limites configurados.
-6. Los precios y valores cuantitativos permanecen pendientes de definicion comercial.
+6. Los planes mensuales son Esencial USD 50, Control USD 75, Profesional USD 100 e Inteligente USD 125. Los volumenes generales permanecen sin limite (`null`); Inteligente admite 500 documentos OCR mensuales y todos los tiers aplican un intervalo realtime minimo de 15 segundos.
 7. La confirmacion del cliente no es un modo de polling; se controla mediante el entitlement `clientApproval` y el estado `Invoice.PENDING_CONFIRMATION`.
 
 ## Sincronizacion

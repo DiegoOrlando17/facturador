@@ -40,11 +40,10 @@ Desde la tier inicial, todo comprobante emitido en ARCA debe poder descargarse c
 
 Estas definiciones deben cerrarse durante la Fase 1 y registrarse en `docs/ai/DECISIONS.md`:
 
-1. Nombres comerciales, precios y limites cuantitativos de los tiers. La matriz funcional acumulativa ya esta materializada en `planCatalog.js`, preservando PDF descargable como capacidad inicial e integracion opcional Drive/Sheets desde la tier 3.
-2. Politica detallada de confirmacion: vencimiento, aprobacion, rechazo y emision diferida; el scheduler automatico/programado ya fue definido en D-014.
-3. Proveedor y flujo de cobro recurrente para las suscripciones.
-4. Estrategia mobile: PWA primero o aplicaciones dedicadas.
-5. Proveedor OCR, formatos, retencion de archivos y revision humana obligatoria.
+1. Politica detallada de confirmacion: vencimiento, aprobacion, rechazo y emision diferida; el scheduler automatico/programado ya fue definido en D-014.
+2. Flujo de cobro recurrente con Mercado Pago Suscripciones.
+3. Estrategia mobile: PWA primero o aplicaciones dedicadas.
+4. Proveedor OCR, formatos, retencion de archivos y revision humana obligatoria.
 
 ## 5. Camino de implementacion
 
@@ -73,7 +72,7 @@ Objetivo: cerrar las reglas que condicionan el resto del producto.
 
 - [x] Definir catalogo tecnico y matriz acumulativa de cuatro tiers.
 - [x] Establecer la descarga PDF como entitlement base y la configuracion opcional de Drive/Sheets como entitlement de la tier 3 en adelante.
-- [ ] Definir nombres comerciales, precios y limites cuantitativos.
+- [x] Definir nombres comerciales, precios y limites cuantitativos: Esencial USD 50, Control USD 75, Profesional USD 100 e Inteligente USD 125 por mes; sin limites generales, OCR 500 documentos/mes y realtime minimo 15 segundos.
 - [x] Modelar entitlements, limites y configuracion de procesamiento por suscripcion mediante la politica versionada documentada en `docs/ai/PLAN_POLICY.md`.
 - [x] Definir y crear de forma aditiva el dominio `Payment` / `Invoice` / credit note / document.
 - [x] Adaptar workers, servicios y APIs al nuevo dominio, validar el flujo integral y retirar los campos fiscales duplicados de `Payment` manteniendo el contrato compatible.
@@ -183,8 +182,8 @@ Aceptacion: los flujos mobile acordados funcionan en Android/iOS y respetan las 
 
 ## 6. Orden inmediato recomendado
 
-1. Definir nombres comerciales, precios y limites cuantitativos.
-2. Elegir proveedor de cobro recurrente y transporte de email transaccional.
+1. Definir transporte de email transaccional.
+2. Crear y vincular los cuatro planes en Mercado Pago Suscripciones.
 3. Conectar checkout/webhooks, alta, mora, cancelacion y reactivacion con idempotencia.
 4. Validar el alta autoservicio completa en staging antes de habilitarla publicamente.
 5. No iniciar OCR o mobile hasta cerrar la operacion comercial y productiva.

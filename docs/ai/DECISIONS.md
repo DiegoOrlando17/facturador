@@ -405,14 +405,33 @@ Consecuencias:
 - el catalogo publico muestra los valores configurados en `Plan`, incluidos precios pendientes;
 - el panel admin se sirve bajo `/admin` y `/` queda reservado al sitio publico.
 
+## D-023 - Catalogo comercial por funcionalidades y Mercado Pago Suscripciones
+
+Estado: vigente
+
+Decision: ofrecer Esencial (USD 50), Control (USD 75), Profesional (USD 100) e Inteligente (USD 125), con facturacion mensual mediante Mercado Pago Suscripciones. Los planes se diferencian por funcionalidades, no por volumen general.
+
+Contexto: el costo marginal inicial de los comprobantes es bajo y todavia no existe evidencia operativa que justifique limites comerciales complejos.
+
+Alternativas consideradas: limites crecientes de comprobantes y usuarios; precios en ARS; cobro manual.
+
+Rationale: simplifica la propuesta comercial y permite medir consumo real antes de introducir restricciones. Mercado Pago soporta recurrencia mensual con tarjeta para Argentina.
+
+Consecuencias:
+
+- comprobantes, usuarios y facturas manuales quedan sin limite comercial inicial;
+- Inteligente incluye hasta 500 documentos OCR mensuales;
+- realtime aplica un intervalo tecnico minimo de 15 segundos;
+- los consumos extraordinarios se resolveran mediante oferta personalizada y futura politica de uso razonable;
+- deben crearse y persistirse los IDs de los cuatro planes externos de Mercado Pago.
+
 ## Decisiones pendientes
 
 No estan aprobadas; deben resolverse antes de las fases que dependen de ellas.
 
 | ID | Pregunta | Bloquea |
 | --- | --- | --- |
-| P-001 | Nombres comerciales, precios y limites cuantitativos de `TIER_1` a `TIER_4`; la matriz funcional acumulativa ya esta definida en `planCatalog.js` | Landing y cobro |
-| P-005 | Proveedor de debito/cobro recurrente | Registro y suscripciones comerciales |
+| P-005 | Contrato final de checkout y webhooks de Mercado Pago Suscripciones | Registro y suscripciones comerciales |
 | P-006 | PWA versus apps dedicadas y alcance de cada app | Mobile |
 | P-007 | Proveedor OCR, formatos, limites y retencion | OCR |
 | P-009 | Storage productivo de PDFs y documentos | Produccion, OCR y backups |

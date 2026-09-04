@@ -29,26 +29,26 @@ const tier4Features = {
 export const PLAN_CATALOG = [
   {
     code: "TIER_1",
-    name: "Tier 1",
+    name: "Esencial",
     description: "Facturacion automatica o programada desde Mercado Pago POS, portal cliente y PDF bajo demanda.",
     features: baseFeatures,
   },
   {
     code: "TIER_2",
-    name: "Tier 2",
-    description: "Incluye Tier 1, confirmacion del cliente, emision diferida y notas de credito.",
+    name: "Control",
+    description: "Incluye Esencial, confirmacion del cliente, emision diferida y notas de credito.",
     features: tier2Features,
   },
   {
     code: "TIER_3",
-    name: "Tier 3",
-    description: "Incluye Tier 2, facturacion manual e integracion opcional con Google Drive y Sheets.",
+    name: "Profesional",
+    description: "Incluye Control, facturacion manual e integracion opcional con Google Drive y Sheets.",
     features: tier3Features,
   },
   {
     code: "TIER_4",
-    name: "Tier 4",
-    description: "Incluye Tier 3 y generacion asistida por OCR desde documentos.",
+    name: "Inteligente",
+    description: "Incluye Profesional y generacion asistida por OCR desde documentos.",
     features: tier4Features,
   },
 ].map((plan, index) => {
@@ -62,20 +62,20 @@ export const PLAN_CATALOG = [
       monthlyInvoices: null,
       tenantUsers: null,
       manualInvoicesMonthly: null,
-      ocrDocumentsMonthly: null,
+      ocrDocumentsMonthly: tier === 4 ? 500 : null,
     },
     processing: {
       allowedModes,
       defaultMode: "realtime",
-      minRealtimeIntervalMs: null,
+      minRealtimeIntervalMs: 15000,
       maxRunsPerDay: null,
     },
   });
 
   return {
     ...plan,
-    price: null,
-    currency: "ARS",
+    price: [50, 75, 100, 125][index],
+    currency: "USD",
     billingCycle: "monthly",
     status: "ACTIVE",
     featuresJson: JSON.stringify(policy, null, 2),

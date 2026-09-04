@@ -38,6 +38,8 @@ La configuracion completa, las variables de entorno y las precauciones para inte
 
 ## Administracion de planes
 
+El catalogo base contiene cuatro planes mensuales: Esencial (USD 50), Control (USD 75), Profesional (USD 100) e Inteligente (USD 125). Se diferencian por funcionalidades; los volumenes generales no tienen limite comercial inicial. Inteligente admite 500 documentos OCR por mes y el procesamiento realtime aplica un minimo de 15 segundos.
+
 El panel `Configuracion` permite a `SUPERADMIN` crear y editar planes, precio, moneda, ciclo, estado, servicios habilitados y limites opcionales. Dejar un limite vacio conserva el valor comercial como no definido.
 
 El panel de administradores permite asignar roles, activar o desactivar cuentas y restablecer passwords. Cada administrador puede cambiar su propia password desde `Mi cuenta`, confirmando primero la actual.

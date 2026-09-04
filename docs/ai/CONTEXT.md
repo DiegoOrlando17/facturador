@@ -11,7 +11,7 @@ Facturador es un SaaS multitenant argentino para emitir comprobantes en ARCA a p
 3. comprobantes manuales;
 4. creacion asistida por OCR desde archivos.
 
-El alcance completo tambien incluye panel admin web/mobile, portal cliente web/mobile, landing, registro, debito automatico y tutoriales. Existen cuatro planes tecnicos `TIER_1` a `TIER_4` con entitlements acumulativos; sus precios y limites cuantitativos aun no estan definidos.
+El alcance completo tambien incluye panel admin web/mobile, portal cliente web/mobile, landing, registro, debito automatico y tutoriales. Los planes acumulativos son Esencial (USD 50), Control (USD 75), Profesional (USD 100) e Inteligente (USD 125), mensuales. No tienen limites generales de volumen; Inteligente incluye hasta 500 documentos OCR por mes y el polling realtime respeta un minimo de 15 segundos.
 
 Todas las tiers incluyen la descarga desde el portal del PDF de cada comprobante emitido en ARCA. A partir de la tier 3 se ofrece una integracion opcional con Google del cliente: una carpeta de Drive para los PDF facturados y una planilla de Sheets para registrar el estado de todos los pagos procesados.
 

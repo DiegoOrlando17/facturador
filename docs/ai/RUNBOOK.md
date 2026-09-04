@@ -192,7 +192,7 @@ Sincronizar el catalogo vigente de planes sin eliminar planes ni reasignar tenan
 npm run plans:sync
 ```
 
-El comando crea o actualiza `TIER_1` a `TIER_4`, es idempotente y deja los precios en `null` hasta su definicion comercial.
+El comando crea o actualiza `TIER_1` a `TIER_4`, es idempotente y sincroniza nombres, precios mensuales en USD y la politica comercial vigente. Revisar el cambio antes de ejecutarlo en un ambiente compartido.
 
 Antes de usar scripts administrativos, revisar sus argumentos y apuntar explicitamente a la base correcta. `tenant:bootstrap` y `mp:reset-from-checkpoint` modifican estado y requieren backup/checkpoint y validacion del tenant objetivo.
 
