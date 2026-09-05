@@ -4,6 +4,7 @@ import { resolvePlanPolicy } from "../domain/planPolicy.js";
 import { normalizePublicRegistration } from "../domain/publicRegistration.js";
 import { hashPassword } from "../utils/password.js";
 import { isMercadoPagoBillingConfigured } from "./mercadoPagoBilling.service.js";
+import { sendVerificationEmail } from "./email.service.js";
 
 const prisma = new PrismaClient();
 const VERIFICATION_TTL_MS = 24 * 60 * 60 * 1000;
@@ -42,7 +43,25 @@ export async function registerPublicTenant(payload, { exposeVerificationToken = 
     return tenant;
   });
 
-  return { tenantSlug: result.slug, email: data.email, verificationRequired: true, billingStatus: "provider_pending", ...(exposeVerificationToken ? { verificationToken: token } : {}) };
+  let emailDelivery;
+  try { emailDelivery = await sendVerificationEmail({ to: data.email, businessName: data.businessName, token }); }
+  catch (error) { emailDelivery = { sent: false, reason: error.message }; }
+  return { tenantSlug: result.slug, email: data.email, verificationRequired: true, emailSent: emailDelivery.sent, billingStatus: "provider_pending", ...(exposeVerificationToken ? { verificationToken: token } : {}) };
+}
+
+export async function resendPublicContactVerification(email, { exposeVerificationToken = process.env.NODE_ENV !== "production" } = {}) {
+  const normalizedEmail = String(email || "").trim().toLowerCase();
+  const user = await prisma.tenantUser.findFirst({ where: { email: normalizedEmail, status: "DISABLED" }, include: { tenant: true } });
+  if (!user) return { accepted: true };
+  const token = crypto.randomBytes(32).toString("base64url");
+  await prisma.$transaction([
+    prisma.contactVerification.updateMany({ where: { tenantId: user.tenantId, email: normalizedEmail, verifiedAt: null }, data: { expiresAt: new Date(0) } }),
+    prisma.contactVerification.create({ data: { tenantId: user.tenantId, email: normalizedEmail, tokenHash: tokenHash(token), expiresAt: new Date(Date.now() + VERIFICATION_TTL_MS) } }),
+  ]);
+  let delivery;
+  try { delivery = await sendVerificationEmail({ to: normalizedEmail, businessName: user.tenant.name, token }); }
+  catch { delivery = { sent: false }; }
+  return { accepted: true, emailSent: delivery.sent, ...(exposeVerificationToken ? { verificationToken: token } : {}) };
 }
 
 export async function verifyPublicContact(token) {

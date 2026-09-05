@@ -29,11 +29,13 @@ import { LandingPage } from "@/pages/LandingPage";
 import { RegisterPage } from "@/pages/RegisterPage";
 import { TutorialsPage } from "@/pages/TutorialsPage";
 import { ClientSubscriptionPage } from "@/pages/ClientSubscriptionPage";
+import { VerifyEmailPage } from "@/pages/VerifyEmailPage";
 
 export const router = createBrowserRouter([
   { path: "/", element: <LandingPage /> },
   { path: "/registro", element: <RegisterPage /> },
   { path: "/tutoriales", element: <TutorialsPage /> },
+  { path: "/verificar-email", element: <VerifyEmailPage /> },
   {
     path: "/login",
     element: <LoginPage />,

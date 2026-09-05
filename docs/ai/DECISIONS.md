@@ -426,6 +426,20 @@ Consecuencias:
 - cada alta crea un `preapproval` sin plan asociado para conservar `external_reference`, precio convertido y trazabilidad por tenant;
 - Mercado Pago cobra en ARS al vendedor billete BNA vigente al crear el checkout; tras cada pago aprobado se actualiza el importe del ciclo siguiente con una nueva cotizacion.
 
+## D-024 - Resend para verificacion de contacto
+
+Estado: vigente
+
+Decision: enviar la verificacion inicial y sus reenvios mediante la API HTTP de Resend, usando enlaces de un solo uso con vencimiento de 24 horas.
+
+Contexto: el owner no puede acceder antes de validar su email y el alta productiva no debe exponer tokens en respuestas.
+
+Alternativas consideradas: SMTP directo, Amazon SES y verificacion manual.
+
+Rationale: Resend ofrece una API pequeña, idempotencia y verificacion de dominio sin agregar una dependencia al backend.
+
+Consecuencias: produccion requiere `RESEND_API_KEY`, `EMAIL_FROM` y `PUBLIC_APP_URL`; SPF y DKIM deben estar verificados; una falla de entrega no revierte el tenant ya creado y el usuario puede solicitar reenvio sin revelar si otra cuenta existe.
+
 ## Decisiones pendientes
 
 No estan aprobadas; deben resolverse antes de las fases que dependen de ellas.

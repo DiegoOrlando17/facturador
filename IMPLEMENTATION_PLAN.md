@@ -135,7 +135,7 @@ Aceptacion: un cliente puede completar onboarding, revisar ventas, operar lo per
 Objetivo: convertir el sistema operable en un producto contratable.
 
 - [x] Construir landing publica con alcance, tiers, precios configurables, FAQ y contacto.
-- [ ] Implementar registro, creacion de tenant y verificacion de identidad/contacto. El alta transaccional y la verificacion por token estan implementadas; falta transporte de email productivo.
+- [x] Implementar registro, creacion de tenant y verificacion de contacto mediante enlace enviado por Resend, con reenvio limitado y token de 24 horas.
 - [x] Integrar Mercado Pago Suscripciones mediante checkout alojado y sincronizacion consultada contra la API ante webhooks; precios USD convertidos a ARS con vendedor billete BNA.
 - [x] Aplicar alta, mora, pausa, cancelacion y reactivacion de forma segura; falta certificacion con credenciales de prueba y staging.
 - [x] Publicar tutoriales de Mercado Pago, ARCA, Drive/Sheets y uso del portal.
@@ -181,9 +181,9 @@ Aceptacion: los flujos mobile acordados funcionan en Android/iOS y respetan las 
 
 ## 6. Orden inmediato recomendado
 
-1. Definir transporte de email transaccional.
+1. Verificar un dominio remitente en Resend y configurar sus credenciales de staging.
 2. Configurar credenciales de prueba y webhook de Mercado Pago Suscripciones.
-3. Validar alta, mora, pausa, cancelacion, reactivacion y actualizacion mensual de importe en staging.
+3. Validar alta, email, mora, pausa, cancelacion, reactivacion y actualizacion mensual de importe en staging.
 4. No iniciar OCR o mobile hasta cerrar la operacion comercial y productiva.
 
 ## 7. Riesgos principales

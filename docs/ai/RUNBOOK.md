@@ -4,7 +4,7 @@ Ultima revision: 2026-08-26
 
 Estado: monorepo consolidado. PostgreSQL, Redis, migraciones, datos demo, API, workers, frontend, login admin, portal cliente y descarga PDF fueron validados manualmente. Las integraciones externas mantienen sus validaciones especificas pendientes.
 
-Alta publica: aplicar la migracion `20260904120000_public_registration` antes de habilitar `/registro`. En desarrollo, la API devuelve el token de verificacion para probar el circuito local. En `NODE_ENV=production` nunca lo expone; el alta no debe publicarse hasta conectar un transporte de email. Las nuevas suscripciones se crean `PAST_DUE`, sin capacidades operativas.
+Alta publica: aplicar la migracion `20260904120000_public_registration` antes de habilitar `/registro`. En desarrollo, la API devuelve el token de verificacion para probar el circuito local. En produccion configurar `RESEND_API_KEY`, `EMAIL_FROM` con un dominio verificado y `PUBLIC_APP_URL`; el token nunca se expone en la respuesta. El enlace vence en 24 horas y puede reenviarse con `POST /public/resend-verification`. Las nuevas suscripciones se crean `PAST_DUE`, sin capacidades operativas.
 
 Billing: aplicar `20260904150000_mercadopago_subscriptions` y configurar `MP_BILLING_ACCESS_TOKEN`, `BILLING_BACK_URL` y el webhook publico `POST /public/billing/mercadopago/webhook`. La credencial pertenece a la cuenta vendedora de Facturador y nunca debe reutilizar tokens POS de tenants. Configurar los topicos `subscription_preapproval` y `subscription_authorized_payment`. El checkout toma vendedor billete desde `BNA_EXCHANGE_RATE_URL`; si BNA o Mercado Pago no responden, falla sin activar la suscripcion.
 

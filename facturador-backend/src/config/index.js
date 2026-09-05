@@ -24,6 +24,12 @@ export const config = {
     BNA_URL: process.env.BNA_EXCHANGE_RATE_URL || "https://www.bna.com.ar/Personas",
   },
 
+  EMAIL: {
+    RESEND_API_KEY: process.env.RESEND_API_KEY,
+    FROM: process.env.EMAIL_FROM || "Facturador <onboarding@resend.dev>",
+    PUBLIC_APP_URL: process.env.PUBLIC_APP_URL || "http://localhost:5173",
+  },
+
   AFIP: {
     TRA_B64: process.env.AFIP_TRA_B64,
     TRACMS_B64: process.env.AFIP_TRACMS_B64,
