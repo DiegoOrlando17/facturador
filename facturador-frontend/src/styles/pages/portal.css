@@ -1,0 +1,272 @@
+/*
+ * Portal del cliente (páginas migradas en la fase 4b). Comparte el shell; acá
+ * van solo las piezas propias: ticket del mes, "Qué hacer ahora", filtros con
+ * chips y la pantalla "Listo, ya está facturado".
+ */
+
+.portal-page {
+  display: grid;
+  gap: var(--space-8);
+  min-width: 0;
+}
+
+.portal-page > .ui-page-header {
+  margin-bottom: 0;
+}
+
+.portal-muted {
+  color: var(--color-text-subtle);
+}
+
+.portal-mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.portal-section {
+  display: grid;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.portal-section__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-4);
+}
+
+.portal-section__header h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  font-weight: var(--weight-bold);
+}
+
+/* Píldora de conexión ------------------------------------------------------- */
+
+.portal-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  border-radius: 999px;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  text-decoration: none;
+}
+
+.portal-pill__dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.portal-pill--success {
+  background: var(--color-success-bg);
+  color: var(--color-success-text);
+}
+
+.portal-pill--warning {
+  background: var(--color-warning-bg);
+  color: var(--color-warning-text);
+}
+
+a.portal-pill--warning:hover {
+  text-decoration: underline;
+}
+
+/* Inicio -------------------------------------------------------------------- */
+
+.portal-home__top {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  gap: var(--space-6);
+  align-items: stretch;
+}
+
+/* El ticket mide lo que su contenido: no se estira a la altura de la bandeja. */
+.portal-month {
+  align-self: start;
+  min-width: 0;
+}
+
+.portal-month__label {
+  margin: 0;
+  color: var(--color-text-subtle);
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.portal-month__amount {
+  margin: var(--space-3) 0 var(--space-2);
+}
+
+.portal-month__amount .ui-money {
+  font-size: clamp(2.25rem, 3vw + 1rem, 3.25rem);
+  letter-spacing: -0.02em;
+}
+
+.portal-month__change {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-weight: var(--weight-semibold);
+}
+
+.portal-month__change--up {
+  color: var(--color-success-text);
+}
+
+.portal-month__change--down {
+  color: var(--color-danger-text);
+}
+
+.portal-month__stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-8);
+}
+
+.portal-month__stats strong {
+  font-family: var(--font-mono);
+  font-size: var(--text-lg);
+  font-weight: var(--weight-semibold);
+}
+
+.portal-todo {
+  display: grid;
+  align-content: start;
+  gap: var(--space-4);
+  min-width: 0;
+  padding: var(--space-6);
+  border: 2px solid var(--color-border-ink);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+}
+
+.portal-todo h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  font-weight: var(--weight-bold);
+}
+
+.portal-todo__empty {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+
+.portal-todo__list {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.portal-todo__item {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  color: var(--color-text);
+  text-decoration: none;
+}
+
+a.portal-todo__item:hover .portal-todo__text strong {
+  text-decoration: underline;
+}
+
+.portal-todo__item--warning {
+  background: var(--color-warning-bg);
+}
+
+.portal-todo__item--danger {
+  background: var(--color-danger-bg);
+}
+
+.portal-todo__item--info {
+  background: var(--color-info-bg);
+}
+
+.portal-todo__count {
+  min-width: 1.5rem;
+  font-family: var(--font-mono);
+  font-size: var(--text-lg);
+  font-weight: var(--weight-bold);
+  line-height: 1.3;
+}
+
+.portal-todo__item--warning .portal-todo__count,
+.portal-todo__item--warning .portal-todo__icon {
+  color: var(--color-warning-text);
+}
+
+.portal-todo__item--danger .portal-todo__count,
+.portal-todo__item--danger .portal-todo__icon {
+  color: var(--color-danger-text);
+}
+
+.portal-todo__item--info .portal-todo__icon {
+  color: var(--color-info-text);
+}
+
+.portal-todo__icon,
+.portal-todo__arrow {
+  flex: none;
+  width: 1.25rem;
+  height: 1.25rem;
+  margin-top: 0.125rem;
+}
+
+.portal-todo__arrow {
+  margin-left: auto;
+}
+
+.portal-todo__text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.portal-todo__text span {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+}
+
+.portal-todo__done {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-1) var(--space-4);
+  color: var(--color-text-muted);
+}
+
+.portal-todo__done svg {
+  width: 1.125rem;
+  height: 1.125rem;
+  color: var(--color-success-text);
+}
+
+@media (max-width: 1099px) {
+  .portal-home__top {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .portal-page {
+    gap: var(--space-6);
+  }
+
+  .portal-todo {
+    padding: var(--space-5) var(--space-4);
+  }
+}

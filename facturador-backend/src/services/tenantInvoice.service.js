@@ -13,12 +13,30 @@ import { upsertTenantIntegrationConfig } from "./tenantConfig.service.js";
 import { normalizeManualInvoiceInput, resolveInvoiceSchedule } from "../domain/tenantInvoice.js";
 import { resolveSettingsOnlyEnabled } from "../domain/integrationReadiness.js";
 import { decryptJson } from "../utils/crypto.js";
+import { buildInvoiceViewWhere, INVOICE_VIEWS, normalizeInvoiceView } from "../domain/invoiceViews.js";
 
 function formatScheduledAt(date) { return new Intl.DateTimeFormat("es-AR", { dateStyle: "short", timeStyle: "short", timeZone: "America/Argentina/Buenos_Aires" }).format(date); }
 
 async function policyWith(entitlement, tenantId) { const subscription = await getTenantSubscriptionPolicy(tenantId); if (!hasEntitlement(subscription?.policy, entitlement)) throw new Error("Tu plan no incluye esta operacion"); return subscription.policy; }
-function invoiceInclude() { return { payment: { select: { id: true, provider_payment_id: true } }, creditNotes: { orderBy: { createdAt: "desc" } }, events: { orderBy: { createdAt: "desc" }, take: 50 } }; }
-export async function listTenantInvoices(tenantId, { page = 1, pageSize = 20, status = null } = {}) { const current = Math.max(1, Number(page) || 1); const take = Math.min(100, Math.max(1, Number(pageSize) || 20)); const where = { tenantId, ...(status ? { status: String(status).toUpperCase() } : {}) }; const [items,total] = await Promise.all([db.invoice.findMany({ where, include: invoiceInclude(), orderBy: { createdAt: "desc" }, skip: (current-1)*take, take }), db.invoice.count({ where })]); return { items, pagination: { page: current, pageSize: take, total, totalPages: Math.max(1, Math.ceil(total/take)) } }; }
+function invoiceInclude() { return { payment: { select: { id: true, provider_payment_id: true, payment_method_id: true } }, creditNotes: { orderBy: { createdAt: "desc" } }, events: { orderBy: { createdAt: "desc" }, take: 50 } }; }
+
+/**
+ * Listado paginado de facturas del portal por vista (ver domain/invoiceViews.js),
+ * con la cantidad de cada vista para los filtros.
+ */
+export async function listTenantInvoices(tenantId, { page = 1, pageSize = 20, view = "all" } = {}) {
+  const current = Math.max(1, Number(page) || 1);
+  const take = Math.min(100, Math.max(1, Number(pageSize) || 20));
+  const activeView = normalizeInvoiceView(view);
+  const where = buildInvoiceViewWhere(tenantId, activeView);
+  const [items, total, ...viewCounts] = await Promise.all([
+    db.invoice.findMany({ where, include: invoiceInclude(), orderBy: { createdAt: "desc" }, skip: (current - 1) * take, take }),
+    db.invoice.count({ where }),
+    ...INVOICE_VIEWS.map((name) => db.invoice.count({ where: buildInvoiceViewWhere(tenantId, name) })),
+  ]);
+  const counts = Object.fromEntries(INVOICE_VIEWS.map((name, index) => [name, viewCounts[index]]));
+  return { items, view: activeView, counts, pagination: { page: current, pageSize: take, total, totalPages: Math.max(1, Math.ceil(total / take)) } };
+}
 export async function getTenantInvoice(tenantId, invoiceId) { return db.invoice.findUnique({ where: { invoice_id_tenantId: { id: invoiceId, tenantId } }, include: invoiceInclude() }); }
 async function enqueue(queue, name, tenantId, invoiceId, step) { return addOrReplaceFailedJob(queue, name, { tenantId: toQueueId(tenantId), invoiceId: toQueueId(invoiceId) }, { jobId: buildQueueJobId({ tenantId, paymentId: invoiceId, step }), attempts: 5, backoff: { type: "exponential", delay: 3000 }, removeOnComplete: true, removeOnFail: 50 }); }
 export async function confirmTenantInvoice(tenantId, invoiceId, tenantUser, { issueAt = null } = {}) { await policyWith(ENTITLEMENTS.CLIENT_APPROVAL, tenantId); const invoice = await getInvoiceById(tenantId, invoiceId); if (!invoice || invoice.source !== "CONFIRMATION" || invoice.status !== "PENDING_CONFIRMATION" || !invoice.paymentId) throw new Error("El comprobante no esta pendiente de confirmacion"); const { delay, scheduledAt } = resolveInvoiceSchedule(issueAt); await markInvoiceQueued(tenantId, invoice.id, invoice.status); if (scheduledAt) await db.invoiceEvent.create({ data: { tenantId, invoiceId: invoice.id, type: "NOTE_ADDED", message: `Emisión programada para ${formatScheduledAt(scheduledAt)}`, payloadJson: JSON.stringify({ kind: "scheduled_issue", scheduledAt: scheduledAt.toISOString() }) } }); await addOrReplaceFailedJob(paymentsQueue, `payment-confirmed-${invoice.paymentId}`, { tenantId: toQueueId(tenantId), paymentId: toQueueId(invoice.paymentId) }, { jobId: buildQueueJobId({ tenantId, paymentId: invoice.paymentId, step: "afip" }), delay, attempts: 5, backoff: { type: "exponential", delay: 3000 }, removeOnComplete: true, removeOnFail: 50 }); await createTenantAuditLog({ tenantId, actorType: "tenant_user", actorId: String(tenantUser.id), action: scheduledAt ? "invoice_scheduled" : "invoice_confirmed", entityType: "Invoice", entityId: String(invoice.id), after: { issueAt: scheduledAt?.toISOString() ?? null } }); return getTenantInvoice(tenantId, invoice.id); }

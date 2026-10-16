@@ -34,6 +34,7 @@ import { mergeTenantScheduleConfig, normalizeTenantSchedule } from "../domain/te
 import { cancelTenantInvoice, confirmTenantInvoice, createManualTenantInvoice, getTenantIntegrationState, getTenantInvoice, getTenantInvoiceSettings, listTenantInvoices, updateTenantInvoiceSettings } from "../services/tenantInvoice.service.js";
 import { hasRequiredIntegrationCredentials, resolveSettingsOnlyEnabled } from "../domain/integrationReadiness.js";
 import { changeMercadoPagoSubscriptionStatus, createMercadoPagoCheckout, getTenantBillingSubscription } from "../services/mercadoPagoBilling.service.js";
+import { getTenantPortalHome } from "../services/portalHome.service.js";
 
 const router = Router();
 const TESTABLE_PROVIDERS = new Set(["MERCADOPAGO", "AFIP", "DRIVE", "SHEETS"]);
@@ -106,6 +107,15 @@ router.get("/dashboard", async (req, res) => {
     return res.json(normalizeJsonBigInts(summary));
   } catch (error) {
     return res.status(500).json({ error: error.message || "No se pudo obtener dashboard portal" });
+  }
+});
+
+router.get("/home", async (req, res) => {
+  try {
+    return res.json(normalizeJsonBigInts(await getTenantPortalHome(req.tenantAuth.tenantId)));
+  } catch (error) {
+    console.error("[portal] home", error);
+    return res.status(500).json({ error: "No pudimos cargar el inicio. Probá de nuevo en unos minutos." });
   }
 });
 

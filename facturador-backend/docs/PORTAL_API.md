@@ -76,9 +76,28 @@ Devuelve el usuario autenticado del tenant.
 
 Hoy invalida del lado cliente solamente.
 
-## Dashboard
+## Inicio
 
-### `GET /portal/dashboard`
+### `GET /portal/home`
+
+Resumen del Inicio del portal. Todo se calcula solo para el tenant de la sesión; los meses se cortan en hora argentina.
+
+```json
+{
+  "month": { "key": "2026-10", "previousKey": "2026-09", "currency": "ARS", "net": 190470, "invoiced": 193170, "credited": 2700, "invoiceCount": 18, "averageTicket": 10731.67, "previousNet": 139250, "changePercent": 37 },
+  "attention": [{ "code": "invoices_pending_confirmation", "tone": "warning", "count": 3, "detail": null }],
+  "profileStatus": "APPROVED",
+  "subscription": { "status": "ACTIVE", "planName": "Control" },
+  "connection": { "mercadoPagoConnected": true, "invoiceMode": "confirmation", "lastSyncAt": "2026-10-16T13:42:00.000Z", "lastIssuedAt": "2026-10-16T13:40:00.000Z" }
+}
+```
+
+- `month.net`: facturas emitidas menos notas de crédito emitidas en el mes en curso. `previousNet` es el mes anterior hasta el mismo punto ("a esta altura"); `changePercent` es `null` si no hay base.
+- `attention`: de más a menos urgente. Códigos: `subscription_unpaid`, `invoices_failed`, `profile_rejected`, `invoices_pending_confirmation`, `profile_incomplete`, `mercadopago_not_connected`, `profile_in_review`.
+
+### `GET /portal/dashboard` (en desuso)
+
+El portal ya no lo usa (lo reemplaza `/portal/home`); se elimina en la fase de limpieza.
 
 Response:
 
@@ -119,6 +138,12 @@ Uso sugerido en UI:
 - actividad reciente
 
 ## Pagos y facturas
+
+### `GET /portal/invoices`
+
+Query: `page`, `pageSize` (máx. 100), `view` = `all` | `pending` | `issued` | `failed` | `voided` (por defecto `all`). Lista solo facturas; las notas de crédito vienen anidadas en `creditNotes`. `issued` excluye las anuladas (con nota de crédito emitida), que están en `voided`.
+
+Response: `{ items, view, counts: { all, pending, issued, failed, voided }, pagination: { page, pageSize, total, totalPages } }`.
 
 ### `GET /portal/payments`
 
