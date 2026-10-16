@@ -67,7 +67,7 @@ export const PLAN_CATALOG = [
     processing: {
       allowedModes,
       defaultMode: "realtime",
-      minRealtimeIntervalMs: 15000,
+      minRealtimeIntervalMs: 5000,
       maxRunsPerDay: null,
     },
   });

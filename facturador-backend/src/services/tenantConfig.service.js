@@ -557,3 +557,61 @@ export async function addOrUpdateTenantUserWithAuth(
     select: SAFE_TENANT_USER_SELECT,
   });
 }
+
+const SECRETISH_INTEGRATION_KEY = /token|secret|key|password|sign|cert/i;
+const MASKED_SECRET_PATTERN = /^\*{3}/;
+
+function isPlainConfigObject(value) {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+export function isMaskedSecretValue(value) {
+  return typeof value === "string" && MASKED_SECRET_PATTERN.test(value);
+}
+
+/**
+ * Fusiona la configuracion enviada por el admin con los secretos ya guardados,
+ * para que el panel nunca necesite revelar secretos para guardar o probar.
+ * - Un valor enmascarado ("***xxxx") que coincide con el guardado conserva el secreto real.
+ * - Un secreto omitido o vacio conserva el valor guardado.
+ * - Un valor enmascarado que no coincide con lo guardado se rechaza (nunca se persiste "***").
+ */
+export function mergeMaskedIntegrationSecrets(existing, submitted) {
+  const previous = isPlainConfigObject(existing) ? existing : {};
+  const next = isPlainConfigObject(submitted) ? { ...submitted } : {};
+
+  for (const [key, value] of Object.entries(next)) {
+    if (!isMaskedSecretValue(value)) continue;
+
+    const stored = previous[key];
+    if (typeof stored === "string" && stored.length > 0 && maskSecrets({ [key]: stored })[key] === value) {
+      next[key] = stored;
+      continue;
+    }
+
+    throw new Error(`${key}: el valor enmascarado no coincide con el guardado. Cargá el valor real.`);
+  }
+
+  for (const [key, stored] of Object.entries(previous)) {
+    if (!SECRETISH_INTEGRATION_KEY.test(key)) continue;
+    if (stored === undefined || stored === null || stored === "") continue;
+
+    const submittedValue = next[key];
+    const isOmitted = !Object.prototype.hasOwnProperty.call(next, key)
+      || submittedValue === undefined
+      || submittedValue === null
+      || (typeof submittedValue === "string" && submittedValue.trim() === "");
+
+    if (isOmitted) next[key] = stored;
+  }
+
+  return next;
+}
+
+/** Devuelve la configuracion guardada (descifrada) aunque la integracion este deshabilitada. */
+export async function getStoredTenantIntegrationConfig(tenantId, provider) {
+  const row = await prisma.tenantIntegration.findUnique({
+    where: { tenantId_provider: { tenantId, provider: normalizeProvider(provider) } },
+  });
+  return row?.secretEnc ? parseSecretEnc(row.secretEnc) : {};
+}

@@ -30,12 +30,14 @@ import { toBigIntId } from "../utils/bigint.js";
 import { mergeGoogleTenantIntegrationConfig } from "../services/tenantGoogle.service.js";
 import { getTenantSubscriptionPolicy } from "../services/subscriptionPolicy.service.js";
 import { ENTITLEMENTS, hasEntitlement } from "../domain/planPolicy.js";
-import { cancelTenantInvoice, confirmTenantInvoice, createManualTenantInvoice, getTenantInvoice, getTenantInvoiceSettings, listTenantInvoices, updateTenantInvoiceSettings } from "../services/tenantInvoice.service.js";
+import { mergeTenantScheduleConfig, normalizeTenantSchedule } from "../domain/tenantScheduler.js";
+import { cancelTenantInvoice, confirmTenantInvoice, createManualTenantInvoice, getTenantIntegrationState, getTenantInvoice, getTenantInvoiceSettings, listTenantInvoices, updateTenantInvoiceSettings } from "../services/tenantInvoice.service.js";
+import { hasRequiredIntegrationCredentials, resolveSettingsOnlyEnabled } from "../domain/integrationReadiness.js";
 import { changeMercadoPagoSubscriptionStatus, createMercadoPagoCheckout, getTenantBillingSubscription } from "../services/mercadoPagoBilling.service.js";
 
 const router = Router();
 const TESTABLE_PROVIDERS = new Set(["MERCADOPAGO", "AFIP", "DRIVE", "SHEETS"]);
-const TENANT_CONFIGURABLE_PROVIDERS = new Set(["DRIVE", "SHEETS"]);
+const TENANT_CONFIGURABLE_PROVIDERS = new Set(["MERCADOPAGO", "DRIVE", "SHEETS"]);
 
 function normalizeJsonBigInts(value) {
   if (typeof value === "bigint") {
@@ -50,6 +52,12 @@ function normalizeJsonBigInts(value) {
     return value;
   }
 
+  // Date (y Prisma.Decimal) se serializan con su propio toJSON; recorrerlos como
+  // objetos planos los convertía en {} ("Fecha no disponible" en el portal).
+  if (typeof value.toJSON === "function") {
+    return value.toJSON();
+  }
+
   return Object.fromEntries(
     Object.entries(value).map(([key, current]) => [key, normalizeJsonBigInts(current)])
   );
@@ -61,22 +69,24 @@ router.post("/auth/login", async (req, res) => {
     const email = String(req.body.email || "").trim().toLowerCase();
     const password = String(req.body.password || "");
 
-    if (!tenantSlug) throw new Error("tenantSlug es obligatorio");
-    if (!email) throw new Error("email es obligatorio");
-    if (!password) throw new Error("password es obligatoria");
-
-    const tenantUser = await authenticateTenantUser(tenantSlug, email, password);
-    if (!tenantUser) {
-      return res.status(401).json({ error: "Credenciales invalidas" });
+    if (!tenantSlug || !email || !password) {
+      return res.status(400).json({ error: "Completá el identificador de empresa, el email y la contraseña.", code: "MISSING_FIELDS" });
     }
 
+    const result = await authenticateTenantUser(tenantSlug, email, password);
+    if (!result.ok) {
+      return res.status(401).json({ error: result.message, code: result.code });
+    }
+
+    const { tenantUser } = result;
     const token = createTenantToken(tenantUser);
     return res.json(normalizeJsonBigInts({
       token,
       tenantUser,
     }));
   } catch (error) {
-    return res.status(400).json({ error: error.message || "No se pudo iniciar sesion" });
+    console.error("[portal] login", error);
+    return res.status(500).json({ error: "No pudimos iniciar sesión. Probá de nuevo en unos minutos.", code: "UNEXPECTED_ERROR" });
   }
 });
 
@@ -200,7 +210,11 @@ router.get("/reports/timeseries", async (req, res) => {
 router.get("/integrations", async (req, res) => {
   try {
     const integrations = await getTenantPortalIntegrations(req.tenantAuth.tenantId);
-    return res.json(normalizeJsonBigInts(integrations));
+    // "configured" refleja credenciales reales; "enabled" solo no alcanza.
+    return res.json(normalizeJsonBigInts(integrations.map((item) => ({
+      ...item,
+      configured: Boolean(item.enabled) && hasRequiredIntegrationCredentials(item.provider, item.config),
+    }))));
   } catch (error) {
     return res.status(400).json({ error: error.message || "No se pudieron listar integraciones" });
   }
@@ -273,10 +287,28 @@ router.put("/integrations/:provider", requireTenantPermission(TENANT_PERMISSIONS
   try {
     const provider = String(req.params.provider || "").trim().toUpperCase();
     if (!TENANT_CONFIGURABLE_PROVIDERS.has(provider)) {
-      throw new Error("El portal solo permite configurar destinos de Drive y Sheets");
+      throw new Error("El portal no permite configurar esta integracion");
     }
 
     const subscription = await getTenantSubscriptionPolicy(req.tenantAuth.tenantId);
+    if (provider === "MERCADOPAGO") {
+      // Guardar la agenda nunca habilita Mercado Pago: solo conserva "enabled" si ya
+      // estaba habilitado y tiene credenciales propias (ACCESS_TOKEN y POS_ID).
+      const existing = await getTenantIntegrationState(req.tenantAuth.tenantId, provider);
+      const config = mergeTenantScheduleConfig(existing.config, req.body?.config);
+      normalizeTenantSchedule(config, subscription?.policy);
+      const enabled = resolveSettingsOnlyEnabled(provider, { existingEnabled: existing.enabled, config });
+      const row = await replaceTenantIntegrationConfig(req.tenantAuth.tenantId, provider, config, { enabled });
+      return res.json(normalizeJsonBigInts({
+        id: row.id,
+        tenantId: row.tenantId,
+        provider: row.provider,
+        enabled: row.enabled,
+        configured: row.enabled && hasRequiredIntegrationCredentials(provider, config),
+        config: mergeTenantScheduleConfig({}, config),
+      }));
+    }
+
     if (!hasEntitlement(subscription?.policy, ENTITLEMENTS.GOOGLE_DRIVE_SHEETS)) {
       return res.status(403).json({ error: "Tu plan no incluye Google Drive y Sheets" });
     }

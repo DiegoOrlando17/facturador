@@ -9,8 +9,8 @@ const navigation: Array<{ label: string; icon: AppIconName; to?: string }> = [
   { label: "Reportes", icon: "reports", to: "/portal-cliente/reportes" },
   { label: "Datos fiscales", icon: "tax", to: "/portal-cliente/perfil-fiscal" },
   { label: "Integraciones", icon: "integrations", to: "/portal-cliente/integraciones" },
-  { label: "Onboarding", icon: "onboarding", to: "/portal-cliente/onboarding" },
-  { label: "Plan y suscripcion", icon: "invoice", to: "/portal-cliente/suscripcion" },
+  { label: "Puesta en marcha", icon: "onboarding", to: "/portal-cliente/onboarding" },
+  { label: "Plan y suscripción", icon: "invoice", to: "/portal-cliente/suscripcion" },
 ];
 
 export function ClientPortalLayout() {
@@ -31,7 +31,7 @@ export function ClientPortalLayout() {
               <AppIcon name={item.icon} /><span>{item.label}</span>
             </NavLink>
           ) : (
-            <button key={item.label} type="button" className="app-nav__link client-nav-link--pending" disabled title="Disponible en un proximo corte">
+            <button key={item.label} type="button" className="app-nav__link client-nav-link--pending" disabled title="Disponible próximamente">
               <AppIcon name={item.icon} /><span>{item.label}</span>
             </button>
           ))}
@@ -41,7 +41,7 @@ export function ClientPortalLayout() {
           <div><strong>{user?.tenant?.name ?? "Empresa"}</strong><small>{user?.email}</small></div>
         </div>
         <button type="button" className="sidebar-logout-button" onClick={() => { logout(); navigate("/portal-cliente/login", { replace: true }); }}>
-          <AppIcon name="logout" /><span>Cerrar sesion</span>
+          <AppIcon name="logout" /><span>Cerrar sesión</span>
         </button>
       </aside>
       <Outlet />

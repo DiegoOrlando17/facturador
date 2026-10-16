@@ -1,6 +1,6 @@
 import { type FormEvent, useEffect, useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/app/AuthContext";
 import { PermissionGate } from "@/components/auth/PermissionGate";
 import { useApiResource } from "@/hooks/useApiResource";
@@ -24,7 +24,26 @@ type IntegrationFieldDefinition = {
 };
 type MercadopagoPollingMode = "realtime" | "scheduled";
 type MercadopagoScheduleMode = "runs" | "times";
-type TenantDetailTab = "summary" | "profile" | "subscription" | "integrations" | "payments" | "users" | "notes" | "advanced";
+type TenantDetailTab =
+  | "summary"
+  | "onboarding"
+  | "profile"
+  | "subscription"
+  | "integrations"
+  | "payments"
+  | "users"
+  | "notes"
+  | "advanced";
+type PlanPolicy = {
+  tier: number | null;
+  entitlements: Record<string, boolean>;
+  processing: {
+    allowedModes: string[];
+    defaultMode: string | null;
+    minRealtimeIntervalMs: number | null;
+    maxRunsPerDay: number | null;
+  };
+};
 type PaymentStatus =
   | "pending"
   | "processing"
@@ -52,6 +71,7 @@ type TenantDetailResponse = {
     planName: string | null;
     billingProvider: string | null;
     billingRef: string | null;
+    policy?: PlanPolicy | null;
     updatedAt?: string;
   };
   users: {
@@ -75,6 +95,7 @@ type TenantDetailResponse = {
   metrics: {
     totalPayments: number;
     totalAmount: number;
+    statuses?: Record<string, { count: number; amount: number }>;
     recentPayments: Array<{
       id: string;
       amount: number;
@@ -215,14 +236,18 @@ type TenantPaymentsResponse = {
   };
 };
 
-type OnboardingItem = {
+type ReadinessSeverity = "blocking" | "degraded";
+
+type ReadinessItem = {
   id: string;
   label: string;
+  /** Etiqueta corta para el estado operativo cuando este punto es el primero pendiente. */
+  missingLabel: string;
   detail: string;
   isComplete: boolean;
-  targetId: string;
+  severity: ReadinessSeverity;
+  tab: TenantDetailTab;
   impact: string;
-  owner: string;
   action: string;
 };
 
@@ -329,28 +354,54 @@ const integrationFieldDefinitions: Record<IntegrationProvider, IntegrationFieldD
       ],
     },
     { key: "POLLING_INTERVAL_MS", label: "Intervalo de lectura (ms)", inputType: "number", valueType: "number" },
-    { key: "RUNS_PER_DAY", label: "Lecturas por dia", inputType: "number", valueType: "number" },
-    { key: "RUN_AT_TIMES", label: "Horarios programados", valueType: "list", helper: "Podes cargar varios horarios." },
+    { key: "RUNS_PER_DAY", label: "Lecturas por día", inputType: "number", valueType: "number" },
+    { key: "RUN_AT_TIMES", label: "Horarios programados", valueType: "list", helper: "Podés cargar varios horarios." },
   ],
   AFIP: [
     { key: "CUIT", label: "CUIT", required: true },
     { key: "PTO_VTA", label: "Punto de venta", required: true, inputType: "number", valueType: "number" },
     { key: "CBTE_TIPO", label: "Tipo de comprobante", required: true, inputType: "number", valueType: "number" },
-    { key: "ALIC_IVA", label: "Alicuota IVA", inputType: "number", valueType: "number" },
+    { key: "ALIC_IVA", label: "Alícuota IVA", inputType: "number", valueType: "number" },
   ],
   DRIVE: [
-    { key: "DRIVE_FOLDER_ID", label: "Carpeta Drive" },
+    { key: "DRIVE_FOLDER_ID", label: "Carpeta de Drive" },
   ],
   SHEETS: [
-    { key: "SHEETS_ID", label: "Spreadsheet ID" },
-    { key: "SHEET_NAME", label: "Nombre de hoja" },
+    { key: "SHEETS_ID", label: "ID de la planilla" },
+    { key: "SHEET_NAME", label: "Nombre de la hoja" },
   ],
 };
+
+// Credenciales que administra el flujo de autorización de Google: no se editan a mano.
+const googleManagedConfigKeys = [
+  "REFRESH_TOKEN",
+  "ACCESS_TOKEN",
+  "SCOPES",
+  "TOKEN_TYPE",
+  "EXPIRY_DATE",
+  "ID_TOKEN",
+  "refresh_token",
+  "access_token",
+  "scope",
+  "token_type",
+  "expiry_date",
+  "id_token",
+];
 
 const providerClientIgnoredConfigKeys: Partial<Record<IntegrationProvider, Set<string>>> = {
   MERCADOPAGO: new Set(["API_URL"]),
   AFIP: new Set(["WSAA_URL", "WSFE_URL", "CERT_B64", "KEY_B64", "CERT_PATH", "KEY_PATH"]),
+  DRIVE: new Set(googleManagedConfigKeys),
+  SHEETS: new Set(googleManagedConfigKeys),
 };
+
+function isGoogleProvider(provider: IntegrationProvider) {
+  return provider === "DRIVE" || provider === "SHEETS";
+}
+
+function hasGoogleAuthorization(config: Record<string, unknown> | undefined) {
+  return Boolean(config?.REFRESH_TOKEN || config?.refresh_token);
+}
 
 function createSlug(value: string) {
   return value
@@ -378,15 +429,6 @@ function hasMaskedValue(value: unknown): boolean {
   return false;
 }
 
-function hasMeaningfulConfig(integration: TenantIntegration | undefined) {
-  return Boolean(
-    integration?.enabled
-      && integration.config
-      && Object.keys(integration.config).length > 0
-      && !hasMaskedValue(integration.config),
-  );
-}
-
 function hasBlankConfigValue(value: unknown): boolean {
   if (typeof value === "string") return value.trim() === "";
   if (Array.isArray(value)) return value.some(hasBlankConfigValue);
@@ -404,44 +446,43 @@ function stringifyIntegrationFieldValue(value: unknown) {
   return String(value);
 }
 
-function parseObjectJson(value: string | null | undefined) {
-  if (!value?.trim()) return {};
+const mercadopagoPollingModes: MercadopagoPollingMode[] = ["realtime", "scheduled"];
 
-  try {
-    const parsed = JSON.parse(value) as unknown;
-    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
-      ? parsed as Record<string, unknown>
-      : {};
-  } catch {
-    return {};
-  }
+function isMercadopagoPollingMode(value: unknown): value is MercadopagoPollingMode {
+  return value === "realtime" || value === "scheduled";
 }
 
-function isPlanRealtime(plan: Plan | undefined, planCode: string | null | undefined, planName: string | null | undefined) {
-  const features = parseObjectJson(plan?.featuresJson);
-
-  if (features.realtimeBatch === true || features.realtime === true) {
-    return true;
-  }
-
-  const text = `${plan?.code ?? planCode ?? ""} ${plan?.name ?? planName ?? ""}`.toLowerCase();
-  return text.includes("realtime") || text.includes("tiempo real");
+/**
+ * Modos de lectura que habilita la política del plan actual (`processing.allowedModes`).
+ * Sin política conocida no se restringe nada: el backend valida contra el plan al guardar.
+ */
+function getAllowedMercadopagoPollingModes(policy: PlanPolicy | null | undefined): MercadopagoPollingMode[] {
+  if (!policy) return mercadopagoPollingModes;
+  return policy.processing.allowedModes.filter(isMercadopagoPollingMode);
 }
 
+/** Modo efectivo: el guardado si el plan lo permite; si no, el modo por defecto del plan. */
 function getMercadopagoPollingMode(
-  plan: Plan | undefined,
-  data: TenantDetailResponse | undefined | null,
+  policy: PlanPolicy | null | undefined,
   values: Record<string, string>,
 ): MercadopagoPollingMode {
-  if (isPlanRealtime(plan, data?.currentSubscription.planCode, data?.currentSubscription.planName)) {
-    return "realtime";
+  const allowedModes = getAllowedMercadopagoPollingModes(policy);
+  const currentMode = values.POLLING_MODE?.trim().toLowerCase();
+
+  if (isMercadopagoPollingMode(currentMode) && allowedModes.includes(currentMode)) {
+    return currentMode;
   }
 
-  if (plan || data?.currentSubscription.planCode || data?.currentSubscription.planName) {
-    return "scheduled";
+  const defaultMode = policy?.processing.defaultMode;
+  if (isMercadopagoPollingMode(defaultMode) && allowedModes.includes(defaultMode)) {
+    return defaultMode;
   }
 
-  return values.POLLING_MODE === "scheduled" ? "scheduled" : "realtime";
+  return allowedModes[0] ?? "realtime";
+}
+
+function getMercadopagoPollingModeLabel(mode: MercadopagoPollingMode) {
+  return mode === "realtime" ? "Tiempo real" : "Programado";
 }
 
 function getMercadopagoScheduleMode(values: Record<string, string>): MercadopagoScheduleMode {
@@ -605,30 +646,6 @@ function getIntegrationTestRows(result: IntegrationTestResponse) {
     }));
 }
 
-function getOnboardingStatus(completedCount: number, totalCount: number) {
-  if (completedCount === totalCount) {
-    return {
-      label: "Listo para operar",
-      tone: "success",
-      detail: "El cliente tiene datos base, accesos e integraciones principales cargadas.",
-    };
-  }
-
-  if (completedCount >= Math.ceil(totalCount * 0.6)) {
-    return {
-      label: "Casi listo",
-      tone: "warning",
-      detail: "Ya hay una base solida, pero todavia faltan puntos para iniciar sin friccion.",
-    };
-  }
-
-  return {
-    label: "Onboarding incompleto",
-    tone: "danger",
-    detail: "Faltan configuraciones clave antes de considerar activo al cliente.",
-  };
-}
-
 function getIntegrationProviderLabel(provider: IntegrationProvider | string) {
   switch (provider) {
     case "MERCADOPAGO":
@@ -644,54 +661,216 @@ function getIntegrationProviderLabel(provider: IntegrationProvider | string) {
   }
 }
 
-function getTenantOperationalStatus(data: TenantDetailResponse, onboardingItems: OnboardingItem[]) {
+type TenantIntegrationSummaryItem = TenantDetailResponse["integrations"]["items"][number];
+
+function getIntegrationSummaryItem(data: TenantDetailResponse, provider: IntegrationProvider) {
+  return data.integrations.items.find((item) => item.provider === provider);
+}
+
+/** Configurada = activada y con configuración guardada, según el resumen del backend. */
+function isIntegrationReady(item: TenantIntegrationSummaryItem | undefined) {
+  return Boolean(item?.enabled && item.configured && item.health === "configured");
+}
+
+function getIntegrationReadinessDetail(
+  item: TenantIntegrationSummaryItem | undefined,
+  readyDetail: string,
+  missingDetail: string,
+) {
+  if (isIntegrationReady(item)) return readyDetail;
+  if (item && !item.enabled) return "La integración está guardada pero desactivada.";
+  if (item && !item.configured) return "La integración está activada pero sin configuración.";
+  return missingDetail;
+}
+
+function buildReadinessItems(
+  data: TenantDetailResponse,
+  activeAdminUser: TenantUser | undefined,
+  areUsersLoaded: boolean,
+): ReadinessItem[] {
+  const profileApprovalStatus = getProfileApprovalStatus(data.profile);
+  const subscription = data.currentSubscription;
+  const hasActivePlan = Boolean(subscription.planName) && subscription.status === "ACTIVE";
+  const includesGoogle = subscription.policy?.entitlements?.googleDriveSheets === true;
+  const mercadopago = getIntegrationSummaryItem(data, "MERCADOPAGO");
+  const afip = getIntegrationSummaryItem(data, "AFIP");
+  const drive = getIntegrationSummaryItem(data, "DRIVE");
+  const sheets = getIntegrationSummaryItem(data, "SHEETS");
+
+  const items: ReadinessItem[] = [
+    {
+      id: "tenant-active",
+      label: "Cliente activo",
+      missingLabel: "Cliente inactivo",
+      detail: data.identity.status === "ACTIVE" ? "El cliente puede operar." : "Activá el cliente antes de iniciar.",
+      isComplete: data.identity.status === "ACTIVE",
+      severity: "blocking",
+      tab: "summary",
+      impact: "Bloquea cualquier procesamiento automático",
+      action: "Activar cliente",
+    },
+    {
+      id: "tenant-profile",
+      label: "Datos fiscales aprobados",
+      missingLabel: "Falta aprobación fiscal",
+      detail: profileApprovalStatus === "APPROVED"
+        ? "Datos fiscales y de contacto aprobados."
+        : isProfileComplete(data.profile)
+          ? `Datos completos, estado ${getProfileApprovalLabel(profileApprovalStatus).toLowerCase()}.`
+          : "Completá razón social, CUIT, condición de IVA, domicilio y email.",
+      isComplete: profileApprovalStatus === "APPROVED",
+      severity: "blocking",
+      tab: "profile",
+      impact: "Bloquea la activación fiscal",
+      action: "Revisar datos fiscales",
+    },
+    {
+      id: "plan",
+      label: "Plan asignado",
+      missingLabel: subscription.planName ? "Suscripción no activa" : "Falta plan",
+      detail: hasActivePlan
+        ? `${subscription.planName} asignado al cliente.`
+        : subscription.planName
+          ? `${subscription.planName} asignado, pero la suscripción no está activa.`
+          : "Asigná un plan comercial antes de habilitar la operación.",
+      isComplete: hasActivePlan,
+      severity: "blocking",
+      tab: "subscription",
+      impact: "Bloquea la operación comercial",
+      action: "Asignar plan",
+    },
+    {
+      id: "portal-user",
+      label: "Usuario responsable",
+      missingLabel: "Falta usuario responsable",
+      detail: activeAdminUser
+        ? `${activeAdminUser.email} tiene rol ${activeAdminUser.role}.`
+        : areUsersLoaded
+          ? "Creá al menos un usuario owner o admin activo para el portal."
+          : "Cargando usuarios...",
+      isComplete: Boolean(activeAdminUser),
+      severity: "blocking",
+      tab: "users",
+      impact: "Impide que el cliente opere su portal",
+      action: "Crear usuario",
+    },
+    {
+      id: "mercadopago",
+      label: "Mercado Pago",
+      missingLabel: "Falta Mercado Pago",
+      detail: getIntegrationReadinessDetail(mercadopago, "Credenciales de cobro cargadas.", "Cargá el access token y el POS ID."),
+      isComplete: isIntegrationReady(mercadopago),
+      severity: "blocking",
+      tab: "integrations",
+      impact: "Bloquea la lectura automática de cobros",
+      action: "Configurar Mercado Pago",
+    },
+    {
+      id: "afip",
+      label: "ARCA",
+      missingLabel: "Falta ARCA",
+      detail: getIntegrationReadinessDetail(afip, "Datos fiscales y certificado cargados.", "Cargá CUIT, punto de venta, tipo de comprobante y certificados."),
+      isComplete: isIntegrationReady(afip),
+      severity: "blocking",
+      tab: "integrations",
+      impact: "Bloquea la emisión de comprobantes",
+      action: "Configurar ARCA",
+    },
+  ];
+
+  // Drive y Sheets solo cuentan si el plan los incluye; nunca bloquean la facturación.
+  if (includesGoogle) {
+    items.push(
+      {
+        id: "drive",
+        label: "Google Drive",
+        missingLabel: "Falta Google Drive",
+        detail: getIntegrationReadinessDetail(drive, "Conexión de Drive cargada.", "Autorizá Google y configurá la carpeta de destino."),
+        isComplete: isIntegrationReady(drive),
+        severity: "degraded",
+        tab: "integrations",
+        impact: "No bloquea la facturación; degrada la entrega de PDFs",
+        action: "Configurar Drive",
+      },
+      {
+        id: "sheets",
+        label: "Google Sheets",
+        missingLabel: "Falta Google Sheets",
+        detail: getIntegrationReadinessDetail(sheets, "Conexión de Sheets cargada.", "Autorizá Google y configurá la planilla de destino."),
+        isComplete: isIntegrationReady(sheets),
+        severity: "degraded",
+        tab: "integrations",
+        impact: "No bloquea la facturación; degrada el registro en la planilla",
+        action: "Configurar Sheets",
+      },
+    );
+  }
+
+  return items;
+}
+
+function getTenantOperationalStatus(data: TenantDetailResponse, readinessItems: ReadinessItem[]) {
   if (data.identity.status === "DISABLED") {
     return {
       label: "Suspendido",
       tone: "muted",
-      detail: "El cliente esta deshabilitado comercialmente.",
-      action: "Revisar estado comercial",
+      detail: "El cliente está deshabilitado.",
+      action: "Activar cliente",
     };
   }
 
-  const blocker = onboardingItems.find((item) => !item.isComplete);
+  const blocker = readinessItems.find((item) => item.severity === "blocking" && !item.isComplete);
 
   if (blocker) {
     return {
-      label: blocker.label.includes("ARCA")
-        ? "Falta ARCA"
-        : blocker.label.includes("Mercado")
-          ? "Falta Mercado Pago"
-          : blocker.label.includes("Plan")
-            ? "Falta plan"
-            : blocker.label.includes("Datos")
-              ? "Falta aprobacion fiscal"
-              : "Pendiente de configuracion",
-      tone: "warning",
-      detail: `${blocker.impact}. Responsable: ${blocker.owner}.`,
+      label: blocker.missingLabel,
+      tone: "danger",
+      detail: `${blocker.impact}.`,
       action: blocker.action,
     };
   }
 
-  if (data.integrations.needsAttentionCount > 0) {
+  const degraded = readinessItems.filter((item) => item.severity === "degraded" && !item.isComplete);
+
+  if (degraded.length > 0) {
     return {
       label: "Operativo con advertencias",
       tone: "warning",
-      detail: `${data.integrations.needsAttentionCount} integraciones necesitan revision.`,
-      action: "Resolver integraciones",
+      detail: `Puede facturar, pero falta: ${degraded.map((item) => item.label).join(", ")}.`,
+      action: degraded[0].action,
     };
   }
 
   return {
     label: "Listo para facturar",
     tone: "success",
-    detail: "Datos fiscales, plan e integraciones principales estan completos.",
-    action: "Monitorear facturacion",
+    detail: "Datos fiscales, plan e integraciones necesarias están completos.",
+    action: "Monitorear la facturación",
   };
 }
 
 function prettifyStatus(status: string) {
   return status.replace(/_/g, " ");
+}
+
+function getOnboardingSubmissionLabel(status: string) {
+  switch (status) {
+    case "pending":
+      return "Pendiente de revisión";
+    case "approved":
+      return "Aprobado";
+    case "rejected":
+      return "Rechazado";
+    default:
+      return prettifyStatus(status);
+  }
+}
+
+function getOnboardingSubmissionTone(status: string) {
+  if (status === "approved") return "success";
+  if (status === "pending") return "warning";
+  if (status === "rejected") return "danger";
+  return "muted";
 }
 
 function getMonthStartDate() {
@@ -781,11 +960,53 @@ function getPaymentStageTone(status: string) {
   return "warning";
 }
 
+const tenantDetailTabs: Array<{ id: TenantDetailTab; label: string; superadminOnly?: boolean }> = [
+  { id: "summary", label: "Resumen" },
+  { id: "onboarding", label: "Onboarding" },
+  { id: "profile", label: "Datos fiscales" },
+  { id: "subscription", label: "Plan y estado" },
+  { id: "integrations", label: "Integraciones" },
+  { id: "payments", label: "Facturación" },
+  { id: "users", label: "Usuarios" },
+  { id: "notes", label: "Notas" },
+  { id: "advanced", label: "Avanzado", superadminOnly: true },
+];
+
+function isTenantDetailTab(value: string | null): value is TenantDetailTab {
+  return tenantDetailTabs.some((tab) => tab.id === value);
+}
+
+function sumStatusMetrics(
+  statuses: Record<string, { count: number; amount: number }> | undefined,
+  predicate: (status: string) => boolean,
+) {
+  return Object.entries(statuses ?? {}).reduce(
+    (total, [status, metric]) => (predicate(status)
+      ? { count: total.count + metric.count, amount: total.amount + metric.amount }
+      : total),
+    { count: 0, amount: 0 },
+  );
+}
+
 export function TenantDetailPage() {
   const { slug } = useParams();
   const navigate = useNavigate();
-  const { token, user } = useAuth();
-  const [activeTab, setActiveTab] = useState<TenantDetailTab>("summary");
+  const { token, user, can } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const isSuperadmin = user?.role === "SUPERADMIN";
+  const canRevealSecrets = isSuperadmin;
+  const requestedTab = searchParams.get("tab");
+  const activeTab: TenantDetailTab = isTenantDetailTab(requestedTab) && (requestedTab !== "advanced" || isSuperadmin)
+    ? requestedTab
+    : "summary";
+  const setActiveTab = (tab: TenantDetailTab) => {
+    setSearchParams((currentParams) => {
+      const nextParams = new URLSearchParams(currentParams);
+      if (tab === "summary") nextParams.delete("tab");
+      else nextParams.set("tab", tab);
+      return nextParams;
+    });
+  };
   const [isEditPanelOpen, setIsEditPanelOpen] = useState(false);
   const [tenantName, setTenantName] = useState("");
   const [tenantSlug, setTenantSlug] = useState("");
@@ -823,6 +1044,7 @@ export function TenantDetailPage() {
   const [noteErrorMessage, setNoteErrorMessage] = useState<string | null>(null);
   const [noteSuccessMessage, setNoteSuccessMessage] = useState<string | null>(null);
   const [userEmail, setUserEmail] = useState("");
+  const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [userRole, setUserRole] = useState<TenantUserRole>("viewer");
   const [userStatus, setUserStatus] = useState<TenantStatus>("ACTIVE");
   const [userPassword, setUserPassword] = useState("");
@@ -856,6 +1078,8 @@ export function TenantDetailPage() {
   const [mercadoPagoImportErrorMessage, setMercadoPagoImportErrorMessage] = useState<string | null>(null);
   const [approvalPaymentsFrom, setApprovalPaymentsFrom] = useState(getMonthStartDate);
   const [isApprovingOnboarding, setIsApprovingOnboarding] = useState(false);
+  const [isRejectingOnboarding, setIsRejectingOnboarding] = useState(false);
+  const [onboardingReviewNotes, setOnboardingReviewNotes] = useState("");
   const [approvalMessage, setApprovalMessage] = useState<string | null>(null);
   const [approvalErrorMessage, setApprovalErrorMessage] = useState<string | null>(null);
   const [deleteConfirmationSlug, setDeleteConfirmationSlug] = useState("");
@@ -869,7 +1093,7 @@ export function TenantDetailPage() {
     reload,
   } = useApiResource<TenantDetailResponse>(`/admin/tenants/${slug}`, {
     enabled: Boolean(slug),
-    fallbackErrorMessage: "No se pudo cargar el detalle del tenant.",
+    fallbackErrorMessage: "No se pudo cargar el detalle del cliente.",
   });
   const {
     data: notes,
@@ -887,7 +1111,7 @@ export function TenantDetailPage() {
     reload: reloadUsers,
   } = useApiResource<TenantUser[]>(`/admin/tenants/${slug}/users`, {
     enabled: Boolean(slug),
-    fallbackErrorMessage: "No se pudieron cargar los usuarios del tenant.",
+    fallbackErrorMessage: "No se pudieron cargar los usuarios del cliente.",
   });
   const {
     data: integrations,
@@ -905,7 +1129,7 @@ export function TenantDetailPage() {
     reload: reloadOnboardingSubmissions,
   } = useApiResource<OnboardingSubmissionsResponse>(`/admin/tenants/${slug}/onboarding`, {
     enabled: Boolean(slug),
-    fallbackErrorMessage: "No se pudieron cargar los envios de onboarding.",
+    fallbackErrorMessage: "No se pudieron cargar los envíos de onboarding.",
   });
   const {
     data: plansResponse,
@@ -942,12 +1166,19 @@ export function TenantDetailPage() {
     `/admin/tenants/${slug}/payments?${paymentQueryParams.toString()}`,
     {
       enabled: Boolean(slug),
-      fallbackErrorMessage: "No se pudieron cargar los pagos del tenant.",
+      fallbackErrorMessage: "No se pudieron cargar los pagos del cliente.",
     },
   );
-  const latestOnboardingSubmission = onboardingSubmissions?.items.find((submission) => submission.status === "pending")
-    ?? onboardingSubmissions?.items[0];
+  const pendingOnboardingSubmission = onboardingSubmissions?.items.find((submission) => submission.status === "pending");
+  const latestOnboardingSubmission = pendingOnboardingSubmission ?? onboardingSubmissions?.items[0];
+  const identitySyncKey = data ? `${data.identity.id}:${data.identity.updatedAt}` : "";
+  const profileSyncKey = data ? `${data.identity.id}:${data.profile?.updatedAt ?? "sin-perfil"}` : "";
+  const subscriptionSyncKey = data
+    ? `${data.identity.id}:${data.currentSubscription.id ?? "sin-plan"}:${data.currentSubscription.updatedAt ?? ""}:${data.currentSubscription.status}`
+    : "";
 
+  // Los formularios se sincronizan solo cuando cambia el dato de origen (no en cada recarga),
+  // para no pisar lo que se está editando en otra pestaña.
   useEffect(() => {
     if (!data || isSaving) {
       return;
@@ -956,7 +1187,7 @@ export function TenantDetailPage() {
     setTenantName(data.identity.name);
     setTenantSlug(data.identity.slug);
     setTenantStatus(data.identity.status);
-  }, [data, isSaving]);
+  }, [identitySyncKey, isSaving]);
 
   useEffect(() => {
     if (!data || isSavingProfile) {
@@ -972,7 +1203,7 @@ export function TenantDetailPage() {
     setProfileContactPhone(data.profile?.contactPhone ?? "");
     setProfileResponsibleName(data.profile?.responsibleName ?? "");
     setProfileResponsibleEmail(data.profile?.responsibleEmail ?? "");
-  }, [data, isSavingProfile]);
+  }, [profileSyncKey, isSavingProfile]);
 
   useEffect(() => {
     if (!data || isSavingSubscription) {
@@ -983,7 +1214,7 @@ export function TenantDetailPage() {
     setSubscriptionStatus(data.currentSubscription.status === "missing" ? "ACTIVE" : data.currentSubscription.status);
     setSubscriptionBillingProvider(data.currentSubscription.billingProvider ?? "");
     setSubscriptionBillingRef(data.currentSubscription.billingRef ?? "");
-  }, [data, isSavingSubscription]);
+  }, [subscriptionSyncKey, isSavingSubscription]);
 
   useEffect(() => {
     const submittedStartDate = latestOnboardingSubmission?.data?.processingStartDate;
@@ -993,44 +1224,17 @@ export function TenantDetailPage() {
     }
   }, [latestOnboardingSubmission]);
 
+  // El formulario de integración se reinicia solo al cambiar de proveedor o cuando llegan
+  // integraciones nuevas del servidor (carga inicial o después de guardar). Probar una
+  // conexión no recarga nada, así que lo que se cargó a mano no se pierde.
   useEffect(() => {
-    if (isSavingIntegration || isTestingIntegration) {
-      return;
-    }
-
     const savedIntegration = integrations?.find((integration) => integration.provider === integrationProvider);
     setIsIntegrationEnabled(savedIntegration?.enabled ?? true);
-    setIntegrationFormValues({
-      ...buildIntegrationFormValues(integrationProvider, savedIntegration?.config),
-      ...(integrationProvider === "AFIP" && profileCuit.trim() ? { CUIT: profileCuit.trim() } : {}),
-    });
-  }, [integrations, integrationProvider, isSavingIntegration, isTestingIntegration, profileCuit]);
-
-  useEffect(() => {
-    const afipCuit = integrations?.find((integration) => integration.provider === "AFIP")?.config.CUIT;
-
-    if (
-      !isSavingProfile
-      && !data?.profile?.cuit
-      && !profileCuit.trim()
-      && typeof afipCuit === "string"
-      && !hasMaskedValue(afipCuit)
-    ) {
-      setProfileCuit(afipCuit);
-    }
-  }, [data?.profile?.cuit, integrations, isSavingProfile, profileCuit]);
-
-  useEffect(() => {
-    if (integrationProvider !== "AFIP" || !profileCuit.trim() || isSavingIntegration || isTestingIntegration) {
-      return;
-    }
-
-    setIntegrationFormValues((currentValues) => (
-      currentValues.CUIT === profileCuit.trim()
-        ? currentValues
-        : { ...currentValues, CUIT: profileCuit.trim() }
-    ));
-  }, [integrationProvider, isSavingIntegration, isTestingIntegration, profileCuit]);
+    setIntegrationFormValues(buildIntegrationFormValues(integrationProvider, savedIntegration?.config));
+    setAfipFileNames({});
+    setVisibleIntegrationSecretFields({});
+    setRevealedIntegrationByProvider({});
+  }, [integrations, integrationProvider]);
 
   const normalizedTenantSlug = tenantSlug.trim();
   const canSaveTenant = Boolean(tenantName.trim() && normalizedTenantSlug && token && !isSaving);
@@ -1044,7 +1248,14 @@ export function TenantDetailPage() {
   const canSaveUser = Boolean(userEmail.trim() && token && !isSavingUser);
   const canSaveIntegration = Boolean(token && !isSavingIntegration);
   const selectedSavedIntegration = integrations?.find((integration) => integration.provider === integrationProvider);
-  const selectedMercadopagoPollingMode = getMercadopagoPollingMode(selectedPlan, data, integrationFormValues);
+  const currentPlanPolicy = data?.currentSubscription.policy ?? null;
+  const allowedMercadopagoPollingModes = getAllowedMercadopagoPollingModes(currentPlanPolicy);
+  const selectedMercadopagoPollingMode = getMercadopagoPollingMode(currentPlanPolicy, integrationFormValues);
+  const savedMercadopagoPollingMode = selectedSavedIntegration?.provider === "MERCADOPAGO"
+    ? String(selectedSavedIntegration.config.POLLING_MODE ?? "").toLowerCase()
+    : "";
+  const isSavedMercadopagoModeNotAllowed = isMercadopagoPollingMode(savedMercadopagoPollingMode)
+    && savedMercadopagoPollingMode !== selectedMercadopagoPollingMode;
   const selectedMercadopagoScheduleMode = getMercadopagoScheduleMode(integrationFormValues);
   const selectedIntegrationFields = getIntegrationFields(integrationProvider, integrationFormValues).filter((field) => {
     if (providerClientIgnoredConfigKeys[integrationProvider]?.has(field.key)) return false;
@@ -1055,14 +1266,21 @@ export function TenantDetailPage() {
     return field.key !== "POLLING_INTERVAL_MS" && field.key !== "RUNS_PER_DAY";
   });
   const selectedSavedIntegrationForDisplay = selectedSavedIntegration;
+  const profileCuitSuggestion = data?.profile?.cuit?.trim() ?? "";
+  const afipFormCuit = integrationFormValues.CUIT?.trim() ?? "";
+  const shouldSuggestProfileCuit = integrationProvider === "AFIP"
+    && Boolean(profileCuitSuggestion)
+    && afipFormCuit !== profileCuitSuggestion;
   const canTestIntegration = Boolean(token && !isTestingIntegration);
   const canImportMercadoPagoPayments = Boolean(token && mercadoPagoImportFrom && !isImportingMercadoPagoPayments);
+  const isReviewingOnboarding = isApprovingOnboarding || isRejectingOnboarding;
   const canApproveOnboarding = Boolean(
     token
-      && latestOnboardingSubmission
+      && pendingOnboardingSubmission
       && approvalPaymentsFrom
-      && !isApprovingOnboarding,
+      && !isReviewingOnboarding,
   );
+  const canRejectOnboarding = Boolean(token && pendingOnboardingSubmission && !isReviewingOnboarding);
   const canDeleteTenant = Boolean(
     token
       && data
@@ -1074,143 +1292,54 @@ export function TenantDetailPage() {
       tenantUser.status === "ACTIVE"
       && (tenantUser.role === "owner" || tenantUser.role === "admin"),
   );
-  const integrationByProvider = (provider: IntegrationProvider) =>
-    integrations?.find((integration) => integration.provider === provider);
-  const onboardingItems: OnboardingItem[] = data
-    ? [
-        {
-          id: "tenant-active",
-          label: "Tenant activo",
-          detail: data.identity.status === "ACTIVE" ? "El cliente puede operar." : "Activar el tenant antes de iniciar.",
-          isComplete: data.identity.status === "ACTIVE",
-          targetId: "tenant-summary",
-          impact: "Bloquea cualquier procesamiento automatico",
-          owner: "Admin",
-          action: "Activar cliente",
-        },
-        {
-          id: "tenant-profile",
-          label: "Datos fiscales aprobados",
-          detail: profileApprovalStatus === "APPROVED"
-            ? "Datos fiscales y de contacto aprobados."
-            : isProfileComplete(data.profile)
-              ? `Datos completos, estado ${getProfileApprovalLabel(profileApprovalStatus).toLowerCase()}.`
-            : "Completar razon social, CUIT, IVA, domicilio y email.",
-          isComplete: profileApprovalStatus === "APPROVED",
-          targetId: "tenant-profile",
-          impact: "Bloquea la activacion fiscal",
-          owner: "Admin",
-          action: "Revisar datos fiscales",
-        },
-        {
-          id: "plan",
-          label: "Plan asignado",
-          detail: data.currentSubscription.planName
-            ? `${data.currentSubscription.planName} asignado al cliente.`
-            : "Asignar un plan comercial antes de habilitar la operacion.",
-          isComplete: Boolean(data.currentSubscription.planName),
-          targetId: "tenant-subscription",
-          impact: "Bloquea la operacion comercial",
-          owner: "Admin",
-          action: "Asignar plan",
-        },
-        {
-          id: "portal-user",
-          label: "Usuario responsable",
-          detail: activeAdminUser
-            ? `${activeAdminUser.email} tiene rol ${activeAdminUser.role}.`
-            : "Crear al menos un owner o admin activo para el portal.",
-          isComplete: Boolean(activeAdminUser),
-          targetId: "tenant-users",
-          impact: "Impide que el cliente opere su portal",
-          owner: "Admin",
-          action: "Crear usuario",
-        },
-        {
-          id: "mercadopago",
-          label: "Mercado Pago",
-          detail: hasMeaningfulConfig(integrationByProvider("MERCADOPAGO"))
-            ? "Credenciales de cobro cargadas."
-            : "Cargar ACCESS_TOKEN y POS_ID reales.",
-          isComplete: hasMeaningfulConfig(integrationByProvider("MERCADOPAGO")),
-          targetId: "tenant-integrations",
-          impact: "Bloquea la lectura automatica de cobros",
-          owner: "Admin tecnico",
-          action: "Configurar Mercado Pago",
-        },
-        {
-          id: "afip",
-          label: "ARCA",
-          detail: hasMeaningfulConfig(integrationByProvider("AFIP"))
-            ? "Datos fiscales cargados."
-            : "Cargar CUIT, punto de venta, tipo de comprobante y certificados.",
-          isComplete: hasMeaningfulConfig(integrationByProvider("AFIP")),
-          targetId: "tenant-integrations",
-          impact: "Bloquea la emision de comprobantes",
-          owner: "Admin tecnico",
-          action: "Configurar ARCA",
-        },
-        {
-          id: "drive",
-          label: "Google Drive",
-          detail: hasMeaningfulConfig(integrationByProvider("DRIVE"))
-            ? "Conexion de Drive cargada."
-            : "Autorizar Google y configurar la carpeta de destino.",
-          isComplete: hasMeaningfulConfig(integrationByProvider("DRIVE")),
-          targetId: "tenant-integrations",
-          impact: "No bloquea facturacion, degrada entrega de PDFs",
-          owner: "Admin tecnico",
-          action: "Configurar Drive",
-        },
-        {
-          id: "sheets",
-          label: "Google Sheets",
-          detail: hasMeaningfulConfig(integrationByProvider("SHEETS"))
-            ? "Conexion de Sheets cargada."
-            : "Autorizar Google y configurar el spreadsheet de destino.",
-          isComplete: hasMeaningfulConfig(integrationByProvider("SHEETS")),
-          targetId: "tenant-integrations",
-          impact: "No bloquea facturacion, degrada registro contable",
-          owner: "Admin tecnico",
-          action: "Configurar Sheets",
-        },
-        {
-          id: "integration-health",
-          label: "Sin alertas de integraciones",
-          detail: data.integrations.needsAttentionCount === 0
-            ? "No hay alertas operativas visibles."
-            : `${data.integrations.needsAttentionCount} integraciones necesitan atencion.`,
-          isComplete: data.integrations.needsAttentionCount === 0,
-          targetId: "tenant-integrations",
-          impact: "Puede bloquear o degradar el circuito de facturacion",
-          owner: "Admin tecnico",
-          action: "Resolver alertas",
-        },
-      ]
-    : [];
-  const completedOnboardingItems = onboardingItems.filter((item) => item.isComplete).length;
-  const visibleChecklistItems = onboardingItems;
-  const onboardingStatus = getOnboardingStatus(completedOnboardingItems, onboardingItems.length || 1);
-  const operationalStatus = data ? getTenantOperationalStatus(data, onboardingItems) : null;
+  const readinessItems = data ? buildReadinessItems(data, activeAdminUser, Boolean(tenantUsers)) : [];
+  const operationalStatus = data ? getTenantOperationalStatus(data, readinessItems) : null;
   const submittedFiles = latestOnboardingSubmission?.documents ?? [];
-  const overviewPayments = payments?.items ?? data?.metrics.recentPayments ?? [];
-  const completedOverviewPayments = overviewPayments.filter((payment) => payment.status === "complete");
-  const failedOverviewPayments = overviewPayments.filter((payment) => payment.status === "failed");
-  const pendingOverviewPayments = overviewPayments.filter((payment) => payment.status !== "complete" && payment.status !== "failed");
-  const completedOverviewAmount = completedOverviewPayments.reduce((total, payment) => total + payment.amount, 0);
-  const failedOverviewAmount = failedOverviewPayments.reduce((total, payment) => total + payment.amount, 0);
-  const pendingOverviewAmount = pendingOverviewPayments.reduce((total, payment) => total + payment.amount, 0);
+  const submittedIntegrationProviders = Object.keys(
+    (latestOnboardingSubmission?.data?.integrations as Record<string, unknown> | undefined) ?? {},
+  );
+  // KPIs del resumen: totales históricos del cliente que calcula el backend (no la página de Facturación).
+  const metricStatuses = data?.metrics.statuses;
+  const completedMetrics = sumStatusMetrics(metricStatuses, (status) => status === "complete");
+  const failedMetrics = sumStatusMetrics(metricStatuses, (status) => status === "failed");
+  const pendingMetrics = sumStatusMetrics(metricStatuses, (status) => status !== "complete" && status !== "failed");
+  const recentPayments = data?.metrics.recentPayments ?? [];
+  const visibleTabs = tenantDetailTabs.filter((tab) => !tab.superadminOnly || isSuperadmin);
+
+  function openEditPanel({ activate = false }: { activate?: boolean } = {}) {
+    if (data) {
+      setTenantName(data.identity.name);
+      setTenantSlug(data.identity.slug);
+      setTenantStatus(activate ? "ACTIVE" : data.identity.status);
+    }
+    setSaveErrorMessage(null);
+    setSaveSuccessMessage(activate ? "Revisá los datos y guardá para activar el cliente." : null);
+    setIsEditPanelOpen(true);
+  }
+
+  function handleReadinessItemClick(item: ReadinessItem) {
+    if (item.id === "tenant-active") {
+      if (can("tenants:manage")) openEditPanel({ activate: true });
+      return;
+    }
+
+    if (item.id === "mercadopago") selectIntegrationProvider("MERCADOPAGO");
+    if (item.id === "afip") selectIntegrationProvider("AFIP");
+    if (item.id === "drive") selectIntegrationProvider("DRIVE");
+    if (item.id === "sheets") selectIntegrationProvider("SHEETS");
+    setActiveTab(item.tab);
+  }
 
   async function handleUpdateTenant(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     if (!slug || !token) {
-      setSaveErrorMessage("No tenemos una sesion o tenant valido para guardar cambios.");
+      setSaveErrorMessage("No hay una sesión o un cliente válido para guardar cambios.");
       return;
     }
 
     if (!canSaveTenant) {
-      setSaveErrorMessage("Completa nombre y slug para actualizar el tenant.");
+      setSaveErrorMessage("Completá el nombre y el identificador para actualizar el cliente.");
       return;
     }
 
@@ -1229,7 +1358,7 @@ export function TenantDetailPage() {
         },
       });
 
-      setSaveSuccessMessage(`Tenant ${updatedTenant.name} actualizado correctamente.`);
+      setSaveSuccessMessage(`Cliente ${updatedTenant.name} actualizado.`);
 
       if (updatedTenant.slug !== slug) {
         navigate(`/admin/tenants/${updatedTenant.slug}`, { replace: true });
@@ -1238,7 +1367,7 @@ export function TenantDetailPage() {
 
       await reload();
     } catch (error) {
-      setSaveErrorMessage(getApiErrorMessage(error, "No se pudo actualizar el tenant."));
+      setSaveErrorMessage(getApiErrorMessage(error, "No se pudo actualizar el cliente."));
     } finally {
       setIsSaving(false);
     }
@@ -1248,7 +1377,7 @@ export function TenantDetailPage() {
     event.preventDefault();
 
     if (!slug || !token) {
-      setProfileErrorMessage("No tenemos una sesion o tenant valido para guardar datos.");
+      setProfileErrorMessage("No hay una sesión o un cliente válido para guardar datos.");
       return;
     }
 
@@ -1284,7 +1413,7 @@ export function TenantDetailPage() {
 
   async function handleReviewProfile(status: "APPROVED" | "REJECTED") {
     if (!slug || !token) {
-      setProfileReviewErrorMessage("No tenemos una sesion o tenant valido para revisar datos.");
+      setProfileReviewErrorMessage("No hay una sesión o un cliente válido para revisar datos.");
       return;
     }
 
@@ -1316,7 +1445,7 @@ export function TenantDetailPage() {
     event.preventDefault();
 
     if (!slug || !token) {
-      setSubscriptionErrorMessage("No tenemos una sesion o tenant valido para guardar la suscripcion.");
+      setSubscriptionErrorMessage("No hay una sesión o un cliente válido para guardar la suscripcion.");
       return;
     }
 
@@ -1354,7 +1483,7 @@ export function TenantDetailPage() {
     event.preventDefault();
 
     if (!slug || !token) {
-      setNoteErrorMessage("No tenemos una sesion o tenant valido para crear la nota.");
+      setNoteErrorMessage("No hay una sesión o un cliente válido para crear la nota.");
       return;
     }
 
@@ -1391,6 +1520,7 @@ export function TenantDetailPage() {
   }
 
   function startUserEdit(user: TenantUser) {
+    setEditingUserId(user.id);
     setUserEmail(user.email);
     setUserRole(user.role);
     setUserStatus(user.status);
@@ -1403,17 +1533,17 @@ export function TenantDetailPage() {
     event.preventDefault();
 
     if (!slug || !token) {
-      setUserErrorMessage("No tenemos una sesion o tenant valido para guardar el usuario.");
+      setUserErrorMessage("No hay una sesión o un cliente válido para guardar el usuario.");
       return;
     }
 
     if (!canSaveUser) {
-      setUserErrorMessage("Completa el email para guardar el usuario.");
+      setUserErrorMessage("Completá el email para guardar el usuario.");
       return;
     }
 
     if (userPassword && userPassword.length < 8) {
-      setUserErrorMessage("La contrasena debe tener al menos 8 caracteres.");
+      setUserErrorMessage("La contraseña debe tener al menos 8 caracteres.");
       return;
     }
 
@@ -1433,11 +1563,12 @@ export function TenantDetailPage() {
         },
       });
 
+      setEditingUserId(null);
       setUserEmail("");
       setUserRole("viewer");
       setUserStatus("ACTIVE");
       setUserPassword("");
-      setUserSuccessMessage("Usuario guardado correctamente.");
+      setUserSuccessMessage("Usuario guardado.");
       await Promise.all([reloadUsers(), reload()]);
     } catch (error) {
       setUserErrorMessage(getApiErrorMessage(error, "No se pudo guardar el usuario."));
@@ -1447,13 +1578,8 @@ export function TenantDetailPage() {
   }
 
   function selectIntegrationProvider(provider: IntegrationProvider) {
-    const savedIntegration = integrations?.find((integration) => integration.provider === provider);
+    // El efecto de reinicio carga la configuración guardada del nuevo proveedor.
     setIntegrationProvider(provider);
-    setIntegrationFormValues({
-      ...buildIntegrationFormValues(provider, savedIntegration?.config),
-      ...(provider === "AFIP" && profileCuit.trim() ? { CUIT: profileCuit.trim() } : {}),
-    });
-    setIsIntegrationEnabled(savedIntegration?.enabled ?? true);
     setIntegrationErrorMessage(null);
     setIntegrationSuccessMessage(null);
     setIntegrationTestResult(null);
@@ -1463,49 +1589,31 @@ export function TenantDetailPage() {
     setProfileCuit(value);
     setProfileErrorMessage(null);
     setProfileSuccessMessage(null);
-
-    if (integrationProvider === "AFIP") {
-      setIntegrationFormValues((currentValues) => ({ ...currentValues, CUIT: value }));
-    }
   }
 
   function updateIntegrationField(field: string, value: string) {
     setIntegrationFormValues((currentValues) => ({ ...currentValues, [field]: value }));
-    if (integrationProvider === "AFIP" && field === "CUIT") {
-      setProfileCuit(value);
-    }
     setIntegrationErrorMessage(null);
     setIntegrationSuccessMessage(null);
     setIntegrationTestResult(null);
   }
 
-  async function syncProfileCuitFromAfip(cuit: unknown) {
-    const normalizedCuit = String(cuit ?? "").trim();
-
-    if (!slug || !token || !normalizedCuit || normalizedCuit === String(data?.profile?.cuit ?? "").trim()) {
-      return;
-    }
-
-    await apiRequest<TenantProfile>(`/admin/tenants/${slug}/profile`, {
-      method: "PUT",
-      token,
-      body: {
-        legalName: profileLegalName,
-        tradeName: profileTradeName,
-        cuit: normalizedCuit,
-        ivaCondition: profileIvaCondition,
-        fiscalAddress: profileFiscalAddress,
-        contactEmail: profileContactEmail,
-        contactPhone: profileContactPhone,
-        responsibleName: profileResponsibleName,
-        responsibleEmail: profileResponsibleEmail,
-      },
-    });
+  function updateMercadopagoPollingMode(mode: MercadopagoPollingMode) {
+    setIntegrationFormValues((currentValues) => ({
+      ...currentValues,
+      POLLING_MODE: mode,
+      ...(mode === "scheduled" && !currentValues.RUNS_PER_DAY?.trim() && !currentValues.RUN_AT_TIMES?.trim()
+        ? { RUNS_PER_DAY: "1" }
+        : {}),
+    }));
+    setIntegrationErrorMessage(null);
+    setIntegrationSuccessMessage(null);
+    setIntegrationTestResult(null);
   }
 
   async function revealIntegrationConfig(provider: IntegrationProvider) {
     if (!slug || !token) {
-      throw new Error("No tenemos una sesion o tenant valido para mostrar secretos.");
+      throw new Error("No hay una sesión o un cliente válido para mostrar secretos.");
     }
 
     const revealedIntegrations = await apiRequest<TenantIntegration[]>(`/admin/tenants/${slug}/integrations?revealSecrets=true`, {
@@ -1514,7 +1622,7 @@ export function TenantDetailPage() {
     const revealedIntegration = revealedIntegrations.find((integration) => integration.provider === provider);
 
     if (!revealedIntegration) {
-      throw new Error(`No hay configuracion guardada para ${getIntegrationProviderLabel(provider)}.`);
+      throw new Error(`No hay configuración guardada para ${getIntegrationProviderLabel(provider)}.`);
     }
 
     setRevealedIntegrationByProvider((currentValues) => ({
@@ -1536,6 +1644,11 @@ export function TenantDetailPage() {
     const currentValue = integrationFormValues[fieldKey];
 
     if (hasMaskedValue(currentValue)) {
+      if (!canRevealSecrets) {
+        setIntegrationErrorMessage("Tu rol no puede ver secretos guardados. Podés reemplazarlos por un valor nuevo.");
+        return;
+      }
+
       setIsRevealingIntegrationSecrets(true);
       setIntegrationErrorMessage(null);
 
@@ -1567,8 +1680,8 @@ export function TenantDetailPage() {
       return;
     }
 
-    if (!slug || !token) {
-      setIntegrationErrorMessage("No tenemos una sesion o tenant valido para mostrar secretos.");
+    if (!slug || !token || !canRevealSecrets) {
+      setIntegrationErrorMessage("No podés ver secretos guardados con tu sesión actual.");
       return;
     }
 
@@ -1584,7 +1697,9 @@ export function TenantDetailPage() {
     }
   }
 
-  async function preserveAfipManagedFiles(config: Record<string, unknown>) {
+  // Certificado y clave de ARCA: solo se envían si se subió un archivo nuevo. Si se omiten,
+  // el backend conserva los guardados, así que no hace falta revelar secretos para guardar o probar.
+  function withUploadedAfipFiles(config: Record<string, unknown>) {
     if (integrationProvider !== "AFIP") {
       return config;
     }
@@ -1596,23 +1711,33 @@ export function TenantDetailPage() {
 
       if (currentValue?.trim() && !hasMaskedValue(currentValue)) {
         nextConfig[key] = currentValue.trim();
-        continue;
-      }
-
-      if (selectedSavedIntegration?.config[key] && !hasMaskedValue(selectedSavedIntegration.config[key])) {
-        nextConfig[key] = selectedSavedIntegration.config[key];
-        continue;
-      }
-
-      if (selectedSavedIntegration?.config[key]) {
-        const revealedIntegration = revealedIntegrationByProvider.AFIP ?? await revealIntegrationConfig("AFIP");
-        if (revealedIntegration.config[key]) {
-          nextConfig[key] = revealedIntegration.config[key];
-        }
+      } else {
+        delete nextConfig[key];
       }
     }
 
     return nextConfig;
+  }
+
+  /** Arma la configuración a enviar y devuelve un mensaje si falta algo. */
+  function buildSubmittedIntegrationConfig(action: "guardar" | "probar") {
+    let config = buildIntegrationConfig(integrationProvider, integrationFormValues, selectedIntegrationFields);
+
+    if (integrationProvider === "MERCADOPAGO") {
+      config.POLLING_MODE = selectedMercadopagoPollingMode;
+
+      if (selectedMercadopagoPollingMode === "scheduled" && selectedMercadopagoScheduleMode === "runs" && !config.RUNS_PER_DAY) {
+        return { config, error: "Indicá cuántas lecturas por día querés hacer." };
+      }
+    }
+
+    config = withUploadedAfipFiles(config);
+
+    if (hasBlankConfigValue(config)) {
+      return { config, error: `Completá los campos vacíos antes de ${action}.` };
+    }
+
+    return { config, error: null };
   }
 
   function updateMercadopagoScheduleMode(mode: MercadopagoScheduleMode) {
@@ -1670,29 +1795,14 @@ export function TenantDetailPage() {
     event.preventDefault();
 
     if (!slug || !token) {
-      setIntegrationErrorMessage("No tenemos una sesion o tenant valido para guardar la integracion.");
+      setIntegrationErrorMessage("No hay una sesión o un cliente válido para guardar la integración.");
       return;
     }
 
-    let config = buildIntegrationConfig(integrationProvider, {
-      ...integrationFormValues,
-      ...(integrationProvider === "MERCADOPAGO" ? { POLLING_MODE: selectedMercadopagoPollingMode } : {}),
-    }, selectedIntegrationFields);
-    if (integrationProvider === "MERCADOPAGO") {
-      config.POLLING_MODE = selectedMercadopagoPollingMode;
-    }
-    if (integrationProvider === "AFIP" && profileCuit.trim()) {
-      config.CUIT = profileCuit.trim();
-    }
-    config = await preserveAfipManagedFiles(config);
+    const { config, error: configError } = buildSubmittedIntegrationConfig("guardar");
 
-    if (hasBlankConfigValue(config)) {
-      setIntegrationErrorMessage("Completa los campos vacios antes de guardar la integracion.");
-      return;
-    }
-
-    if (hasMaskedValue(config)) {
-      setIntegrationErrorMessage("Reemplaza los valores enmascarados con secretos reales antes de guardar.");
+    if (configError) {
+      setIntegrationErrorMessage(configError);
       return;
     }
 
@@ -1709,14 +1819,11 @@ export function TenantDetailPage() {
           config,
         },
       });
-      if (integrationProvider === "AFIP") {
-        await syncProfileCuitFromAfip(config.CUIT);
-      }
 
-      setIntegrationSuccessMessage(`Integracion ${integrationProvider} guardada correctamente.`);
+      setIntegrationSuccessMessage(`${getIntegrationProviderLabel(integrationProvider)} guardada.`);
       await Promise.all([reloadIntegrations(), reload()]);
     } catch (error) {
-      setIntegrationErrorMessage(getApiErrorMessage(error, "No se pudo guardar la integracion."));
+      setIntegrationErrorMessage(getApiErrorMessage(error, "No se pudo guardar la integración."));
     } finally {
       setIsSavingIntegration(false);
     }
@@ -1724,13 +1831,13 @@ export function TenantDetailPage() {
 
   async function handleAuthorizeGoogle() {
     if (!slug || !token) {
-      setIntegrationErrorMessage("No tenemos una sesion o tenant valido para conectar Google.");
+      setIntegrationErrorMessage("No hay una sesión o un cliente válido para conectar Google.");
       return;
     }
 
     const popup = window.open("about:blank", "facturador-google-oauth", "popup,width=620,height=760");
     if (!popup) {
-      setIntegrationErrorMessage("El navegador bloqueo la ventana de Google. Habilita popups e intenta nuevamente.");
+      setIntegrationErrorMessage("El navegador bloqueó la ventana de Google. Habilitá las ventanas emergentes y probá de nuevo.");
       return;
     }
 
@@ -1766,19 +1873,19 @@ export function TenantDetailPage() {
           if (completed) return;
           if (popup.closed) {
             cleanup();
-            reject(new Error("La ventana se cerro antes de confirmar la autorizacion Google."));
+            reject(new Error("La ventana se cerró antes de confirmar la autorización de Google."));
             return;
           }
           if (Date.now() - startedAt > 10 * 60 * 1000) {
             cleanup();
             popup.close();
-            reject(new Error("La autorizacion Google excedio el tiempo disponible."));
+            reject(new Error("La autorización de Google superó el tiempo disponible."));
           }
         }, 500);
         window.addEventListener("message", handleMessage);
       });
 
-      setIntegrationSuccessMessage("Autorizacion Google finalizada. Se actualizaron Drive y Sheets del tenant.");
+      setIntegrationSuccessMessage("Autorización de Google lista. Se actualizaron Drive y Sheets del cliente.");
       await Promise.all([reloadIntegrations(), reload()]);
     } catch (error) {
       popup.close();
@@ -1790,29 +1897,14 @@ export function TenantDetailPage() {
 
   async function handleTestIntegration() {
     if (!slug || !token) {
-      setIntegrationErrorMessage("No tenemos una sesion o tenant valido para probar la integracion.");
+      setIntegrationErrorMessage("No hay una sesión o un cliente válido para probar la integración.");
       return;
     }
 
-    let config = buildIntegrationConfig(integrationProvider, {
-      ...integrationFormValues,
-      ...(integrationProvider === "MERCADOPAGO" ? { POLLING_MODE: selectedMercadopagoPollingMode } : {}),
-    }, selectedIntegrationFields);
-    if (integrationProvider === "MERCADOPAGO") {
-      config.POLLING_MODE = selectedMercadopagoPollingMode;
-    }
-    if (integrationProvider === "AFIP" && profileCuit.trim()) {
-      config.CUIT = profileCuit.trim();
-    }
-    config = await preserveAfipManagedFiles(config);
+    const { config, error: configError } = buildSubmittedIntegrationConfig("probar");
 
-    if (hasBlankConfigValue(config)) {
-      setIntegrationErrorMessage("Completa los campos vacios antes de probar la conexion.");
-      return;
-    }
-
-    if (hasMaskedValue(config)) {
-      setIntegrationErrorMessage("Reemplaza los valores enmascarados con secretos reales antes de probar.");
+    if (configError) {
+      setIntegrationErrorMessage(configError);
       return;
     }
 
@@ -1836,7 +1928,7 @@ export function TenantDetailPage() {
 
       setIntegrationTestResult(response);
     } catch (error) {
-      setIntegrationErrorMessage(getApiErrorMessage(error, "No se pudo probar la integracion."));
+      setIntegrationErrorMessage(getApiErrorMessage(error, "No se pudo probar la integración."));
     } finally {
       setIsTestingIntegration(false);
     }
@@ -1846,7 +1938,7 @@ export function TenantDetailPage() {
     event.preventDefault();
 
     if (!slug || !token) {
-      setMercadoPagoImportErrorMessage("No tenemos una sesion o tenant valido para traer pagos.");
+      setMercadoPagoImportErrorMessage("No hay una sesión o un cliente válido para traer pagos.");
       return;
     }
 
@@ -1885,13 +1977,13 @@ export function TenantDetailPage() {
   async function handleApproveOnboarding(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (!slug || !token || !latestOnboardingSubmission) {
-      setApprovalErrorMessage("No tenemos una sesion o tenant valido para aprobar el alta.");
+    if (!slug || !token || !pendingOnboardingSubmission) {
+      setApprovalErrorMessage("No hay un envío pendiente para aprobar.");
       return;
     }
 
     if (!approvalPaymentsFrom) {
-      setApprovalErrorMessage("Elegi desde que fecha comenzar a procesar pagos.");
+      setApprovalErrorMessage("Elegí desde qué fecha empezar a procesar pagos.");
       return;
     }
 
@@ -1901,18 +1993,20 @@ export function TenantDetailPage() {
 
     try {
       const response = await apiRequest<TenantOperationalActionResponse>(
-        `/admin/tenants/${slug}/onboarding/${latestOnboardingSubmission.id}/approve`,
+        `/admin/tenants/${slug}/onboarding/${pendingOnboardingSubmission.id}/approve`,
         {
           method: "POST",
           token,
           body: {
             processingStartDate: approvalPaymentsFrom,
+            reviewNotes: onboardingReviewNotes.trim() || undefined,
             enableProcessing: true,
           },
         },
       );
 
-      setApprovalMessage(response.message ?? "Alta aprobada. El procesamiento de pagos quedo solicitado.");
+      setOnboardingReviewNotes("");
+      setApprovalMessage(response.message ?? "Alta aprobada. Quedó pedido el procesamiento de pagos.");
       await Promise.all([reload(), reloadIntegrations(), reloadPayments(), reloadOnboardingSubmissions()]);
     } catch (error) {
       setApprovalErrorMessage(getApiErrorMessage(error, "No se pudo aprobar el alta del cliente."));
@@ -1921,9 +2015,41 @@ export function TenantDetailPage() {
     }
   }
 
+  async function handleRejectOnboarding() {
+    if (!slug || !token || !pendingOnboardingSubmission) {
+      setApprovalErrorMessage("No hay un envío pendiente para rechazar.");
+      return;
+    }
+
+    if (!onboardingReviewNotes.trim()) {
+      setApprovalErrorMessage("Contale al cliente por qué rechazás el envío en la nota de revisión.");
+      return;
+    }
+
+    setIsRejectingOnboarding(true);
+    setApprovalMessage(null);
+    setApprovalErrorMessage(null);
+
+    try {
+      await apiRequest(`/admin/tenants/${slug}/onboarding/${pendingOnboardingSubmission.id}/reject`, {
+        method: "POST",
+        token,
+        body: { reviewNotes: onboardingReviewNotes.trim() },
+      });
+
+      setOnboardingReviewNotes("");
+      setApprovalMessage("Envío rechazado. El cliente puede corregirlo y volver a enviarlo.");
+      await reloadOnboardingSubmissions();
+    } catch (error) {
+      setApprovalErrorMessage(getApiErrorMessage(error, "No se pudo rechazar el envío."));
+    } finally {
+      setIsRejectingOnboarding(false);
+    }
+  }
+
   async function handleExportPayments() {
     if (!slug || !token) {
-      setPaymentsExportErrorMessage("No tenemos una sesion o tenant valido para exportar pagos.");
+      setPaymentsExportErrorMessage("No hay una sesión o un cliente válido para exportar pagos.");
       return;
     }
 
@@ -1969,12 +2095,12 @@ export function TenantDetailPage() {
     event.preventDefault();
 
     if (!slug || !token || !data) {
-      setDeleteErrorMessage("No tenemos una sesion o tenant valido para eliminar.");
+      setDeleteErrorMessage("No hay una sesión o un cliente válido para eliminar.");
       return;
     }
 
     if (deleteConfirmationSlug !== data.identity.slug) {
-      setDeleteErrorMessage("Escribi el slug exacto para confirmar la eliminacion.");
+      setDeleteErrorMessage("Escribí el identificador exacto para confirmar la eliminación.");
       return;
     }
 
@@ -1990,9 +2116,9 @@ export function TenantDetailPage() {
         },
       );
 
-      navigate("/tenants", { replace: true });
+      navigate("/admin/tenants", { replace: true });
     } catch (error) {
-      setDeleteErrorMessage(getApiErrorMessage(error, "No se pudo eliminar el tenant."));
+      setDeleteErrorMessage(getApiErrorMessage(error, "No se pudo eliminar el cliente."));
     } finally {
       setIsDeletingTenant(false);
     }
@@ -2002,7 +2128,7 @@ export function TenantDetailPage() {
     <main className="client-detail-page">
       <section className="detail-header">
         <div>
-          <Link to="/tenants" className="detail-breadcrumb">
+          <Link to="/admin/tenants" className="detail-breadcrumb">
             <span aria-hidden="true">{"<"}</span> Clientes <span aria-hidden="true">/</span> {data?.identity.name ?? "Cliente"}
           </Link>
           <div className="detail-title-row">
@@ -2015,20 +2141,34 @@ export function TenantDetailPage() {
           </div>
           <p className="detail-header__copy">
             {data
-              ? `CUIT ${data.profile?.cuit ?? "sin cargar"} - ${data.currentSubscription.planName ?? "Sin plan"}`
+              ? `CUIT ${data.profile?.cuit ?? "sin cargar"} · ${data.currentSubscription.planName ?? "Sin plan"} · ${data.identity.status === "ACTIVE" ? "Activo" : "Deshabilitado"}`
               : "Estamos preparando la vista operativa del cliente."}
           </p>
         </div>
+        {data ? (
+          <PermissionGate permission="tenants:manage">
+            <div className="detail-header__actions">
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={() => openEditPanel()}
+                disabled={isEditPanelOpen}
+              >
+                Editar cliente
+              </button>
+            </div>
+          </PermissionGate>
+        ) : null}
       </section>
 
-      {isLoading ? (
+      {!data && isLoading ? (
         <section className="panel">
           <div className="panel-state">
             <strong>Cargando detalle...</strong>
-            <span>Consultando informacion del cliente en el monitor admin.</span>
+            <span>Consultando la información del cliente.</span>
           </div>
         </section>
-      ) : errorMessage ? (
+      ) : !data && errorMessage ? (
         <section className="panel">
           <div className="panel-state panel-state--danger">
             <strong>No pudimos cargar el detalle</strong>
@@ -2037,256 +2177,15 @@ export function TenantDetailPage() {
         </section>
       ) : data ? (
         <>
-          <nav className="detail-section-tabs" aria-label="Secciones del cliente">
-            {[
-              ["summary", "Resumen"],
-              ["profile", "Datos fiscales"],
-              ["subscription", "Plan y estado"],
-              ["integrations", "Integraciones"],
-              ["payments", "Facturacion"],
-              ["users", "Usuarios"],
-              ["notes", "Notas"],
-              ["advanced", "Avanzado"],
-            ].map(([tab, label]) => (
-              <button
-                key={tab}
-                type="button"
-                className={activeTab === tab ? "detail-section-tabs__active" : ""}
-                onClick={() => setActiveTab(tab as TenantDetailTab)}
-              >
-                {label}
-              </button>
-            ))}
-          </nav>
-
-          {activeTab === "summary" ? <section id="tenant-summary" className="client-overview-grid">
-            <aside className="client-operational-card">
-              <h3>Estado operativo</h3>
-              <p>{operationalStatus?.label === "Listo para facturar" ? "El cliente puede facturar automaticamente." : operationalStatus?.detail}</p>
-              <div className="client-checklist">
-                {visibleChecklistItems.map((item) => (
-                  <button
-                    key={item.id}
-                    type="button"
-                    className="client-checklist__item"
-                    onClick={() => {
-                      if (item.targetId === "tenant-profile") setActiveTab("profile");
-                      if (item.targetId === "tenant-subscription") setActiveTab("subscription");
-                      if (item.targetId === "tenant-integrations") setActiveTab("integrations");
-                      if (item.targetId === "tenant-users") setActiveTab("users");
-                    }}
-                  >
-                    <span className={`client-checklist__mark${item.isComplete ? " client-checklist__mark--complete" : ""}`}>
-                      {item.isComplete ? "✓" : "!"}
-                    </span>
-                    <span>
-                      <strong>{item.label}</strong>
-                      <small>{item.isComplete ? item.detail : item.action}</small>
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </aside>
-
-            <section className="client-activity-panel">
-              <div className="client-activity-heading">
-                <h3>Resumen de actividad <span>(ultimos 7 dias)</span></h3>
-              </div>
-              <div className="client-activity-kpis">
-                <article>
-                  <span>Pagos recibidos</span>
-                  <strong>{overviewPayments.length}</strong>
-                  <small>{formatCurrency(data.metrics.totalAmount)}</small>
-                </article>
-                <article>
-                  <span>Facturas emitidas</span>
-                  <strong>{completedOverviewPayments.length}</strong>
-                  <small>{formatCurrency(completedOverviewAmount)}</small>
-                </article>
-                <article>
-                  <span>Con error</span>
-                  <strong>{failedOverviewPayments.length}</strong>
-                  <small>{formatCurrency(failedOverviewAmount)}</small>
-                </article>
-                <article>
-                  <span>Pendientes</span>
-                  <strong>{pendingOverviewPayments.length}</strong>
-                  <small>{formatCurrency(pendingOverviewAmount)}</small>
-                </article>
-              </div>
-
-              <div className="client-payments-table">
-                <h3>Ultimos pagos</h3>
-                <div className="client-payments-table__head">
-                  <span>Fecha</span>
-                  <span>Importe</span>
-                  <span>Etapa actual</span>
-                  <span>Estado</span>
-                  <span>Accion</span>
-                </div>
-                {overviewPayments.slice(0, 5).map((payment) => (
-                  <div key={payment.id} className="client-payments-table__row">
-                    <span>{formatDateTime(payment.createdAt)}</span>
-                    <strong>{formatCurrency(payment.amount)}</strong>
-                    <span>{getPaymentStageLabel(payment.status)}</span>
-                    <span>
-                      <small className={`status-chip status-chip--${getPaymentStageTone(payment.status)}`}>
-                        {payment.status === "complete" ? "Completado" : payment.status === "failed" ? "Error" : "Pendiente"}
-                      </small>
-                    </span>
-                    <Link to={`/admin/payments/${payment.id}`} className="section-mini-button">Ver</Link>
-                  </div>
-                ))}
-                {overviewPayments.length === 0 ? (
-                  <div className="client-payments-table__empty">Todavia no hay pagos recientes.</div>
-                ) : null}
-              </div>
-            </section>
-          </section> : null}
-
-          <section className={`panel operational-summary operational-summary--${operationalStatus?.tone ?? "muted"}`}>
-            <div>
-              <span className="eyebrow">Estado operativo</span>
-              <h2>{operationalStatus?.label}</h2>
-              <p>{operationalStatus?.detail}</p>
-            </div>
-            <div className="operational-summary__action">
-              <span>Accion recomendada</span>
-              <strong>{operationalStatus?.action}</strong>
-            </div>
-          </section>
-
-          <nav className="detail-section-tabs" aria-label="Secciones del cliente">
-            <a href="#tenant-summary">Resumen</a>
-            <a href="#tenant-profile">Datos fiscales</a>
-            <a href="#tenant-subscription">Plan</a>
-            <a href="#tenant-integrations">Integraciones</a>
-            <a href="#tenant-payments">Facturacion</a>
-            <a href="#tenant-advanced">Avanzado</a>
-          </nav>
-
-          <section className="panel onboarding-panel">
-            <div className="onboarding-panel__summary">
-              <div>
-                <span className="eyebrow">Alta de cliente</span>
-                <h2>Que falta para operar</h2>
-                <p>{onboardingStatus.detail}</p>
-              </div>
-              <div className={`onboarding-score onboarding-score--${onboardingStatus.tone}`}>
-                <strong>{completedOnboardingItems}/{onboardingItems.length}</strong>
-                <span>checks completos</span>
-              </div>
-            </div>
-
-            <div className="onboarding-list">
-              {onboardingItems.map((item) => (
-                <a key={item.id} className="onboarding-item" href={`#${item.targetId}`}>
-                  <span className={`onboarding-item__mark${item.isComplete ? " onboarding-item__mark--complete" : ""}`}>
-                    {item.isComplete ? "OK" : "!"}
-                  </span>
-                  <div>
-                    <strong>{item.label}</strong>
-                    <p>{item.detail}</p>
-                    <small>{item.impact} - {item.owner} - {item.action}</small>
-                  </div>
-                </a>
-              ))}
-            </div>
-          </section>
-
-          <section className="panel onboarding-review-panel">
-            <div className="panel-heading">
-              <div>
-                <span className="eyebrow">Revision final</span>
-                <h2>Alta y procesamiento</h2>
-              </div>
-              {latestOnboardingSubmission ? (
-                <span className={`badge badge--${latestOnboardingSubmission.status === "approved" ? "success" : latestOnboardingSubmission.status === "pending" ? "warning" : "muted"}`}>
-                  {prettifyStatus(latestOnboardingSubmission.status)}
-                </span>
-              ) : (
-                <span className="badge badge--muted">Sin solicitud</span>
-              )}
-            </div>
-
-            <div className="onboarding-review-grid">
-              <div className="onboarding-review-card">
-                <strong>Documentacion del cliente</strong>
-                {areOnboardingSubmissionsLoading ? (
-                  <p>Cargando envios de onboarding...</p>
-                ) : onboardingSubmissionsErrorMessage ? (
-                  <p>{onboardingSubmissionsErrorMessage}</p>
-                ) : latestOnboardingSubmission ? (
-                  <>
-                    <span>
-                      {`Envio ${latestOnboardingSubmission.id} - actualizado ${formatDateTime(latestOnboardingSubmission.updatedAt)}`}
-                    </span>
-                    {submittedFiles.length > 0 ? (
-                      <div className="onboarding-files-list">
-                        {submittedFiles.map((file) => (
-                          <a key={`${file.type}-${file.name}`} href={file.url} target="_blank" rel="noreferrer">
-                            <span>{file.name}</span>
-                            <small>{prettifyStatus(file.type)}</small>
-                          </a>
-                        ))}
-                      </div>
-                    ) : (
-                      <p>Todavia no hay archivos expuestos por el backend para revisar.</p>
-                    )}
-                  </>
-                ) : (
-                  <p>
-                    Cuando el portal permita al cliente subir datos fiscales, certificados y accesos, esta seccion va a mostrar lo enviado para revisarlo antes de aprobar.
-                  </p>
-                )}
-              </div>
-
-              <PermissionGate
-                permission="tenants:manage"
-                fallback={
-                  <div className="panel-state">
-                    <strong>Solo lectura</strong>
-                    <span>Tu rol puede revisar el alta, pero no aprobar ni disparar procesamiento.</span>
-                  </div>
-                }
-              >
-                <form className="onboarding-action-form" onSubmit={(event) => void handleApproveOnboarding(event)}>
-                  {latestOnboardingSubmission ? (
-                    <span>{`Envio seleccionado: ${latestOnboardingSubmission.id}`}</span>
-                  ) : (
-                    <span>No hay envios pendientes para aprobar.</span>
-                  )}
-                  <label className="field">
-                    <span>Procesar pagos desde</span>
-                    <input
-                      type="date"
-                      value={approvalPaymentsFrom}
-                      onChange={(event) => {
-                        setApprovalPaymentsFrom(event.target.value);
-                        setApprovalErrorMessage(null);
-                        setApprovalMessage(null);
-                      }}
-                      disabled={isApprovingOnboarding}
-                    />
-                  </label>
-                  <button type="submit" className="primary-button" disabled={!canApproveOnboarding}>
-                    {isApprovingOnboarding ? "Aprobando..." : "Aprobar alta y procesar"}
-                  </button>
-                  <span>
-                    Al aprobar se pide activar el tenant y comenzar el circuito de pagos desde la fecha elegida.
-                  </span>
-                  {approvalErrorMessage ? <p className="form-error">{approvalErrorMessage}</p> : null}
-                  {approvalMessage ? <p className="form-success">{approvalMessage}</p> : null}
-                </form>
-              </PermissionGate>
-            </div>
-          </section>
+          {errorMessage ? (
+            <p className="form-error" role="alert">{`No pudimos actualizar el detalle: ${errorMessage}`}</p>
+          ) : null}
 
           {isEditPanelOpen ? (
-            <section className="panel tenant-form-panel" aria-label="Editar tenant">
+            <section className="panel tenant-form-panel" aria-label="Editar cliente">
               <div className="panel-heading">
                 <div>
-                  <span className="eyebrow">Datos basicos</span>
+                  <span className="eyebrow">Datos básicos</span>
                   <h2>Editar cliente</h2>
                 </div>
                 <button
@@ -2295,11 +2194,14 @@ export function TenantDetailPage() {
                   disabled={isSaving}
                   onClick={() => {
                     setIsEditPanelOpen(false);
+                    setTenantName(data.identity.name);
+                    setTenantSlug(data.identity.slug);
+                    setTenantStatus(data.identity.status);
                     setSaveErrorMessage(null);
                     setSaveSuccessMessage(null);
                   }}
                 >
-                  Cancelar
+                  Cerrar
                 </button>
               </div>
 
@@ -2315,11 +2217,12 @@ export function TenantDetailPage() {
                       setSaveSuccessMessage(null);
                     }}
                     disabled={isSaving}
+                    required
                   />
                 </label>
 
                 <label className="field">
-                  <span>Slug</span>
+                  <span>Identificador para ingresar</span>
                   <input
                     type="text"
                     value={tenantSlug}
@@ -2329,7 +2232,9 @@ export function TenantDetailPage() {
                       setSaveSuccessMessage(null);
                     }}
                     disabled={isSaving}
+                    required
                   />
+                  <small>Es lo que el cliente escribe para entrar al portal. Si lo cambiás, avisale.</small>
                 </label>
 
                 <label className="field">
@@ -2353,7 +2258,7 @@ export function TenantDetailPage() {
                     {isSaving ? "Guardando..." : "Guardar cambios"}
                   </button>
                   <span>
-                    Si cambias el slug, vamos a moverte automaticamente a la nueva ruta.
+                    Si cambiás el identificador, te llevamos automáticamente a la nueva dirección.
                   </span>
                 </div>
 
@@ -2363,48 +2268,244 @@ export function TenantDetailPage() {
             </section>
           ) : null}
 
-          {false ? <PermissionGate permission="tenants:manage">
-            <section className="panel danger-zone-panel" aria-label="Eliminar tenant">
-              <div className="panel-heading">
-                <div>
-                  <span className="eyebrow">Reset de pruebas</span>
-                  <h2>Eliminar tenant</h2>
-                </div>
-                <span className="badge badge--danger">Destructivo</span>
+          <nav className="detail-section-tabs" aria-label="Secciones del cliente" role="tablist">
+            {visibleTabs.map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                role="tab"
+                aria-selected={activeTab === tab.id}
+                className={activeTab === tab.id ? "detail-section-tabs__active" : ""}
+                onClick={() => setActiveTab(tab.id)}
+              >
+                {tab.label}
+                {tab.id === "onboarding" && pendingOnboardingSubmission ? (
+                  <span className="tenant-detail-tab-dot" aria-label="Envío pendiente de revisión" />
+                ) : null}
+              </button>
+            ))}
+          </nav>
+
+          {activeTab === "summary" ? <section id="tenant-summary" className="client-overview-grid">
+            <aside className="client-operational-card">
+              <h3>Estado operativo</h3>
+              <p>{operationalStatus?.detail}</p>
+              {operationalStatus && operationalStatus.label !== "Listo para facturar" ? (
+                <p className="tenant-readiness-action">
+                  <span>Acción recomendada:</span> <strong>{operationalStatus.action}</strong>
+                </p>
+              ) : null}
+              <div className="client-checklist">
+                {readinessItems.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    className="client-checklist__item"
+                    onClick={() => handleReadinessItemClick(item)}
+                    disabled={item.id === "tenant-active" && (item.isComplete || !can("tenants:manage"))}
+                  >
+                    <span className={`client-checklist__mark${item.isComplete ? " client-checklist__mark--complete" : ""}`}>
+                      {item.isComplete ? "✓" : "!"}
+                    </span>
+                    <span>
+                      <strong>{item.label}</strong>
+                      <small>{item.detail}</small>
+                      {!item.isComplete && item.severity === "degraded" ? (
+                        <small className="tenant-readiness-note">No bloquea la facturación</small>
+                      ) : null}
+                    </span>
+                  </button>
+                ))}
+              </div>
+              {data.currentSubscription.policy && data.currentSubscription.policy.entitlements.googleDriveSheets !== true ? (
+                <p className="tenant-readiness-note">Google Drive y Sheets no están incluidos en el plan actual.</p>
+              ) : null}
+            </aside>
+
+            <section className="client-activity-panel">
+              <div className="client-activity-heading">
+                <h3>Resumen de actividad <span>(histórico)</span></h3>
+              </div>
+              <div className="client-activity-kpis">
+                <article>
+                  <span>Pagos recibidos</span>
+                  <strong>{data.metrics.totalPayments}</strong>
+                  <small>{formatCurrency(data.metrics.totalAmount)}</small>
+                </article>
+                <article>
+                  <span>Facturas emitidas</span>
+                  <strong>{completedMetrics.count}</strong>
+                  <small>{formatCurrency(completedMetrics.amount)}</small>
+                </article>
+                <article>
+                  <span>Con error</span>
+                  <strong>{failedMetrics.count}</strong>
+                  <small>{formatCurrency(failedMetrics.amount)}</small>
+                </article>
+                <article>
+                  <span>Pendientes</span>
+                  <strong>{pendingMetrics.count}</strong>
+                  <small>{formatCurrency(pendingMetrics.amount)}</small>
+                </article>
               </div>
 
-              <form className="danger-zone-form" onSubmit={(event) => void handleDeleteTenant(event)}>
-                <p>
-                  Elimina el tenant y su informacion local asociada: pagos, eventos, usuarios, integraciones, checkpoints, suscripciones, notas, auditoria, secuencias y envios de onboarding.
-                </p>
-                <label className="checkbox-field">
-                  <input
-                    type="checkbox"
-                    checked={shouldDeleteLocalFiles}
-                    onChange={(event) => setShouldDeleteLocalFiles(event.target.checked)}
-                    disabled={isDeletingTenant}
-                  />
-                  <span>Borrar PDFs locales referenciados por pagos</span>
-                </label>
-                <label className="field">
-                  <span>{`Escribi ${data?.identity.slug ?? ""} para confirmar`}</span>
-                  <input
-                    type="text"
-                    value={deleteConfirmationSlug}
-                    onChange={(event) => {
-                      setDeleteConfirmationSlug(event.target.value);
-                      setDeleteErrorMessage(null);
-                    }}
-                    disabled={isDeletingTenant}
-                  />
-                </label>
-                <button type="submit" className="secondary-button secondary-button--danger" disabled={!canDeleteTenant}>
-                  {isDeletingTenant ? "Eliminando tenant..." : "Eliminar tenant completo"}
-                </button>
-                {deleteErrorMessage ? <p className="form-error">{deleteErrorMessage}</p> : null}
-              </form>
+              <div className="client-payments-table">
+                <h3>Últimos pagos</h3>
+                <div className="client-payments-table__head">
+                  <span>Fecha</span>
+                  <span>Importe</span>
+                  <span>Etapa actual</span>
+                  <span>Estado</span>
+                  <span>Acción</span>
+                </div>
+                {recentPayments.slice(0, 5).map((payment) => (
+                  <div key={payment.id} className="client-payments-table__row">
+                    <span>{formatDateTime(payment.createdAt)}</span>
+                    <strong>{formatCurrency(payment.amount)}</strong>
+                    <span>{getPaymentStageLabel(payment.status)}</span>
+                    <span>
+                      <small className={`status-chip status-chip--${getPaymentStageTone(payment.status)}`}>
+                        {payment.status === "complete" ? "Completado" : payment.status === "failed" ? "Error" : "Pendiente"}
+                      </small>
+                    </span>
+                    <Link to={`/admin/payments/${payment.id}`} className="section-mini-button">Ver</Link>
+                  </div>
+                ))}
+                {recentPayments.length === 0 ? (
+                  <div className="client-payments-table__empty">Todavía no hay pagos.</div>
+                ) : null}
+              </div>
             </section>
-          </PermissionGate> : null}
+          </section> : null}
+
+          {activeTab === "onboarding" ? <section id="tenant-onboarding" className="panel onboarding-review-panel">
+            <div className="panel-heading">
+              <div>
+                <span className="eyebrow">Revisión del alta</span>
+                <h2>Onboarding del cliente</h2>
+              </div>
+              {latestOnboardingSubmission ? (
+                <span className={`badge badge--${getOnboardingSubmissionTone(latestOnboardingSubmission.status)}`}>
+                  {getOnboardingSubmissionLabel(latestOnboardingSubmission.status)}
+                </span>
+              ) : (
+                <span className="badge badge--muted">Sin envíos</span>
+              )}
+            </div>
+
+            <div className="onboarding-review-grid">
+              <div className="onboarding-review-card">
+                <strong>Lo que envió el cliente</strong>
+                {areOnboardingSubmissionsLoading ? (
+                  <p>Cargando envíos de onboarding...</p>
+                ) : onboardingSubmissionsErrorMessage ? (
+                  <p>{onboardingSubmissionsErrorMessage}</p>
+                ) : latestOnboardingSubmission ? (
+                  <>
+                    <span>
+                      {`Enviado ${formatDateTime(latestOnboardingSubmission.createdAt)} · actualizado ${formatDateTime(latestOnboardingSubmission.updatedAt)}`}
+                    </span>
+                    {submittedIntegrationProviders.length > 0 ? (
+                      <p>{`Integraciones incluidas: ${submittedIntegrationProviders.map(getIntegrationProviderLabel).join(", ")}.`}</p>
+                    ) : (
+                      <p>El envío no incluye integraciones.</p>
+                    )}
+                    {typeof latestOnboardingSubmission.data?.processingStartDate === "string" ? (
+                      <p>{`Fecha de inicio pedida: ${latestOnboardingSubmission.data.processingStartDate.slice(0, 10)}`}</p>
+                    ) : null}
+                    {latestOnboardingSubmission.reviewNotes ? (
+                      <p>{`Nota de revisión: ${latestOnboardingSubmission.reviewNotes}`}</p>
+                    ) : null}
+                    {submittedFiles.length > 0 ? (
+                      <div className="onboarding-files-list">
+                        {submittedFiles.map((file) => (
+                          <a key={`${file.type}-${file.name}`} href={file.url} target="_blank" rel="noreferrer">
+                            <span>{file.name}</span>
+                            <small>{prettifyStatus(file.type)}</small>
+                          </a>
+                        ))}
+                      </div>
+                    ) : null}
+                  </>
+                ) : (
+                  <p>
+                    El cliente todavía no envió su onboarding desde el portal. Cuando lo haga, vas a poder revisarlo acá antes de aprobarlo.
+                  </p>
+                )}
+                {(onboardingSubmissions?.items.length ?? 0) > 1 ? (
+                  <ul className="tenant-onboarding-history">
+                    {onboardingSubmissions?.items.map((submission) => (
+                      <li key={submission.id}>
+                        {`${formatDateTime(submission.createdAt)} · ${getOnboardingSubmissionLabel(submission.status)}`}
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+              </div>
+
+              <PermissionGate
+                permission="tenants:manage"
+                fallback={
+                  <div className="panel-state">
+                    <strong>Solo lectura</strong>
+                    <span>Tu rol puede revisar el alta, pero no aprobarla ni rechazarla.</span>
+                  </div>
+                }
+              >
+                <form className="onboarding-action-form" onSubmit={(event) => void handleApproveOnboarding(event)}>
+                  {pendingOnboardingSubmission ? (
+                    <span>Hay un envío pendiente de revisión.</span>
+                  ) : (
+                    <span>No hay envíos pendientes para aprobar.</span>
+                  )}
+                  <label className="field">
+                    <span>Procesar pagos desde</span>
+                    <input
+                      type="date"
+                      value={approvalPaymentsFrom}
+                      onChange={(event) => {
+                        setApprovalPaymentsFrom(event.target.value);
+                        setApprovalErrorMessage(null);
+                        setApprovalMessage(null);
+                      }}
+                      disabled={isReviewingOnboarding || !pendingOnboardingSubmission}
+                    />
+                  </label>
+                  <label className="field">
+                    <span>Nota de revisión</span>
+                    <textarea
+                      value={onboardingReviewNotes}
+                      onChange={(event) => {
+                        setOnboardingReviewNotes(event.target.value);
+                        setApprovalErrorMessage(null);
+                        setApprovalMessage(null);
+                      }}
+                      placeholder="Obligatoria si rechazás: contale al cliente qué tiene que corregir."
+                      disabled={isReviewingOnboarding || !pendingOnboardingSubmission}
+                    />
+                  </label>
+                  <div className="tenant-form__actions">
+                    <button type="submit" className="primary-button" disabled={!canApproveOnboarding}>
+                      {isApprovingOnboarding ? "Aprobando..." : "Aprobar alta y procesar"}
+                    </button>
+                    <button
+                      type="button"
+                      className="secondary-button secondary-button--danger"
+                      disabled={!canRejectOnboarding}
+                      onClick={() => void handleRejectOnboarding()}
+                    >
+                      {isRejectingOnboarding ? "Rechazando..." : "Rechazar envío"}
+                    </button>
+                  </div>
+                  <span>
+                    Al aprobar, las integraciones que envió el cliente reemplazan a las guardadas y se empiezan a leer los pagos de Mercado Pago desde la fecha elegida. El estado del cliente no cambia.
+                  </span>
+                  {approvalErrorMessage ? <p className="form-error">{approvalErrorMessage}</p> : null}
+                  {approvalMessage ? <p className="form-success">{approvalMessage}</p> : null}
+                </form>
+              </PermissionGate>
+            </div>
+          </section> : null}
 
           {activeTab === "profile" ? <section id="tenant-profile" className="panel tenant-profile-panel">
             <div className="panel-heading">
@@ -2738,55 +2839,6 @@ export function TenantDetailPage() {
             </div>
           </section> : null}
 
-          <section id="tenant-legacy-summary" className="content-grid">
-            <article className="panel">
-              <span className="eyebrow">Identidad</span>
-              <h2>Resumen del cliente</h2>
-              <div className="tenant-card__grid">
-                <div>
-                  <span>Estado</span>
-                  <strong>{data.identity.status}</strong>
-                </div>
-                <div>
-                  <span>Plan</span>
-                  <strong>{data.currentSubscription.planName ?? "Sin plan"}</strong>
-                </div>
-                <div>
-                  <span>Usuarios</span>
-                  <strong>{data.users.total}</strong>
-                </div>
-                <div>
-                  <span>Facturado</span>
-                  <strong>{formatCurrency(data.metrics.totalAmount)}</strong>
-                </div>
-              </div>
-
-              <div className="invoice-list">
-                {data.metrics.recentPayments.slice(0, 5).map((payment) => (
-                  <div key={payment.id} className="invoice-row">
-                    <div>
-                      <strong>{payment.customer || `Pago ${payment.id}`}</strong>
-                      <span>{payment.status}</span>
-                      <small className="invoice-row__meta">{formatDateTime(payment.createdAt)}</small>
-                    </div>
-                    <p>{formatCurrency(payment.amount)}</p>
-                  </div>
-                ))}
-              </div>
-            </article>
-
-            <article className="panel accent-panel">
-              <span className="eyebrow">Operativo</span>
-              <h2>Integraciones y notas</h2>
-              <ul>
-                <li>{`${data.integrations.configuredCount}/${data.integrations.enabledCount} integraciones configuradas.`}</li>
-                <li>{`${data.integrations.needsAttentionCount} integraciones con atencion.`}</li>
-                <li>{`${data.notes.total} notas internas registradas.`}</li>
-                <li>{`${data.metrics.totalPayments} pagos historicos en el tenant.`}</li>
-              </ul>
-            </article>
-          </section>
-
           {activeTab === "payments" ? <section id="tenant-payments" className="panel payments-panel">
             <div className="panel-heading">
               <div>
@@ -2891,7 +2943,7 @@ export function TenantDetailPage() {
               </div>
             ) : payments && payments.items.length > 0 ? (
               <>
-                <div className="payments-list" aria-label="Pagos del tenant">
+                <div className="payments-list" aria-label="Pagos del cliente">
                   {payments.items.map((payment) => (
                     <article key={payment.id} className="payment-card">
                       <div className="payment-card__main">
@@ -3031,7 +3083,7 @@ export function TenantDetailPage() {
                 {areNotesLoading ? (
                   <div className="panel-state">
                     <strong>Cargando notas...</strong>
-                    <span>Estamos trayendo el seguimiento interno del tenant.</span>
+                    <span>Estamos trayendo el seguimiento interno del cliente.</span>
                   </div>
                 ) : notesErrorMessage ? (
                   <div className="panel-state panel-state--danger">
@@ -3098,7 +3150,9 @@ export function TenantDetailPage() {
                       }}
                       placeholder="owner@cliente.com"
                       disabled={isSavingUser}
+                      readOnly={Boolean(editingUserId)}
                     />
+                    {editingUserId ? <small>El email no se puede cambiar. Para otro email, creá un usuario nuevo.</small> : null}
                   </label>
 
                   <label className="field">
@@ -3136,7 +3190,7 @@ export function TenantDetailPage() {
                   </label>
 
                   <label className="field">
-                    <span>Password opcional</span>
+                    <span>{editingUserId ? "Nueva contraseña (opcional)" : "Contraseña (opcional)"}</span>
                     <input
                       type="password"
                       value={userPassword}
@@ -3145,7 +3199,7 @@ export function TenantDetailPage() {
                         setUserErrorMessage(null);
                         setUserSuccessMessage(null);
                       }}
-                      placeholder="Minimo 8 caracteres"
+                      placeholder="Mínimo 8 caracteres"
                       disabled={isSavingUser}
                     />
                   </label>
@@ -3159,6 +3213,7 @@ export function TenantDetailPage() {
                       className="secondary-button"
                       disabled={isSavingUser}
                       onClick={() => {
+                        setEditingUserId(null);
                         setUserEmail("");
                         setUserRole("viewer");
                         setUserStatus("ACTIVE");
@@ -3167,7 +3222,7 @@ export function TenantDetailPage() {
                         setUserSuccessMessage(null);
                       }}
                     >
-                      Limpiar
+                      {editingUserId ? "Cancelar edición" : "Limpiar"}
                     </button>
                   </div>
 
@@ -3176,7 +3231,7 @@ export function TenantDetailPage() {
                 </form>
               </PermissionGate>
 
-              <div className="users-list" aria-label="Listado de usuarios del tenant">
+              <div className="users-list" aria-label="Listado de usuarios del cliente">
                 {areUsersLoading ? (
                   <div className="panel-state">
                     <strong>Cargando usuarios...</strong>
@@ -3231,8 +3286,8 @@ export function TenantDetailPage() {
             <div className="integration-warning">
               <strong>Guardado sensible</strong>
               <span>
-                Carga los datos como los envio el cliente. La aplicacion valida, prueba y guarda la configuracion cifrada;
-                si ves valores con asteriscos, reemplazalos por valores reales antes de probar o guardar.
+                Cargá los datos como los envió el cliente. La configuración se guarda cifrada. Los secretos guardados se muestran
+                enmascarados: si no los cambiás, se conservan tal cual al probar o guardar.
               </span>
             </div>
 
@@ -3272,25 +3327,63 @@ export function TenantDetailPage() {
                       }}
                       disabled={isSavingIntegration || isTestingIntegration}
                     />
-                    <span>Activar cuando la conexion este probada</span>
+                    <span>Integración activada (activala cuando la conexión esté probada)</span>
                   </label>
 
                   {integrationProvider === "MERCADOPAGO" ? (
                     <div className="integration-mode-panel">
                       <div>
-                        <span>Modo de lectura segun plan</span>
-                        <strong>{selectedMercadopagoPollingMode === "realtime" ? "Tiempo real" : "Programado"}</strong>
-                        {selectedPlan ? <small>{selectedPlan.name}</small> : null}
+                        <span>Modo de lectura</span>
+                        {allowedMercadopagoPollingModes.length > 1 ? (
+                          <div className="integration-segmented-control" role="group" aria-label="Modo de lectura">
+                            {allowedMercadopagoPollingModes.map((mode) => (
+                              <button
+                                key={mode}
+                                type="button"
+                                className={selectedMercadopagoPollingMode === mode ? "integration-segmented-control__active" : ""}
+                                aria-pressed={selectedMercadopagoPollingMode === mode}
+                                onClick={() => updateMercadopagoPollingMode(mode)}
+                                disabled={isSavingIntegration || isTestingIntegration}
+                              >
+                                {getMercadopagoPollingModeLabel(mode)}
+                              </button>
+                            ))}
+                          </div>
+                        ) : (
+                          <strong>{getMercadopagoPollingModeLabel(selectedMercadopagoPollingMode)}</strong>
+                        )}
+                        <small>
+                          {!currentPlanPolicy
+                            ? "El cliente no tiene plan: Mercado Pago no se va a poder guardar hasta asignarle uno."
+                            : data.currentSubscription.status !== "ACTIVE"
+                              ? "La suscripción del cliente no está activa: Mercado Pago no se va a poder guardar hasta regularizarla."
+                            : allowedMercadopagoPollingModes.length === 0
+                              ? "El plan actual no habilita la lectura automática de Mercado Pago."
+                              : allowedMercadopagoPollingModes.length > 1
+                                ? `${data.currentSubscription.planName ?? "El plan"} permite ambos modos.`
+                                : `${data.currentSubscription.planName ?? "El plan"} solo permite ${getMercadopagoPollingModeLabel(allowedMercadopagoPollingModes[0]).toLowerCase()}.`}
+                        </small>
+                        {isSavedMercadopagoModeNotAllowed ? (
+                          <small className="form-error">
+                            {`La configuración guardada usa ${getMercadopagoPollingModeLabel(savedMercadopagoPollingMode as MercadopagoPollingMode).toLowerCase()}, que el plan actual no permite. Si guardás, pasa a ${getMercadopagoPollingModeLabel(selectedMercadopagoPollingMode).toLowerCase()}.`}
+                          </small>
+                        ) : null}
+                        {selectedMercadopagoPollingMode === "realtime" && currentPlanPolicy?.processing.minRealtimeIntervalMs ? (
+                          <small>{`Intervalo mínimo del plan: ${currentPlanPolicy.processing.minRealtimeIntervalMs} ms.`}</small>
+                        ) : null}
+                        {selectedMercadopagoPollingMode === "scheduled" && currentPlanPolicy?.processing.maxRunsPerDay ? (
+                          <small>{`Máximo del plan: ${currentPlanPolicy.processing.maxRunsPerDay} lecturas por día.`}</small>
+                        ) : null}
                       </div>
                       {selectedMercadopagoPollingMode === "scheduled" ? (
-                        <div className="integration-segmented-control" role="group" aria-label="Tipo de programacion">
+                        <div className="integration-segmented-control" role="group" aria-label="Tipo de programación">
                           <button
                             type="button"
                             className={selectedMercadopagoScheduleMode === "runs" ? "integration-segmented-control__active" : ""}
                             onClick={() => updateMercadopagoScheduleMode("runs")}
                             disabled={isSavingIntegration || isTestingIntegration}
                           >
-                            Lecturas por dia
+                            Lecturas por día
                           </button>
                           <button
                             type="button"
@@ -3303,6 +3396,33 @@ export function TenantDetailPage() {
                         </div>
                       ) : null}
                     </div>
+                  ) : null}
+
+                  {shouldSuggestProfileCuit ? (
+                    <div className="integration-warning">
+                      <strong>CUIT distinto al de Datos fiscales</strong>
+                      <span>
+                        {afipFormCuit
+                          ? `El CUIT de ARCA (${afipFormCuit}) no coincide con el de Datos fiscales (${profileCuitSuggestion}).`
+                          : `Datos fiscales tiene el CUIT ${profileCuitSuggestion}.`}
+                      </span>
+                      <button
+                        type="button"
+                        className="secondary-button"
+                        onClick={() => updateIntegrationField("CUIT", profileCuitSuggestion)}
+                        disabled={isSavingIntegration || isTestingIntegration}
+                      >
+                        Usar el CUIT de Datos fiscales
+                      </button>
+                    </div>
+                  ) : null}
+
+                  {isGoogleProvider(integrationProvider) ? (
+                    <p className={hasGoogleAuthorization(selectedSavedIntegration?.config) ? "form-success" : "form-error"}>
+                      {hasGoogleAuthorization(selectedSavedIntegration?.config)
+                        ? "Google está autorizado para este cliente."
+                        : "Falta autorizar Google: usá “Conectar Google” antes de guardar o probar."}
+                    </p>
                   ) : null}
 
                   <div className="integration-fields">
@@ -3368,7 +3488,7 @@ export function TenantDetailPage() {
                               onChange={(event) => updateIntegrationField(field.key, event.target.value)}
                               disabled={isSavingIntegration || isTestingIntegration}
                             />
-                            {field.secret ? (
+                            {field.secret && (canRevealSecrets || !hasMaskedValue(integrationFormValues[field.key])) ? (
                               <button
                                 type="button"
                                 className="integration-secret-button"
@@ -3383,6 +3503,9 @@ export function TenantDetailPage() {
                           </div>
                         )}
                         {field.helper ? <small>{field.helper}</small> : null}
+                        {field.secret && hasMaskedValue(integrationFormValues[field.key]) ? (
+                          <small>Valor guardado. Dejalo así para conservarlo o escribí uno nuevo para reemplazarlo.</small>
+                        ) : null}
                       </label>
                     ))}
                   </div>
@@ -3399,7 +3522,7 @@ export function TenantDetailPage() {
                             onChange={(event) => void handleAfipFileUpload("CERT_B64", event.target.files?.[0])}
                           />
                           <span>Elegir archivo</span>
-                          <small>{afipFileNames.CERT_B64 ?? (selectedSavedIntegration?.config.CERT_B64 ? "Archivo guardado" : "Sin archivo seleccionado")}</small>
+                          <small>{afipFileNames.CERT_B64 ?? (selectedSavedIntegration?.config.CERT_B64 ? "Archivo guardado (se conserva si no subís otro)" : "Sin archivo seleccionado")}</small>
                         </label>
                       </div>
 
@@ -3413,25 +3536,27 @@ export function TenantDetailPage() {
                             onChange={(event) => void handleAfipFileUpload("KEY_B64", event.target.files?.[0])}
                           />
                           <span>Elegir archivo</span>
-                          <small>{afipFileNames.KEY_B64 ?? (selectedSavedIntegration?.config.KEY_B64 ? "Archivo guardado" : "Sin archivo seleccionado")}</small>
+                          <small>{afipFileNames.KEY_B64 ?? (selectedSavedIntegration?.config.KEY_B64 ? "Archivo guardado (se conserva si no subís otro)" : "Sin archivo seleccionado")}</small>
                         </label>
                       </div>
                     </div>
                   ) : null}
 
                   <div className="integration-form__actions">
-                    {integrationProvider === "DRIVE" || integrationProvider === "SHEETS" ? (
+                    {isGoogleProvider(integrationProvider) ? (
                       <button
                         type="button"
                         className="secondary-button"
                         disabled={isAuthorizingGoogle || isSavingIntegration || isTestingIntegration}
                         onClick={() => void handleAuthorizeGoogle()}
                       >
-                        {isAuthorizingGoogle ? "Esperando autorizacion..." : "Conectar / reautorizar Google"}
+                        {isAuthorizingGoogle
+                          ? "Esperando autorización..."
+                          : hasGoogleAuthorization(selectedSavedIntegration?.config) ? "Reautorizar Google" : "Conectar Google"}
                       </button>
                     ) : null}
                     <button type="button" className="secondary-button" disabled={!canTestIntegration} onClick={() => void handleTestIntegration()}>
-                      {isTestingIntegration ? "Probando conexion..." : "Probar conexion"}
+                      {isTestingIntegration ? "Probando conexión..." : "Probar conexión"}
                     </button>
                     <button type="submit" className="primary-button" disabled={!canSaveIntegration}>
                       {isSavingIntegration ? "Guardando..." : "Guardar"}
@@ -3442,7 +3567,7 @@ export function TenantDetailPage() {
                   {integrationSuccessMessage ? <p className="form-success">{integrationSuccessMessage}</p> : null}
                   {integrationTestResult ? (
                     <div className={`integration-test-result${integrationTestResult.connected ?? integrationTestResult.ok ? " integration-test-result--success" : ""}`}>
-                      <strong>{integrationTestResult.connected ?? integrationTestResult.ok ? "Conexion OK" : "La prueba respondio con advertencias"}</strong>
+                      <strong>{integrationTestResult.connected ?? integrationTestResult.ok ? "Conexión OK" : "La prueba respondió con advertencias"}</strong>
                       {Array.isArray(integrationTestResult.warnings) && integrationTestResult.warnings.length > 0 ? (
                         <ul>
                           {integrationTestResult.warnings.map((warning) => (
@@ -3463,11 +3588,11 @@ export function TenantDetailPage() {
                 </form>
               </PermissionGate>
 
-              <div className="integrations-list" aria-label="Ultima integracion guardada del proveedor seleccionado">
+              <div className="integrations-list" aria-label="Última integración guardada del proveedor seleccionado">
                 {areIntegrationsLoading ? (
                   <div className="panel-state">
                     <strong>Cargando integraciones...</strong>
-                    <span>Estamos trayendo configuraciones enmascaradas del tenant.</span>
+                    <span>Estamos trayendo las configuraciones del cliente.</span>
                   </div>
                 ) : integrationsErrorMessage ? (
                   <div className="panel-state panel-state--danger">
@@ -3504,16 +3629,18 @@ export function TenantDetailPage() {
                                         ? getMaskedDisplayValue(displayedValue)
                                         : getDisplayValue(displayedValue)}
                                     </span>
-                                    <button
-                                      type="button"
-                                      className="integration-secret-button"
-                                      aria-label={visibleIntegrationSecretFields[visibilityKey] ? "Ocultar valor" : "Ver valor"}
-                                      title={visibleIntegrationSecretFields[visibilityKey] ? "Ocultar valor" : "Ver valor"}
-                                      onClick={() => void toggleSavedIntegrationSecretVisibility(field.key)}
-                                      disabled={isRevealingIntegrationSecrets}
-                                    >
-                                      {visibleIntegrationSecretFields[visibilityKey] ? <EyeOff aria-hidden="true" /> : <Eye aria-hidden="true" />}
-                                    </button>
+                                    {canRevealSecrets ? (
+                                      <button
+                                        type="button"
+                                        className="integration-secret-button"
+                                        aria-label={visibleIntegrationSecretFields[visibilityKey] ? "Ocultar valor" : "Ver valor"}
+                                        title={visibleIntegrationSecretFields[visibilityKey] ? "Ocultar valor" : "Ver valor"}
+                                        onClick={() => void toggleSavedIntegrationSecretVisibility(field.key)}
+                                        disabled={isRevealingIntegrationSecrets}
+                                      >
+                                        {visibleIntegrationSecretFields[visibilityKey] ? <EyeOff aria-hidden="true" /> : <Eye aria-hidden="true" />}
+                                      </button>
+                                    ) : null}
                                   </span>
                                 ) : (
                                   getDisplayValue(displayedValue)
@@ -3526,27 +3653,27 @@ export function TenantDetailPage() {
                     </article>
                 ) : (
                   <div className="panel-state">
-                    <strong>No hay configuracion guardada</strong>
-                    <span>{`Cuando guardes ${getIntegrationProviderLabel(integrationProvider)}, la ultima version va a aparecer aca.`}</span>
+                    <strong>No hay configuración guardada</strong>
+                    <span>{`Cuando guardes ${getIntegrationProviderLabel(integrationProvider)}, la última versión va a aparecer acá.`}</span>
                   </div>
                 )}
               </div>
             </div>
           </section> : null}
 
-          {activeTab === "advanced" && user?.role === "SUPERADMIN" ? (
+          {activeTab === "advanced" && isSuperadmin ? (
             <section id="tenant-advanced" className="panel danger-zone-panel" aria-label="Zona avanzada">
               <div className="panel-heading">
                 <div>
                   <span className="eyebrow">Avanzado</span>
                   <h2>Zona de peligro</h2>
                 </div>
-                <span className="badge badge--danger">Solo superadmin</span>
+                <span className="badge badge--danger">Solo acceso total</span>
               </div>
 
               <form className="danger-zone-form" onSubmit={(event) => void handleDeleteTenant(event)}>
                 <p>
-                  Elimina el cliente y su informacion local asociada: pagos, eventos, usuarios, integraciones, checkpoints, suscripciones, notas, auditoria, secuencias y envios de onboarding.
+                  Elimina el cliente y toda su información local: pagos, eventos, usuarios, integraciones, puntos de control, suscripciones, notas, auditoría, secuencias y envíos de onboarding.
                 </p>
                 <div className="danger-impact-grid">
                   <span>{data.metrics.totalPayments} pagos</span>
@@ -3564,7 +3691,7 @@ export function TenantDetailPage() {
                   <span>Borrar PDFs locales referenciados por pagos</span>
                 </label>
                 <label className="field">
-                  <span>{`Escribi ${data.identity.slug} para confirmar`}</span>
+                  <span>{`Escribí ${data.identity.slug} para confirmar`}</span>
                   <input
                     type="text"
                     value={deleteConfirmationSlug}

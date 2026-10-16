@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { Navigate, useLocation, useNavigate } from "react-router-dom";
+import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/app/AuthContext";
 import { AppIcon } from "@/components/ui/AppIcon";
 
@@ -182,8 +182,9 @@ export function LoginPage() {
 
       <footer className="login-legal">
         <span>&copy; 2026 Facturador. Todos los derechos reservados.</span>
-        <a href="/login">Terminos y condiciones</a>
-        <a href="/login">Politica de privacidad</a>
+        <Link to="/terminos">Términos y condiciones</Link>
+        <Link to="/privacidad">Política de privacidad</Link>
+        <Link to="/arrepentimiento">Botón de arrepentimiento</Link>
       </footer>
     </main>
   );

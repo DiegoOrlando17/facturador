@@ -1,14 +1,44 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link, NavLink, useLocation } from "react-router-dom";
 import { useAuth } from "@/app/AuthContext";
 import { AppIcon } from "@/components/ui/AppIcon";
+import { useApiResource } from "@/hooks/useApiResource";
+import { getAdminInitials, getAdminRoleName } from "@/lib/adminPermissions";
+
+type AlertsCountResponse = {
+  total: number;
+};
+
+const ONBOARDING_TAB = "onboarding";
 
 export function AppShell({ children }: { children: ReactNode }) {
-  const { logout, user } = useAuth();
+  const { logout, user, token } = useAuth();
   const location = useLocation();
   const [lastDashboardUpdate, setLastDashboardUpdate] = useState<Date | null>(null);
-  const displayName = user?.name?.split(" ")[0] || user?.email?.split("@")[0] || "Diego";
+  const displayName = user?.name?.trim().split(/\s+/)[0] || user?.email?.split("@")[0] || "";
+  const fullName = user?.name?.trim() || user?.email || "";
+  const initials = getAdminInitials(user?.name, user?.email);
+  const roleName = getAdminRoleName(user?.role);
   const showTopbar = location.pathname === "/admin";
+  const isClientsSection = location.pathname === "/admin/tenants";
+  const isOnboardingTab = isClientsSection && new URLSearchParams(location.search).get("tab") === ONBOARDING_TAB;
+  const isClientsActive = location.pathname.startsWith("/admin/tenants") && !isOnboardingTab;
+
+  const { data: alerts, reload: reloadAlerts } = useApiResource<AlertsCountResponse>("/admin/alerts", {
+    enabled: Boolean(token),
+    fallbackErrorMessage: "No se pudo consultar la cantidad de alertas.",
+  });
+  const alertsCount = alerts?.total ?? 0;
+  const isFirstPath = useRef(true);
+
+  useEffect(() => {
+    if (isFirstPath.current) {
+      isFirstPath.current = false;
+      return;
+    }
+
+    void reloadAlerts();
+  }, [location.pathname, reloadAlerts]);
 
   useEffect(() => {
     function handleDashboardUpdated(event: Event) {
@@ -47,7 +77,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </Link>
 
         <nav className="app-nav" aria-label="Principal">
-          <span className="app-nav__group">Operacion diaria</span>
+          <span className="app-nav__group">Operación diaria</span>
           <NavLink
             to="/admin"
             end
@@ -56,26 +86,28 @@ export function AppShell({ children }: { children: ReactNode }) {
             <AppIcon name="home" />
             <span>Inicio</span>
           </NavLink>
-          <NavLink
+          <Link
             to="/admin/tenants"
-            className={({ isActive }) => `app-nav__link${isActive && !location.search.includes("attention=1") ? " app-nav__link--active" : ""}`}
+            className={`app-nav__link${isClientsActive ? " app-nav__link--active" : ""}`}
+            aria-current={isClientsActive ? "page" : undefined}
           >
             <AppIcon name="clients" />
             <span>Clientes</span>
-          </NavLink>
-          <NavLink
-            to="/admin/tenants?attention=1"
-            className={({ isActive }) => `app-nav__link${isActive && location.search.includes("attention=1") ? " app-nav__link--active" : ""}`}
+          </Link>
+          <Link
+            to={`/admin/tenants?tab=${ONBOARDING_TAB}`}
+            className={`app-nav__link${isOnboardingTab ? " app-nav__link--active" : ""}`}
+            aria-current={isOnboardingTab ? "page" : undefined}
           >
             <AppIcon name="onboarding" />
             <span>Altas</span>
-          </NavLink>
+          </Link>
           <NavLink
             to="/admin/billing"
             className={({ isActive }) => `app-nav__link${isActive ? " app-nav__link--active" : ""}`}
           >
             <AppIcon name="invoice" />
-            <span>Facturacion</span>
+            <span>Facturación</span>
           </NavLink>
           <NavLink
             to="/admin/integrations"
@@ -90,15 +122,22 @@ export function AppShell({ children }: { children: ReactNode }) {
           >
             <AppIcon name="bell" />
             <span>Alertas</span>
-            <small className="app-nav__badge">1</small>
+            {alertsCount > 0 ? (
+              <small
+                className="app-nav__badge phase1-nav-badge"
+                aria-label={`${alertsCount} ${alertsCount === 1 ? "alerta activa" : "alertas activas"}`}
+              >
+                {alertsCount > 99 ? "99+" : alertsCount}
+              </small>
+            ) : null}
           </NavLink>
-          <span className="app-nav__group">Administracion interna</span>
+          <span className="app-nav__group">Administración interna</span>
           <NavLink
             to="/admin/audit"
             className={({ isActive }) => `app-nav__link${isActive ? " app-nav__link--active" : ""}`}
           >
             <AppIcon name="shield" />
-            <span>Auditoria</span>
+            <span>Auditoría</span>
           </NavLink>
           {user?.role === "SUPERADMIN" ? (
             <>
@@ -107,7 +146,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 className={({ isActive }) => `app-nav__link${isActive ? " app-nav__link--active" : ""}`}
               >
                 <AppIcon name="settings" />
-                <span>Configuracion</span>
+                <span>Configuración</span>
               </NavLink>
               <NavLink
                 to="/admin/admins"
@@ -120,28 +159,28 @@ export function AppShell({ children }: { children: ReactNode }) {
           ) : null}
         </nav>
 
-        <div className="sidebar-user-card">
-          <span className="sidebar-user-card__avatar">DO</span>
+        <Link to="/admin/account" className="sidebar-user-card phase1-user-card" aria-label={`Mi cuenta: ${fullName}`}>
+          <span className="sidebar-user-card__avatar" aria-hidden="true">{initials}</span>
           <div>
-            <strong>{user?.name || "Diego Orlando"}</strong>
-            <small>Administrador</small>
+            <strong>{fullName || "Mi cuenta"}</strong>
+            <small>{roleName}</small>
           </div>
-        </div>
+        </Link>
         <button type="button" className="sidebar-logout-button" onClick={logout}>
           <AppIcon name="logout" />
-          <span>Cerrar sesion</span>
+          <span>Cerrar sesión</span>
         </button>
       </aside>
 
       <div className="app-main">
         <header className={`app-topbar${showTopbar ? "" : " app-topbar--section-hidden"}`}>
           <div>
-            <strong className="topbar-greeting">{`Hola, ${displayName}`} <span aria-hidden="true">👋</span></strong>
+            <strong className="topbar-greeting">{displayName ? `Hola, ${displayName}` : "Hola"}</strong>
             <span>Panel interno de Facturador</span>
           </div>
           <div className="app-topbar__actions">
             <span className="topbar-sync">
-              Ultima actualizacion: {lastUpdatedLabel}
+              Última actualización: {lastUpdatedLabel}
             </span>
             <button
               type="button"
@@ -151,8 +190,8 @@ export function AppShell({ children }: { children: ReactNode }) {
               <AppIcon name="refresh" />
               <span>Actualizar</span>
             </button>
-            </div>
-          </header>
+          </div>
+        </header>
 
         {children}
       </div>

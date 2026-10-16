@@ -61,10 +61,33 @@ export function getAdminRoleLabel(role: string | null | undefined) {
     case "SUPERADMIN":
       return "Acceso total";
     case "OPERATOR":
-      return "Operacion";
+      return "Operación";
     case "VIEWER":
       return "Solo lectura";
     default:
       return "Sin rol";
   }
+}
+
+export function getAdminRoleName(role: string | null | undefined) {
+  switch (role) {
+    case "SUPERADMIN":
+      return "Superadmin";
+    case "OPERATOR":
+      return "Operador";
+    case "VIEWER":
+      return "Lector";
+    default:
+      return "Sin rol";
+  }
+}
+
+export function getAdminInitials(name: string | null | undefined, email: string | null | undefined) {
+  const words = (name ?? "").trim().split(/\s+/).filter(Boolean);
+
+  if (words.length >= 2) return `${words[0][0]}${words[words.length - 1][0]}`.toUpperCase();
+  if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
+
+  const localPart = (email ?? "").split("@")[0].replace(/[^a-zA-Z0-9]/g, "");
+  return localPart ? localPart.slice(0, 2).toUpperCase() : "?";
 }

@@ -188,7 +188,7 @@ export function SettingsPage() {
   }, [token, user?.role]);
 
   if (user && user.role !== "SUPERADMIN") {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/admin" replace />;
   }
 
   async function loadPlans() {

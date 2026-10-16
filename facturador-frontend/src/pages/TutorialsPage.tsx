@@ -1,3 +1,70 @@
 import { Link } from "react-router-dom";
-const guides = [{ title: "Conectar Mercado Pago POS", steps: ["Identifica el Point/POS que recibe las ventas.", "Genera una credencial de lectura para la cuenta correcta.", "Carga la configuracion desde Integraciones y ejecuta la prueba."] }, { title: "Preparar ARCA", steps: ["Habilita comprobantes electronicos y el punto de venta.", "Genera certificado y clave para el ambiente correspondiente.", "Completa el perfil fiscal y solicita su revision."] }, { title: "Configurar Drive y Sheets", steps: ["Autoriza la cuenta de Google desde Integraciones.", "Selecciona una carpeta y una planilla accesibles.", "Ejecuta ambas pruebas antes de procesar ventas."] }, { title: "Completar el onboarding", steps: ["Completa los datos fiscales obligatorios.", "Conecta y prueba las integraciones de tu plan.", "Envia la informacion a revision y espera la aprobacion."] }];
-export function TutorialsPage() { return <main className="marketing-page"><nav className="marketing-nav"><Link to="/" className="marketing-brand">Facturador</Link><div><Link to="/portal-cliente/login">Ingresar</Link><Link className="primary-button" to="/registro">Comenzar</Link></div></nav><section className="tutorial-hero"><span className="eyebrow">Centro de ayuda</span><h1>Todo lo necesario para empezar a facturar.</h1><p>Guias breves para preparar tus cuentas sin compartir secretos por canales inseguros.</p></section><section className="tutorial-grid">{guides.map((guide, index) => <article key={guide.title}><span>Guia {index + 1}</span><h2>{guide.title}</h2><ol>{guide.steps.map((step) => <li key={step}>{step}</li>)}</ol></article>)}</section><section className="marketing-cta"><h2>¿Ya tienes la informacion preparada?</h2><Link className="primary-button" to="/registro">Crear cuenta</Link></section></main>; }
+import { MarketingFooter, MarketingNav } from "@/components/layout/MarketingChrome";
+
+const guides = [
+  {
+    title: "Conectar Mercado Pago POS",
+    steps: [
+      "Identificá el Point/POS que recibe las ventas.",
+      "Generá una credencial de lectura para la cuenta correcta.",
+      "Cargá la configuración desde Integraciones y ejecutá la prueba.",
+    ],
+  },
+  {
+    title: "Preparar ARCA",
+    steps: [
+      "Habilitá los comprobantes electrónicos y el punto de venta.",
+      "Generá el certificado y la clave para el ambiente correspondiente.",
+      "Completá el perfil fiscal y pedí su revisión.",
+    ],
+  },
+  {
+    title: "Configurar Drive y Sheets",
+    steps: [
+      "Autorizá la cuenta de Google desde Integraciones.",
+      "Elegí una carpeta y una planilla accesibles.",
+      "Ejecutá ambas pruebas antes de procesar ventas.",
+    ],
+  },
+  {
+    title: "Completar el onboarding",
+    steps: [
+      "Completá los datos fiscales obligatorios.",
+      "Conectá y probá las integraciones de tu plan.",
+      "Enviá la información a revisión y esperá la aprobación.",
+    ],
+  },
+];
+
+export function TutorialsPage() {
+  return (
+    <main className="marketing-page">
+      <MarketingNav />
+      <section className="tutorial-hero">
+        <span className="eyebrow">Centro de ayuda</span>
+        <h1>Todo lo necesario para empezar a facturar.</h1>
+        <p>Guías breves para preparar tus cuentas sin compartir datos sensibles por canales inseguros.</p>
+      </section>
+      <section className="tutorial-grid">
+        {guides.map((guide, index) => (
+          <article key={guide.title}>
+            <span>Guía {index + 1}</span>
+            <h2>{guide.title}</h2>
+            <ol>
+              {guide.steps.map((step) => (
+                <li key={step}>{step}</li>
+              ))}
+            </ol>
+          </article>
+        ))}
+      </section>
+      <section className="marketing-cta">
+        <h2>¿Ya tenés la información preparada?</h2>
+        <Link className="primary-button" to="/registro">
+          Crear cuenta
+        </Link>
+      </section>
+      <MarketingFooter />
+    </main>
+  );
+}

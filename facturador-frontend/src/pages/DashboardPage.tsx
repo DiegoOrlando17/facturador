@@ -92,6 +92,10 @@ type IconName =
   | "drive"
   | "sheets";
 
+type KpiTone = "green" | "orange" | "blue" | "red";
+
+const EMPTY_VALUE = "—";
+
 function DashboardIcon({ name }: { name: IconName }) {
   if (isIntegrationLogoName(name)) {
     return <IntegrationLogo name={name} />;
@@ -114,7 +118,7 @@ function getServiceLogoName(name: string): IntegrationLogoName | null {
 
 function healthLabel(status: HealthStatus) {
   if (status === "healthy") return "Operativo";
-  if (status === "attention") return "Caido";
+  if (status === "attention") return "Con problemas";
   if (status === "setup_pending") return "Sin configurar";
   return "Sin datos";
 }
@@ -126,39 +130,49 @@ function serviceClass(status: HealthStatus) {
   return "muted";
 }
 
+function plural(count: number, singular: string, pluralForm: string) {
+  return count === 1 ? singular : pluralForm;
+}
+
 function getAttentionClientText(count: number) {
   if (count === 0) return "Sistema operativo";
 
-  return `${count} cliente${count === 1 ? "" : "s"} necesita${count === 1 ? "" : "n"} atencion`;
+  return `${count} ${plural(count, "cliente necesita", "clientes necesitan")} atención`;
 }
 
 function getOperationalHeadline(attentionCount: number, failedPayments: number, downServices: number) {
   const totalIssues = attentionCount + failedPayments + downServices;
 
   if (totalIssues === 0) return "Sistema operativo";
-  if (downServices > 0) return "Atencion requerida";
-  if (failedPayments > 0) return "Facturacion requiere revision";
+  if (downServices > 0) return "Atención requerida";
+  if (failedPayments > 0) return "La facturación requiere revisión";
   return getAttentionClientText(attentionCount);
 }
 
 function getOperationalDetail(attentionCount: number, failedPayments: number, downServices: number, criticalAttention?: AttentionItem) {
   if (downServices > 0) {
-    return `${downServices} servicio${downServices === 1 ? "" : "s"} critico${downServices === 1 ? "" : "s"} caido${downServices === 1 ? "" : "s"}. Revisalo antes de dar por sano el sistema.`;
+    return `${downServices} ${plural(downServices, "servicio crítico tiene", "servicios críticos tienen")} problemas. Revisalo antes de dar por sano el sistema.`;
   }
 
   if (failedPayments > 0) {
-    return `${failedPayments} pago${failedPayments === 1 ? "" : "s"} quedo${failedPayments === 1 ? "" : "n"} en error y puede${failedPayments === 1 ? "" : "n"} frenar facturacion.`;
+    return `${failedPayments} ${plural(failedPayments, "pago requiere", "pagos requieren")} revisión (con error o con una etapa trabada) y ${plural(failedPayments, "puede", "pueden")} frenar la facturación.`;
   }
 
   if (criticalAttention) {
-    return `${criticalAttention.tenant.name} es el caso mas critico para revisar.`;
+    return `${criticalAttention.tenant.name} es el caso más crítico para revisar.`;
   }
 
   if (attentionCount > 0) {
     return "Hay clientes con aprobaciones, datos o integraciones pendientes.";
   }
 
-  return "No hay bloqueos operativos, errores de facturacion ni servicios criticos caidos.";
+  return "No hay bloqueos operativos, errores de facturación ni servicios críticos con problemas.";
+}
+
+function getCriticalActionPath(failedPayments: number, downServices: number) {
+  if (failedPayments > 0) return "/admin/billing?status=failed";
+  if (downServices > 0) return "/admin/integrations";
+  return "/admin/alerts";
 }
 
 function getTodayDashboardPath() {
@@ -177,13 +191,13 @@ function getAttentionTone(priority: AttentionItem["priority"]) {
 
 function getAttentionImpact(item: AttentionItem) {
   if (item.type === "payment_failed") return "Bloquea comprobante";
-  if (item.type === "integration_attention") return "Puede bloquear facturacion";
-  if (item.type === "profile_incomplete" || item.type === "profile_pending") return "Bloquea activacion";
+  if (item.type === "integration_attention") return "Puede bloquear facturación";
+  if (item.type === "profile_incomplete" || item.type === "profile_pending") return "Bloquea activación";
   return "Bloquea alta";
 }
 
 function getAttentionOwner(item: AttentionItem) {
-  if (item.type === "integration_attention") return "Admin tecnico";
+  if (item.type === "integration_attention") return "Admin técnico";
   if (item.type === "profile_incomplete") return "Cliente";
   return "Admin";
 }
@@ -191,6 +205,33 @@ function getAttentionOwner(item: AttentionItem) {
 function formatActivityTime(value: string) {
   const formatted = formatDateTime(value);
   return formatted === "Fecha no disponible" ? formatted : formatted.split(", ").pop() ?? formatted;
+}
+
+function KpiCard({
+  tone,
+  icon,
+  label,
+  value,
+  note,
+  noteIsDanger = false,
+}: {
+  tone: KpiTone;
+  icon: IconName;
+  label: string;
+  value: number | null;
+  note: string;
+  noteIsDanger?: boolean;
+}) {
+  return (
+    <article className={`admin-kpi-card admin-kpi-card--${tone}`} aria-busy={value === null}>
+      <div className="admin-kpi-card__title">
+        <span><DashboardIcon name={icon} /></span>
+        <p>{label}</p>
+      </div>
+      <strong className={value === null ? "phase1-kpi-placeholder" : undefined}>{value === null ? EMPTY_VALUE : value}</strong>
+      <small className={noteIsDanger ? "admin-kpi-card__danger-note" : undefined}>{note}</small>
+    </article>
+  );
 }
 
 export function DashboardPage() {
@@ -205,13 +246,16 @@ export function DashboardPage() {
     fallbackErrorMessage: "No se pudo cargar el dashboard.",
   });
 
-  const summary = dashboard?.summary;
-  const pendingApproval = summary?.tenants.pendingApproval ?? 6;
-  const failedPayments = summary?.payments.failed ?? 1;
-  const invoicesToday = summary?.payments.complete ?? 124;
-  const activeClients = summary?.tenants.active ?? 42;
+  const summary = dashboard?.summary ?? null;
+  const hasSummary = summary !== null;
+  const pendingApproval = summary ? summary.tenants.pendingApproval ?? 0 : null;
+  const failedPayments = summary ? summary.payments.failed : null;
+  const invoicesToday = summary ? summary.payments.complete : null;
+  const activeClients = summary ? summary.tenants.active : null;
   const attentionItems = summary?.attentionItems ?? [];
-  const attentionClientCount = new Set(attentionItems.map((item) => item.tenant.id || item.tenant.slug)).size;
+  const attentionClientCount = summary
+    ? new Set(attentionItems.map((item) => item.tenant.id || item.tenant.slug)).size
+    : null;
   const criticalAttention = attentionItems.find((item) => item.priority === "danger") ?? attentionItems[0];
   const serviceRows = summary?.operationalServices ?? [
     { name: "Workers", status: "unknown" as const },
@@ -222,10 +266,38 @@ export function DashboardPage() {
     { name: "ARCA", status: summary?.systemHealth?.afip.status ?? "unknown" as const },
   ];
   const sortedServiceRows = [...serviceRows].sort((left, right) => left.name.localeCompare(right.name, "es"));
-  const criticalServiceCount = serviceRows.filter((service) => service.status === "attention").length;
+  const criticalServiceCount = summary
+    ? serviceRows.filter((service) => service.status === "attention").length
+    : null;
   const recentActivity = summary?.recentActivity ?? [];
-  const operationalHeadline = getOperationalHeadline(attentionClientCount, failedPayments, criticalServiceCount);
-  const operationalDetail = getOperationalDetail(attentionClientCount, failedPayments, criticalServiceCount, criticalAttention);
+
+  const issueCounts = hasSummary
+    ? {
+      attention: attentionClientCount ?? 0,
+      failed: failedPayments ?? 0,
+      services: criticalServiceCount ?? 0,
+    }
+    : null;
+  const hasIssues = issueCounts
+    ? issueCounts.attention > 0 || issueCounts.failed > 0 || issueCounts.services > 0
+    : false;
+
+  let operationalHeadline: string;
+  let operationalDetail: string;
+
+  if (issueCounts) {
+    operationalHeadline = getOperationalHeadline(issueCounts.attention, issueCounts.failed, issueCounts.services);
+    operationalDetail = getOperationalDetail(issueCounts.attention, issueCounts.failed, issueCounts.services, criticalAttention);
+  } else if (isLoading) {
+    operationalHeadline = "Consultando el estado del sistema…";
+    operationalDetail = "Estamos trayendo los datos de hoy.";
+  } else {
+    operationalHeadline = "No pudimos cargar el estado del sistema";
+    operationalDetail = "Los indicadores no están disponibles. Reintentá en unos segundos.";
+  }
+
+  const alertCardClass = issueCounts && !hasIssues ? " admin-alert-card--success" : "";
+  const alertCardIcon: IconName = issueCounts ? (hasIssues ? "alert" : "check-circle") : isLoading ? "clock" : "alert";
 
   useEffect(() => {
     function handleDashboardRefresh() {
@@ -251,24 +323,31 @@ export function DashboardPage() {
     }));
   }, [dashboard]);
 
+  const attentionTone: KpiTone = attentionClientCount === null || attentionClientCount === 0 ? "green" : "orange";
+  const pendingTone: KpiTone = pendingApproval === null || pendingApproval === 0 ? "green" : "orange";
+  const servicesTone: KpiTone = criticalServiceCount === null || criticalServiceCount === 0 ? "green" : "red";
+  const loadingNote = isLoading ? "Cargando…" : "Sin datos";
+
   return (
     <main className="admin-dashboard">
-      <section className={`admin-alert-card${attentionClientCount === 0 && failedPayments === 0 && criticalServiceCount === 0 ? " admin-alert-card--success" : ""}`}>
+      <section className={`admin-alert-card${alertCardClass}`}>
         <div className="admin-alert-card__main">
           <span className="admin-alert-card__icon">
-            <DashboardIcon name={attentionClientCount === 0 && failedPayments === 0 && criticalServiceCount === 0 ? "check-circle" : "alert"} />
+            <DashboardIcon name={alertCardIcon} />
           </span>
           <div>
             <span className="eyebrow">Centro operativo</span>
             <h1>{operationalHeadline}</h1>
             <p>{operationalDetail}</p>
-            {criticalAttention || failedPayments > 0 || criticalServiceCount > 0 ? <p>Trabaja los bloqueos por impacto para dejar el sistema facturando.</p> : null}
-            {attentionClientCount > 0 || failedPayments > 0 || criticalServiceCount > 0 ? (
-              <div className="admin-alert-card__actions">
-                <Link to={failedPayments > 0 ? "/billing?status=failed" : criticalServiceCount > 0 ? "/integrations" : "/tenants?attention=1"} className="primary-button">
-                  Ver problemas criticos
-                </Link>
-              </div>
+            {issueCounts && hasIssues ? (
+              <>
+                <p>Trabajá los bloqueos por impacto para dejar el sistema facturando.</p>
+                <div className="admin-alert-card__actions">
+                  <Link to={getCriticalActionPath(issueCounts.failed, issueCounts.services)} className="primary-button">
+                    Ver problemas críticos
+                  </Link>
+                </div>
+              </>
             ) : null}
           </div>
         </div>
@@ -284,7 +363,7 @@ export function DashboardPage() {
                 ) : null}
                 {name}
               </span>
-              <small className={`status-pill status-pill--${serviceClass(status)}`}>{healthLabel(status)}</small>
+              <small className={`status-pill status-pill--${serviceClass(status)}`}>{hasSummary ? healthLabel(status) : loadingNote}</small>
             </div>
           ))}
         </div>
@@ -300,46 +379,54 @@ export function DashboardPage() {
       ) : null}
 
       <section className="admin-kpi-grid" aria-label="Resumen general">
-        <article className="admin-kpi-card admin-kpi-card--green">
-          <div className="admin-kpi-card__title">
-            <span><DashboardIcon name="clients" /></span>
-            <p>Clientes bloqueados</p>
-          </div>
-          <strong>{isLoading ? "..." : attentionClientCount}</strong>
-          <small>{summary ? `${activeClients} activos en total` : "Consultando clientes"}</small>
-        </article>
-        <article className="admin-kpi-card admin-kpi-card--orange">
-          <div className="admin-kpi-card__title">
-            <span><DashboardIcon name="onboarding" /></span>
-            <p>Altas pendientes</p>
-          </div>
-          <strong>{isLoading ? "..." : pendingApproval}</strong>
-          <small>{pendingApproval === 1 ? "1 alta pendiente" : `${pendingApproval} altas pendientes`}</small>
-        </article>
-        <article className="admin-kpi-card admin-kpi-card--blue">
-          <div className="admin-kpi-card__title">
-            <span><DashboardIcon name="invoice" /></span>
-            <p>Facturacion lista</p>
-          </div>
-          <strong>{isLoading ? "..." : invoicesToday}</strong>
-          <small>Completadas hoy</small>
-        </article>
-        <article className="admin-kpi-card admin-kpi-card--red">
-          <div className="admin-kpi-card__title">
-            <span><DashboardIcon name="clock" /></span>
-            <p>Servicios caidos</p>
-          </div>
-          <strong>{isLoading ? "..." : criticalServiceCount}</strong>
-          <small className="admin-kpi-card__danger-note">
-            {failedPayments > 0 ? `${failedPayments} pagos con error` : "Sin errores de pagos"}
-          </small>
-        </article>
+        <KpiCard
+          tone={attentionTone}
+          icon="clients"
+          label="Clientes que requieren atención"
+          value={attentionClientCount}
+          note={activeClients === null ? loadingNote : `${activeClients} ${plural(activeClients, "cliente activo", "clientes activos")} en total`}
+        />
+        <KpiCard
+          tone={pendingTone}
+          icon="onboarding"
+          label="Altas pendientes"
+          value={pendingApproval}
+          note={pendingApproval === null
+            ? loadingNote
+            : pendingApproval === 0
+              ? "Sin altas para aprobar"
+              : `${pendingApproval} ${plural(pendingApproval, "alta espera", "altas esperan")} aprobación`}
+        />
+        <KpiCard
+          tone="blue"
+          icon="invoice"
+          label="Facturas emitidas hoy"
+          value={invoicesToday}
+          note={failedPayments === null
+            ? loadingNote
+            : failedPayments > 0
+              ? `${failedPayments} ${plural(failedPayments, "pago", "pagos")} para revisar`
+              : "Sin pagos para revisar"}
+          noteIsDanger={(failedPayments ?? 0) > 0}
+        />
+        <KpiCard
+          tone={servicesTone}
+          icon="alert"
+          label="Servicios con problemas"
+          value={criticalServiceCount}
+          note={criticalServiceCount === null
+            ? loadingNote
+            : criticalServiceCount === 0
+              ? "Todos los servicios operativos"
+              : `${criticalServiceCount} de ${serviceRows.length} ${plural(serviceRows.length, "servicio", "servicios")}`}
+          noteIsDanger={(criticalServiceCount ?? 0) > 0}
+        />
       </section>
 
       <section className="admin-table-card">
         <div className="admin-section-heading">
-          <h2>Requiere atencion</h2>
-          <Link to="/alerts">Ver todas</Link>
+          <h2>Requiere atención</h2>
+          <Link to="/admin/alerts">Ver todas</Link>
         </div>
         <div className="admin-attention-table">
           <div className="admin-attention-table__head">
@@ -348,7 +435,7 @@ export function DashboardPage() {
             <span>Problema</span>
             <span>Impacto</span>
             <span>Responsable</span>
-            <span>Accion</span>
+            <span>Acción</span>
           </div>
           {attentionItems.length > 0 ? attentionItems.map((item) => {
             const tone = getAttentionTone(item.priority);
@@ -368,7 +455,13 @@ export function DashboardPage() {
           }) : (
             <div className="admin-attention-table__row admin-attention-table__row--empty">
               <div className="admin-attention-table__empty">
-                <span>No hay nada que requiera atencion en este momento.</span>
+                <span>
+                  {hasSummary
+                    ? "No hay nada que requiera atención en este momento."
+                    : isLoading
+                      ? "Cargando casos que requieren atención…"
+                      : "No pudimos cargar los casos que requieren atención."}
+                </span>
               </div>
             </div>
           )}
@@ -392,12 +485,12 @@ export function DashboardPage() {
               </div>
             )) : (
               <div className="panel-state">
-                <strong>Sin actividad reciente</strong>
-                <span>Cuando entren pagos o comprobantes, van a aparecer aca.</span>
+                <strong>{hasSummary || !isLoading ? "Sin actividad reciente" : "Cargando actividad…"}</strong>
+                <span>Cuando entren pagos o comprobantes, van a aparecer acá.</span>
               </div>
             )}
           </div>
-          <Link to="/billing">Ver toda la actividad</Link>
+          <Link to="/admin/billing">Ver toda la actividad</Link>
         </article>
       </section>
     </main>

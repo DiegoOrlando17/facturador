@@ -14,6 +14,7 @@ import { paymentsQueue } from "../queues/payments.queue.js";
 import { invoicesQueue } from "../queues/invoices.queue.js";
 import { creditNotesQueue } from "../queues/creditNotes.queue.js";
 import { classifyQueueHealth } from "../domain/operationalHealth.js";
+import { REPORT_TIMEZONE, assertReportGranularity, buildReportDateRange } from "../domain/reportPeriods.js";
 
 const DEFAULT_PAGE = 1;
 const DEFAULT_PAGE_SIZE = 20;
@@ -134,24 +135,49 @@ function buildAmountSummary(result = []) {
   });
 }
 
-function buildSqlDateFilter(filters = {}) {
+// Fecha efectiva de un pago en reportes: acreditación o, si falta, registro.
+const REPORT_EFFECTIVE_AT_SQL = Prisma.sql`COALESCE(p."date_approved", p."createdAt")`;
+
+export function buildSqlDateFilter(filters = {}) {
   const parts = [];
 
   if (filters.tenantId) {
     parts.push(Prisma.sql`AND p."tenantId" = ${filters.tenantId}`);
   }
 
-  const from = parseDateOrNull(filters.dateFrom);
+  const { from, to } = buildReportDateRange(filters);
   if (from) {
-    parts.push(Prisma.sql`AND COALESCE(p."date_approved", p."createdAt") >= ${from}`);
+    parts.push(Prisma.sql`AND ${REPORT_EFFECTIVE_AT_SQL} >= ${from}`);
   }
 
-  const to = parseDateOrNull(filters.dateTo, { endOfDay: true });
   if (to) {
-    parts.push(Prisma.sql`AND COALESCE(p."date_approved", p."createdAt") <= ${to}`);
+    parts.push(Prisma.sql`AND ${REPORT_EFFECTIVE_AT_SQL} <= ${to}`);
   }
 
-  return Prisma.join(parts, Prisma.sql` `);
+  // Prisma.join necesita al menos un elemento y un separador de tipo string.
+  return parts.length ? Prisma.join(parts, " ") : Prisma.empty;
+}
+
+// Agrupa por día/semana/mes en hora argentina y devuelve el instante UTC del
+// inicio de cada período (las columnas son timestamp sin zona guardados en UTC).
+export function buildReportBucketSql(granularity) {
+  const unit = assertReportGranularity(granularity);
+  const zone = Prisma.raw(`'${REPORT_TIMEZONE}'`);
+  return Prisma.sql`((date_trunc(${Prisma.raw(`'${unit}'`)}, (${REPORT_EFFECTIVE_AT_SQL} AT TIME ZONE 'UTC') AT TIME ZONE ${zone})) AT TIME ZONE ${zone})`;
+}
+
+function buildReportPaymentWhere(filters = {}) {
+  const where = buildPaymentWhere({ ...filters, dateFrom: null, dateTo: null });
+  const { from, to } = buildReportDateRange(filters);
+  if (!from && !to) return where;
+
+  const range = { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) };
+  return {
+    ...where,
+    AND: [
+      { OR: [{ date_approved: range }, { date_approved: null, createdAt: range }] },
+    ],
+  };
 }
 
 function normalizeSummaryFilters(filters = {}) {
@@ -627,7 +653,7 @@ function buildAttentionItem(type, tenant, detail = {}) {
       detail: "El cliente envio datos para revisar antes de operar.",
       priority: "warning",
       actionLabel: "Revisar alta",
-      actionPath: `/tenants/${tenant.slug}#tenant-onboarding`,
+      actionPath: `/admin/tenants/${tenant.slug}#tenant-onboarding`,
       createdAt: detail.createdAt,
     };
   }
@@ -639,7 +665,7 @@ function buildAttentionItem(type, tenant, detail = {}) {
       detail: "Hay una integracion habilitada sin credenciales completas.",
       priority: "warning",
       actionLabel: "Configurar",
-      actionPath: `/tenants/${tenant.slug}#tenant-integrations`,
+      actionPath: `/admin/tenants/${tenant.slug}#tenant-integrations`,
       createdAt: detail.updatedAt,
     };
   }
@@ -651,7 +677,7 @@ function buildAttentionItem(type, tenant, detail = {}) {
       detail: "Faltan datos fiscales o de contacto necesarios para operar.",
       priority: "warning",
       actionLabel: "Completar datos",
-      actionPath: `/tenants/${tenant.slug}#tenant-profile`,
+      actionPath: `/admin/tenants/${tenant.slug}#tenant-profile`,
       createdAt: tenant.updatedAt,
     };
   }
@@ -663,7 +689,7 @@ function buildAttentionItem(type, tenant, detail = {}) {
       detail: "El perfil fiscal esta completo y espera revision interna.",
       priority: "warning",
       actionLabel: "Aprobar datos",
-      actionPath: `/tenants/${tenant.slug}#tenant-profile`,
+      actionPath: `/admin/tenants/${tenant.slug}#tenant-profile`,
       createdAt: detail.updatedAt || tenant.updatedAt,
     };
   }
@@ -674,7 +700,7 @@ function buildAttentionItem(type, tenant, detail = {}) {
     detail: detail.error || "Un pago requiere revision manual.",
     priority: "danger",
     actionLabel: "Ver pago",
-    actionPath: `/payments/${detail.id}`,
+    actionPath: `/admin/payments/${detail.id}`,
     createdAt: detail.updatedAt,
   };
 }
@@ -998,7 +1024,7 @@ export async function getAdminTenantSummary(tenantId) {
 }
 
 export async function getAdminReportsSummary(filters = {}) {
-  const paymentWhere = buildPaymentWhere(filters);
+  const paymentWhere = buildReportPaymentWhere(filters);
   const sqlDateFilter = buildSqlDateFilter(filters);
 
   const [aggregate, byStatus, topTenants] = await Promise.all([
@@ -1046,7 +1072,7 @@ export async function getAdminReportsSummary(filters = {}) {
 export async function getAdminReportsTimeseries(filters = {}) {
   const granularity = normalizeGranularity(filters.granularity);
   const sqlDateFilter = buildSqlDateFilter(filters);
-  const bucket = Prisma.raw(`date_trunc('${granularity}', COALESCE(p."date_approved", p."createdAt"))`);
+  const bucket = buildReportBucketSql(granularity);
 
   const rows = await db.$queryRaw`
     SELECT
@@ -1064,6 +1090,7 @@ export async function getAdminReportsTimeseries(filters = {}) {
     filters: {
       ...normalizeSummaryFilters(filters),
       granularity,
+      timezone: REPORT_TIMEZONE,
     },
     series: rows,
   };

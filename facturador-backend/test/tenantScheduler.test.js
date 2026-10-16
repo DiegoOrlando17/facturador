@@ -6,16 +6,17 @@ import { resolvePlanPolicy } from "../src/domain/planPolicy.js";
 import {
   buildUniformRunTimes,
   evaluateTenantSchedule,
+  mergeTenantScheduleConfig,
   normalizeTenantSchedule,
 } from "../src/domain/tenantScheduler.js";
 
 const policy = resolvePlanPolicy(PLAN_CATALOG[0]);
 
 test("realtime respeta el intervalo minimo", () => {
-  const schedule = normalizeTenantSchedule({ POLLING_MODE: "realtime", POLLING_INTERVAL_MS: 15000 }, policy);
+  const schedule = normalizeTenantSchedule({ POLLING_MODE: "realtime", POLLING_INTERVAL_MS: 5000 }, policy);
   const first = evaluateTenantSchedule(schedule, {}, DateTime.fromISO("2026-08-22T12:00:00Z"));
-  const early = evaluateTenantSchedule(schedule, first.runtime, DateTime.fromISO("2026-08-22T12:00:14Z"));
-  const due = evaluateTenantSchedule(schedule, first.runtime, DateTime.fromISO("2026-08-22T12:00:15Z"));
+  const early = evaluateTenantSchedule(schedule, first.runtime, DateTime.fromISO("2026-08-22T12:00:04Z"));
+  const due = evaluateTenantSchedule(schedule, first.runtime, DateTime.fromISO("2026-08-22T12:00:05Z"));
 
   assert.equal(first.shouldRun, true);
   assert.match(first.slotKey, /^realtime\|\d+$/);
@@ -54,4 +55,31 @@ test("rechaza horarios, zonas e intervalos invalidos", () => {
 
 test("RUNS_PER_DAY heredado genera slots deterministas", () => {
   assert.deepEqual(buildUniformRunTimes(4), ["00:00", "06:00", "12:00", "18:00"]);
+});
+
+test("el tenant solo puede combinar campos de agenda sin alterar credenciales", () => {
+  const merged = mergeTenantScheduleConfig(
+    { ACCESS_TOKEN: "secret", POS_ID: "pos", POLLING_INTERVAL_MS: 15000 },
+    { ACCESS_TOKEN: "otro", POLLING_INTERVAL_MS: 5000 }
+  );
+
+  assert.equal(merged.ACCESS_TOKEN, "secret");
+  assert.equal(merged.POS_ID, "pos");
+  assert.equal(merged.POLLING_INTERVAL_MS, 5000);
+});
+
+test("elegir lecturas por dia limpia los horarios explicitos anteriores", () => {
+  const merged = mergeTenantScheduleConfig(
+    { POLLING_MODE: "scheduled", RUN_AT_TIMES: ["09:00", "18:00"], RUNS_PER_DAY: 2 },
+    { POLLING_MODE: "scheduled", RUNS_PER_DAY: 4 }
+  );
+
+  assert.deepEqual(merged.RUN_AT_TIMES, []);
+  const schedule = normalizeTenantSchedule(merged, policy);
+  assert.equal(schedule.runAtTimes.length, schedule.runsPerDay);
+});
+
+test("RUN_AT_TIMES vacio explicito se respeta al combinar", () => {
+  const merged = mergeTenantScheduleConfig({ RUN_AT_TIMES: ["09:00"] }, { RUN_AT_TIMES: [] });
+  assert.deepEqual(merged.RUN_AT_TIMES, []);
 });

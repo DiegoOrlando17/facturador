@@ -10,6 +10,33 @@ export const DEFAULT_SCHEDULER_TIMEZONE = "America/Argentina/Buenos_Aires";
 export const MIN_POLLING_INTERVAL_MS = 5_000;
 const MAX_RUNS_PER_DAY = 1_440;
 const TIME_PATTERN = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
+const TENANT_SCHEDULE_FIELDS = Object.freeze([
+  "POLLING_MODE",
+  "POLLING_INTERVAL_MS",
+  "RUNS_PER_DAY",
+  "RUN_AT_TIMES",
+  "TIMEZONE",
+]);
+
+export function mergeTenantScheduleConfig(existing = {}, submitted = {}) {
+  if (!submitted || typeof submitted !== "object" || Array.isArray(submitted)) {
+    throw new Error("La configuracion de polling debe ser un objeto");
+  }
+
+  const merged = { ...existing };
+  for (const field of TENANT_SCHEDULE_FIELDS) {
+    if (Object.prototype.hasOwnProperty.call(submitted, field)) merged[field] = submitted[field];
+  }
+  // Si el cliente elige "lecturas por día" sin mandar horarios, los horarios
+  // explícitos anteriores no deben seguir ganando sobre RUNS_PER_DAY.
+  if (
+    Object.prototype.hasOwnProperty.call(submitted, "RUNS_PER_DAY")
+    && !Object.prototype.hasOwnProperty.call(submitted, "RUN_AT_TIMES")
+  ) {
+    merged.RUN_AT_TIMES = [];
+  }
+  return merged;
+}
 
 function normalizePositiveInteger(value, field, { min = 1, max = Number.MAX_SAFE_INTEGER } = {}) {
   const parsed = Number(value);

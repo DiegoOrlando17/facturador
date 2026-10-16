@@ -22,7 +22,7 @@ test("los limites comerciales indefinidos no se inventan", () => {
   const policy = resolvePlanPolicy(PLAN_CATALOG[0]);
   assert.equal(policy.limits.monthlyInvoices, null);
   assert.equal(policy.processing.maxRunsPerDay, null);
-  assert.equal(policy.processing.minRealtimeIntervalMs, 15000);
+  assert.equal(policy.processing.minRealtimeIntervalMs, 5000);
   assert.equal(resolvePlanPolicy(PLAN_CATALOG[3]).limits.ocrDocumentsMonthly, 500);
 });
 

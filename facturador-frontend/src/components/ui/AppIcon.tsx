@@ -10,7 +10,6 @@ import {
   FileCheck2,
   FileText,
   Filter,
-  Headphones,
   HelpCircle,
   Home,
   Lock,
@@ -83,7 +82,7 @@ const icons = {
 } satisfies Record<AppIconName, typeof Home>;
 
 export function AppIcon({ name }: { name: AppIconName }) {
-  const Icon = icons[name] ?? Headphones;
+  const Icon = icons[name] ?? HelpCircle;
 
   return <Icon aria-hidden="true" />;
 }

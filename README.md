@@ -64,7 +64,7 @@ El dashboard inicial consume datos reales del tenant autenticado y muestra impor
 
 La seccion `Reportes` resume cantidad, importe y ticket promedio para un rango de fechas, con evolucion agrupada por dia, semana o mes.
 
-La seccion `Integraciones` muestra Mercado Pago, ARCA, Drive y Sheets. Los roles tenant `owner/admin` pueden probar conexiones y, cuando el plan incluye Google, configurar los IDs de carpeta y planilla sin acceder ni modificar credenciales OAuth. La autorizacion OAuth inicial permanece a cargo de un administrador del sistema.
+La seccion `Integraciones` muestra Mercado Pago, ARCA, Drive y Sheets. Los roles tenant `owner/admin` pueden configurar la agenda de polling de Mercado Pago sin acceder ni modificar sus credenciales y, cuando el plan incluye Google, configurar los IDs de carpeta y planilla sin acceder ni modificar credenciales OAuth. La autorizacion OAuth inicial permanece a cargo de un administrador del sistema.
 
 La seccion `Datos fiscales` permite a `owner/admin` guardar borradores o enviar el perfil completo a revision. El portal muestra el estado de aprobacion y las observaciones administrativas; editar un perfil aprobado lo devuelve a revision. `approver/viewer` conservan acceso de solo lectura.
 

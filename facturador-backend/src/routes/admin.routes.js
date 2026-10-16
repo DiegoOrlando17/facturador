@@ -31,9 +31,11 @@ import {
   addOrUpdateTenantUserWithAuth,
   createTenant,
   deleteTenantWithData,
+  getStoredTenantIntegrationConfig,
   getTenantBySlug,
   getTenantIntegrationConfig,
   listTenantIntegrations,
+  mergeMaskedIntegrationSecrets,
   listTenantUsers,
   listTenants,
   replaceTenantIntegrationConfig,
@@ -165,15 +167,17 @@ function validateIntegrationConfig(provider, config) {
   return current;
 }
 
-async function resolveGoogleManagedIntegrationConfig(tenantId, provider, submittedConfig) {
+// Resuelve la configuracion enviada desde el panel admin: los secretos enmascarados u omitidos
+// se completan con los guardados (el front no necesita revelarlos) y en Drive/Sheets se
+// conservan siempre las credenciales que administra el flujo OAuth de Google.
+async function resolveSubmittedIntegrationConfig(tenantId, provider, submittedConfig) {
+  const existing = await getStoredTenantIntegrationConfig(tenantId, provider);
+  const submitted = mergeMaskedIntegrationSecrets(existing, submittedConfig);
+
   if (provider !== "DRIVE" && provider !== "SHEETS") {
-    return validateIntegrationConfig(provider, submittedConfig);
+    return validateIntegrationConfig(provider, submitted);
   }
 
-  const existing = await tryGetTenantIntegrationConfig(tenantId, provider);
-  const submitted = submittedConfig && typeof submittedConfig === "object" && !Array.isArray(submittedConfig)
-    ? submittedConfig
-    : {};
   const config = mergeGoogleTenantIntegrationConfig(provider, existing, submitted);
   return validateIntegrationConfig(provider, config);
 }
@@ -811,7 +815,7 @@ router.put("/tenants/:slug/integrations/:provider", requireAdminPermission(ADMIN
     const tenantId = await resolveTenantIdBySlug(req.params.slug);
     const provider = validateProvider(req.params.provider);
     const enabled = req.body.enabled !== undefined ? Boolean(req.body.enabled) : true;
-    const config = await resolveGoogleManagedIntegrationConfig(tenantId, provider, req.body.config);
+    const config = await resolveSubmittedIntegrationConfig(tenantId, provider, req.body.config);
     if (provider === "MERCADOPAGO") {
       const subscription = await getTenantSubscriptionPolicy(tenantId);
       normalizeTenantSchedule(config, subscription?.policy);
@@ -835,7 +839,7 @@ router.post("/tenants/:slug/integrations/:provider/test", requireAdminPermission
     const tenantId = await resolveTenantIdBySlug(req.params.slug);
     const provider = validateProvider(req.params.provider);
     const config = req.body?.config !== undefined
-      ? await resolveGoogleManagedIntegrationConfig(tenantId, provider, req.body.config)
+      ? await resolveSubmittedIntegrationConfig(tenantId, provider, req.body.config)
       : await getTenantIntegrationConfig(tenantId, provider);
     const result = await testIntegrationConnection(provider, config);
 

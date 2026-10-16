@@ -40,16 +40,61 @@ function sanitizeTenantUser(tenantUser) {
   };
 }
 
-export async function authenticateTenantUser(tenantSlug, email, password) {
-  const tenantId = await resolveTenantIdBySlug(tenantSlug);
-  const tenantUser = await findTenantUserByEmail(tenantId, email);
-  if (!tenantUser) return null;
-  if (tenantUser.status !== "ACTIVE") return null;
-  if (tenantUser.tenant?.status !== "ACTIVE") return null;
-  if (!tenantUser.passwordHash) return null;
+export const TENANT_LOGIN_FAILURES = Object.freeze({
+  INVALID_CREDENTIALS: {
+    code: "INVALID_CREDENTIALS",
+    message: "Empresa, email o contraseña incorrectos.",
+  },
+  EMAIL_NOT_VERIFIED: {
+    code: "EMAIL_NOT_VERIFIED",
+    message: "Todavía no verificaste tu email. Revisá tu casilla o pedí un nuevo enlace de verificación.",
+  },
+  USER_DISABLED: {
+    code: "USER_DISABLED",
+    message: "Tu usuario está deshabilitado. Pedile acceso al responsable de tu empresa.",
+  },
+  TENANT_INACTIVE: {
+    code: "TENANT_INACTIVE",
+    message: "La cuenta de tu empresa no está activa. Escribinos a soporte para revisarla.",
+  },
+});
 
-  const passwordOk = await verifyPassword(password, tenantUser.passwordHash);
-  if (!passwordOk) return null;
+/**
+ * Decide por que falla un login. Solo revela estados de la cuenta
+ * (sin verificar, deshabilitada) cuando la contraseña es correcta, para no
+ * filtrar que empresas o emails existen.
+ */
+export function resolveTenantLoginFailure({ tenantUser, passwordOk, hasPendingVerification = false }) {
+  if (!tenantUser || !tenantUser.passwordHash || !passwordOk) return TENANT_LOGIN_FAILURES.INVALID_CREDENTIALS;
+  if (tenantUser.status !== "ACTIVE") {
+    return hasPendingVerification ? TENANT_LOGIN_FAILURES.EMAIL_NOT_VERIFIED : TENANT_LOGIN_FAILURES.USER_DISABLED;
+  }
+  if (tenantUser.tenant?.status !== "ACTIVE") return TENANT_LOGIN_FAILURES.TENANT_INACTIVE;
+  return null;
+}
+
+async function findTenantIdForLogin(tenantSlug) {
+  try {
+    return await resolveTenantIdBySlug(tenantSlug);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Devuelve { ok: true, tenantUser } o { ok: false, code, message } con un
+ * mensaje listo para mostrar al usuario.
+ */
+export async function authenticateTenantUser(tenantSlug, email, password) {
+  const tenantId = await findTenantIdForLogin(tenantSlug);
+  const tenantUser = tenantId ? await findTenantUserByEmail(tenantId, email) : null;
+  const passwordOk = tenantUser?.passwordHash ? await verifyPassword(password, tenantUser.passwordHash) : false;
+  const hasPendingVerification = tenantUser && passwordOk && tenantUser.status !== "ACTIVE"
+    ? (await db.contactVerification.count({ where: { tenantId: tenantUser.tenantId, email: tenantUser.email, verifiedAt: null } })) > 0
+    : false;
+
+  const failure = resolveTenantLoginFailure({ tenantUser, passwordOk, hasPendingVerification });
+  if (failure) return { ok: false, ...failure };
 
   const updated = await db.tenantUser.update({
     where: { id: tenantUser.id },
@@ -61,7 +106,7 @@ export async function authenticateTenantUser(tenantSlug, email, password) {
     },
   });
 
-  return sanitizeTenantUser(updated);
+  return { ok: true, tenantUser: sanitizeTenantUser(updated) };
 }
 
 export async function getTenantPortalUserById(id) {

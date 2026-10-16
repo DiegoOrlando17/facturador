@@ -30,12 +30,20 @@ import { RegisterPage } from "@/pages/RegisterPage";
 import { TutorialsPage } from "@/pages/TutorialsPage";
 import { ClientSubscriptionPage } from "@/pages/ClientSubscriptionPage";
 import { VerifyEmailPage } from "@/pages/VerifyEmailPage";
+import { NotFoundPage, RouteErrorPage } from "@/pages/NotFoundPage";
+import { PrivacyPage, TermsPage, WithdrawalPage } from "@/pages/LegalPage";
 
-export const router = createBrowserRouter([
+export const router = createBrowserRouter([{
+  // Ruta raíz sin elemento: solo aporta el errorElement para todo el árbol.
+  errorElement: <RouteErrorPage />,
+  children: [
   { path: "/", element: <LandingPage /> },
   { path: "/registro", element: <RegisterPage /> },
   { path: "/tutoriales", element: <TutorialsPage /> },
   { path: "/verificar-email", element: <VerifyEmailPage /> },
+  { path: "/terminos", element: <TermsPage /> },
+  { path: "/privacidad", element: <PrivacyPage /> },
+  { path: "/arrepentimiento", element: <WithdrawalPage /> },
   {
     path: "/login",
     element: <LoginPage />,
@@ -113,4 +121,6 @@ export const router = createBrowserRouter([
       },
     ],
   },
-]);
+  { path: "*", element: <NotFoundPage /> },
+  ],
+}]);

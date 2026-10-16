@@ -10,7 +10,7 @@ export function TenantProtectedLayout() {
       <div className="auth-gate">
         <div className="auth-gate__card">
           <span className="eyebrow">Portal del cliente</span>
-          <strong>Recuperando sesion...</strong>
+          <strong>Recuperando tu sesión…</strong>
           <p>Estamos validando tu acceso.</p>
         </div>
       </div>

@@ -1,5 +1,5 @@
 import { Link, useSearchParams } from "react-router-dom";
-import { type FormEvent, type ReactNode, useMemo, useState } from "react";
+import { Fragment, type FormEvent, type ReactNode, useMemo, useState } from "react";
 import { useAuth } from "@/app/AuthContext";
 import { PermissionGate } from "@/components/auth/PermissionGate";
 import { AppIcon, type AppIconName } from "@/components/ui/AppIcon";
@@ -36,7 +36,8 @@ type SectionIconName =
   | "redis"
   | "sheets"
   | "alert"
-  | "guide";
+  | "guide"
+  | "integrations";
 
 type TenantListItem = {
   id: string;
@@ -126,7 +127,12 @@ type DashboardPaymentsSummary = {
   failed: number;
   complete: number;
   totalAmount: number;
+  statuses?: Record<string, { count: number; amount: number }>;
 };
+
+function sumStatusCounts(statuses: NonNullable<DashboardPaymentsSummary["statuses"]>, keys: string[]) {
+  return keys.reduce((total, key) => total + (statuses[key]?.count ?? 0), 0);
+}
 
 type DashboardResponse = {
   summary: {
@@ -170,13 +176,14 @@ function SectionIcon({ name }: { name: SectionIconName }) {
   const names = {
     alert: "alert",
     client: "clients",
+    integrations: "integrations",
     filter: "filter",
     guide: "check-circle",
     invoice: "invoice",
     search: "search",
   };
 
-  return <AppIcon name={names[name as keyof typeof names] as AppIconName} />;
+  return <AppIcon name={(names[name as keyof typeof names] ?? "integrations") as AppIconName} />;
 }
 
 function StatusBadge({ tone, children }: { tone: Tone; children: string }) {
@@ -191,6 +198,15 @@ function createSlug(value: string) {
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
+}
+
+function normalizeSlugInput(value: string) {
+  return value
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+/g, "");
 }
 
 function hasProfileAttention(tenant: TenantListItem) {
@@ -299,7 +315,7 @@ function getPaymentStageLabel(payment: AdminPayment) {
 function getPaymentStageDetail(payment: AdminPayment) {
   if (payment.error) return payment.error;
   if (payment.status === "complete") return payment.drive_file_link ? "Drive y registro OK" : "CAE obtenido";
-  if (payment.status === "afip_pending") return "Esperando envio o respuesta de ARCA";
+  if (payment.status === "afip_pending") return "Esperando envío o respuesta de ARCA";
   if (payment.status === "pdf_pending") return "CAE listo, falta PDF";
   if (payment.status === "drive_pending") return "PDF listo, falta Drive";
   if (payment.status === "sheets_pending") return "Falta registrar en Sheets";
@@ -329,23 +345,73 @@ function SectionHeader({ title, detail, actions }: { title: string; detail: stri
   );
 }
 
+const CLIENT_FILTERS: ClientFilter[] = ["all", "ready", "warning", "blocked", "onboarding"];
+const TENANT_HEALTH_FILTERS: TenantHealth[] = ["healthy", "attention", "setup_pending"];
+const TENANT_SLUG_MIN_LENGTH = 3;
+
+function parseClientFilter(value: string | null): ClientFilter {
+  return CLIENT_FILTERS.includes(value as ClientFilter) ? value as ClientFilter : "all";
+}
+
+function parseHealthFilter(searchParams: URLSearchParams): TenantHealth | "all" {
+  const value = searchParams.get("health");
+  if (TENANT_HEALTH_FILTERS.includes(value as TenantHealth)) return value as TenantHealth;
+  // Compatibilidad con links viejos (?attention=1 / ?alerts=1).
+  if (searchParams.get("attention") === "1" || searchParams.get("alerts") === "1") return "attention";
+  return "all";
+}
+
+function getPaginationPages(page: number, totalPages: number) {
+  const pages = new Set([1, page - 1, page, page + 1, totalPages]);
+  return Array.from(pages).filter((value) => value >= 1 && value <= totalPages).sort((left, right) => left - right);
+}
+
 export function ClientsSectionPage() {
   const { token } = useAuth();
-  const [searchParams] = useSearchParams();
-  const attentionOnly = searchParams.get("attention") === "1" || searchParams.get("alerts") === "1";
-  const [query, setQuery] = useState("");
-  const [activeFilter, setActiveFilter] = useState<ClientFilter>(attentionOnly ? "blocked" : "all");
-  const [healthFilter, setHealthFilter] = useState<TenantHealth | "all">(attentionOnly ? "attention" : "all");
-  const [planFilter, setPlanFilter] = useState("all");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const query = searchParams.get("search") ?? "";
+  const activeFilter = parseClientFilter(searchParams.get("tab"));
+  const healthFilter = parseHealthFilter(searchParams);
+  const planFilter = searchParams.get("plan") || "all";
+  const requestedPage = Math.max(1, Math.floor(Number(searchParams.get("page")) || 1));
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [tenantName, setTenantName] = useState("");
   const [tenantSlug, setTenantSlug] = useState("");
+  const [slugTouched, setSlugTouched] = useState(false);
   const [tenantStatus, setTenantStatus] = useState<TenantStatus>("ACTIVE");
   const [isCreating, setIsCreating] = useState(false);
   const [createMessage, setCreateMessage] = useState("");
   const [createError, setCreateError] = useState("");
-  const [page, setPage] = useState(1);
   const pageSize = 6;
+
+  function updateParams(changes: Record<string, string | null>, options: { resetPage?: boolean; replace?: boolean } = {}) {
+    const { resetPage = true, replace = false } = options;
+
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current);
+      const legacyHealth = parseHealthFilter(current);
+
+      next.delete("attention");
+      next.delete("alerts");
+      if (legacyHealth !== "all" && !next.get("health")) next.set("health", legacyHealth);
+
+      Object.entries(changes).forEach(([key, value]) => {
+        if (value === null || value === "" || value === "all") {
+          next.delete(key);
+        } else {
+          next.set(key, value);
+        }
+      });
+
+      if (resetPage) next.delete("page");
+
+      return next;
+    }, { replace });
+  }
+
+  function setPage(pageNumber: number) {
+    updateParams({ page: pageNumber > 1 ? String(pageNumber) : null }, { resetPage: false });
+  }
   const { data, errorMessage, isLoading, reload } = useApiResource<TenantsResponse>("/admin/tenants", {
     fallbackErrorMessage: "No se pudo cargar el listado de clientes.",
   });
@@ -382,13 +448,14 @@ export function ClientsSectionPage() {
     });
   }, [activeFilter, healthFilter, items, planFilter, query]);
   const totalPages = Math.max(1, Math.ceil(filteredItems.length / pageSize));
+  const page = Math.min(requestedPage, totalPages);
   const visibleRows = filteredItems.slice((page - 1) * pageSize, page * pageSize);
   const normalizedTenantSlug = tenantSlug.trim();
-  const canCreateTenant = Boolean(token && tenantName.trim() && normalizedTenantSlug && !isCreating);
+  const isSlugValid = normalizedTenantSlug.length >= TENANT_SLUG_MIN_LENGTH;
+  const canCreateTenant = Boolean(token && tenantName.trim() && isSlugValid && !isCreating);
 
   function updateFilter(filter: ClientFilter) {
-    setActiveFilter(filter);
-    setPage(1);
+    updateParams({ tab: filter });
   }
 
   function handleTenantNameChange(value: string) {
@@ -396,7 +463,7 @@ export function ClientsSectionPage() {
     setCreateError("");
     setCreateMessage("");
 
-    if (!tenantSlug.trim()) {
+    if (!slugTouched) {
       setTenantSlug(createSlug(value));
     }
   }
@@ -405,12 +472,12 @@ export function ClientsSectionPage() {
     event.preventDefault();
 
     if (!token) {
-      setCreateError("Tu sesion no esta disponible. Ingresa nuevamente para crear clientes.");
+      setCreateError("Tu sesión no está disponible. Ingresá nuevamente para crear clientes.");
       return;
     }
 
     if (!canCreateTenant) {
-      setCreateError("Completa nombre y slug para crear el cliente.");
+      setCreateError(`Completá el nombre y un slug de al menos ${TENANT_SLUG_MIN_LENGTH} caracteres para crear el cliente.`);
       return;
     }
 
@@ -424,7 +491,7 @@ export function ClientsSectionPage() {
         token,
         body: {
           name: tenantName.trim(),
-          slug: normalizedTenantSlug,
+          slug: createSlug(normalizedTenantSlug),
           status: tenantStatus,
         },
       });
@@ -432,6 +499,7 @@ export function ClientsSectionPage() {
 
       setTenantName("");
       setTenantSlug("");
+      setSlugTouched(false);
       setTenantStatus("ACTIVE");
       setIsCreateOpen(false);
       setCreateMessage(`${createdName} creado correctamente.`);
@@ -446,8 +514,10 @@ export function ClientsSectionPage() {
   return (
     <main className="admin-section-page clients-page">
       <SectionHeader
-        title="Clientes"
-        detail="Gestiona todos tus clientes (tenants)."
+        title={activeFilter === "onboarding" ? "Altas" : "Clientes"}
+        detail={activeFilter === "onboarding"
+          ? "Clientes en onboarding o con datos pendientes de aprobación."
+          : "Gestioná todos tus clientes."}
         actions={
           <PermissionGate
             permission="tenants:manage"
@@ -465,20 +535,16 @@ export function ClientsSectionPage() {
           <input
             type="search"
             value={query}
-            onChange={(event) => {
-              setQuery(event.target.value);
-              setPage(1);
-            }}
-            placeholder="Buscar por nombre, CUIT o email..."
+            onChange={(event) => updateParams({ search: event.target.value }, { replace: true })}
+            placeholder="Buscar por nombre, slug, CUIT o plan…"
+            aria-label="Buscar clientes"
           />
         </label>
         <select
           className="section-select clients-select"
           value={healthFilter}
-          onChange={(event) => {
-            setHealthFilter(event.target.value as TenantHealth | "all");
-            setPage(1);
-          }}
+          aria-label="Filtrar por estado operativo"
+          onChange={(event) => updateParams({ health: event.target.value })}
         >
           <option value="all">Estado operativo</option>
           <option value="healthy">Listo para facturar</option>
@@ -488,10 +554,8 @@ export function ClientsSectionPage() {
         <select
           className="section-select clients-select"
           value={planFilter}
-          onChange={(event) => {
-            setPlanFilter(event.target.value);
-            setPage(1);
-          }}
+          aria-label="Filtrar por plan"
+          onChange={(event) => updateParams({ plan: event.target.value })}
         >
           <option value="all">Todos los planes</option>
           <option value="none">Sin plan</option>
@@ -502,15 +566,9 @@ export function ClientsSectionPage() {
         <button
           type="button"
           className="section-button section-button--soft clients-filter-button"
-          onClick={() => {
-            setQuery("");
-            setActiveFilter("all");
-            setHealthFilter("all");
-            setPlanFilter("all");
-            setPage(1);
-          }}
+          onClick={() => setSearchParams(new URLSearchParams())}
         >
-          <SectionIcon name="filter" />Filtros
+          <SectionIcon name="filter" />Limpiar filtros
         </button>
       </div>
       {isCreateOpen ? (
@@ -531,13 +589,19 @@ export function ClientsSectionPage() {
               type="text"
               value={tenantSlug}
               onChange={(event) => {
-                setTenantSlug(createSlug(event.target.value));
+                setSlugTouched(true);
+                setTenantSlug(normalizeSlugInput(event.target.value));
                 setCreateError("");
                 setCreateMessage("");
               }}
+              onBlur={() => setTenantSlug((current) => createSlug(current))}
               placeholder="cliente-sur"
+              minLength={TENANT_SLUG_MIN_LENGTH}
+              maxLength={50}
+              required
               disabled={isCreating}
             />
+            {tenantSlug && !isSlugValid ? <small>El slug tiene que tener al menos {TENANT_SLUG_MIN_LENGTH} caracteres.</small> : null}
           </label>
           <label className="field">
             <span>Estado inicial</span>
@@ -548,7 +612,7 @@ export function ClientsSectionPage() {
           </label>
           <div className="section-create-panel__actions">
             <button type="submit" className="section-button section-button--primary" disabled={!canCreateTenant}>
-              {isCreating ? "Creando..." : "Crear cliente"}
+              {isCreating ? "Creando…" : "Crear cliente"}
             </button>
             <button type="button" className="section-button" onClick={() => setIsCreateOpen(false)} disabled={isCreating}>
               Cancelar
@@ -579,10 +643,10 @@ export function ClientsSectionPage() {
       <section className="section-table-card">
         <div className="section-table section-table--clients">
           <div className="section-table__head">
-            <span>Cliente</span><span>Estado operativo</span><span>Plan</span><span>Alertas</span><span>Ultima actividad</span><span>Accion</span>
+            <span>Cliente</span><span>Estado operativo</span><span>Plan</span><span>Alertas</span><span>Última actividad</span><span>Acción</span>
           </div>
           {isLoading ? (
-            <div className="section-table__state">Cargando clientes...</div>
+            <div className="section-table__state">Cargando clientes…</div>
           ) : errorMessage ? (
             <div className="section-table__state section-table__state--danger">
               <span>{errorMessage}</span>
@@ -617,28 +681,21 @@ export function ClientsSectionPage() {
         </div>
       </section>
       <div className="section-pagination clients-pagination">
-        <button type="button" disabled={page === 1} onClick={() => setPage((current) => Math.max(1, current - 1))}>{"<"}</button>
-        {Array.from({ length: Math.min(totalPages, 3) }, (_, index) => index + 1).map((pageNumber) => (
-          <button
-            key={pageNumber}
-            type="button"
-            className={page === pageNumber ? "section-pagination__active" : ""}
-            onClick={() => setPage(pageNumber)}
-          >
-            {pageNumber}
-          </button>
+        <button type="button" disabled={page === 1} onClick={() => setPage(page - 1)} aria-label="Página anterior">{"<"}</button>
+        {getPaginationPages(page, totalPages).map((pageNumber, index, pages) => (
+          <Fragment key={pageNumber}>
+            {index > 0 && pageNumber - pages[index - 1] > 1 ? <span>…</span> : null}
+            <button
+              type="button"
+              className={page === pageNumber ? "section-pagination__active" : ""}
+              aria-current={page === pageNumber ? "page" : undefined}
+              onClick={() => setPage(pageNumber)}
+            >
+              {pageNumber}
+            </button>
+          </Fragment>
         ))}
-        {totalPages > 4 ? <span>...</span> : null}
-        {totalPages > 3 ? (
-          <button
-            type="button"
-            className={page === totalPages ? "section-pagination__active" : ""}
-            onClick={() => setPage(totalPages)}
-          >
-            {totalPages}
-          </button>
-        ) : null}
-        <button type="button" disabled={page === totalPages} onClick={() => setPage((current) => Math.min(totalPages, current + 1))}>{">"}</button>
+        <button type="button" disabled={page === totalPages} onClick={() => setPage(page + 1)} aria-label="Página siguiente">{">"}</button>
       </div>
     </main>
   );
@@ -667,7 +724,7 @@ export function BillingSectionPage() {
     reload: reloadDashboard,
   } = useApiResource<DashboardResponse>("/admin/dashboard", {
     enabled: Boolean(token),
-    fallbackErrorMessage: "No se pudo cargar el resumen de facturacion.",
+    fallbackErrorMessage: "No se pudo cargar el resumen de facturación.",
   });
 
   const {
@@ -677,10 +734,20 @@ export function BillingSectionPage() {
     reload: reloadPayments,
   } = useApiResource<AdminPaymentsResponse>(`/admin/payments?${queryParams.toString()}`, {
     enabled: Boolean(token),
-    fallbackErrorMessage: "No se pudo cargar la actividad de facturacion.",
+    fallbackErrorMessage: "No se pudo cargar la actividad de facturación.",
   });
 
   const paymentSummary = dashboard?.summary.payments;
+  const stageCounts = paymentSummary?.statuses
+    ? {
+      arca: sumStatusCounts(paymentSummary.statuses, ["pending", "processing", "afip_pending"]),
+      delivery: sumStatusCounts(paymentSummary.statuses, ["pdf_pending", "drive_pending", "sheets_pending"]),
+      failed: sumStatusCounts(paymentSummary.statuses, ["failed"]),
+    }
+    : null;
+  // Con desglose por estado, las etapas pendientes y los fallidos no se superponen.
+  const failedCount = stageCounts ? stageCounts.failed : paymentSummary?.failed;
+  const formatKpi = (value: number | undefined) => (isDashboardLoading && !paymentSummary) || value === undefined ? "—" : value;
   const totalPages = payments?.pagination.totalPages ?? 1;
 
   function resetFilters() {
@@ -697,8 +764,8 @@ export function BillingSectionPage() {
   return (
     <main className="admin-section-page">
       <SectionHeader
-        title="Facturacion"
-        detail="Sigue cada pago por etapa: cobro, ARCA, PDF, Drive y Sheets."
+        title="Facturación"
+        detail="Seguí cada pago por etapa: cobro, ARCA, PDF, Drive y Sheets."
         actions={
           <button type="button" className="section-button section-button--soft" onClick={refreshBillingData}>
             Actualizar
@@ -706,18 +773,24 @@ export function BillingSectionPage() {
         }
       />
       <section className="section-kpi-row">
-        <article><span>Pagos recibidos</span><strong>{isDashboardLoading ? "..." : paymentSummary?.total ?? 0}</strong><small>Total historico</small></article>
-        <article><span>Pendientes ARCA</span><strong>{isDashboardLoading ? "..." : paymentSummary?.pending ?? 0}</strong><small>Incluye etapas en curso</small></article>
-        <article><span>Pendientes PDF/Drive</span><strong>{isDashboardLoading ? "..." : paymentSummary?.pending ?? 0}</strong><small>Revisar etapa actual</small></article>
-        <article><span>Errores a resolver</span><strong>{isDashboardLoading ? "..." : paymentSummary?.failed ?? 0}</strong><small className={(paymentSummary?.failed ?? 0) > 0 ? "section-danger-text" : ""}>Impactan facturacion</small></article>
-        <article><span>Facturas emitidas</span><strong>{isDashboardLoading ? "..." : paymentSummary?.complete ?? 0}</strong><small>{formatCurrency(paymentSummary?.totalAmount ?? 0)} registrados</small></article>
+        <article><span>Pagos recibidos</span><strong>{formatKpi(paymentSummary?.total)}</strong><small>Total histórico</small></article>
+        {stageCounts ? (
+          <>
+            <article><span>Pendientes ARCA</span><strong>{formatKpi(stageCounts.arca)}</strong><small>Recibidos, en proceso o esperando ARCA</small></article>
+            <article><span>Pendientes PDF/Drive</span><strong>{formatKpi(stageCounts.delivery)}</strong><small>Con CAE, falta PDF, Drive o Sheets</small></article>
+          </>
+        ) : (
+          <article><span>En proceso</span><strong>{formatKpi(paymentSummary?.pending)}</strong><small>Todas las etapas en curso</small></article>
+        )}
+        <article><span>Errores a resolver</span><strong>{formatKpi(failedCount)}</strong><small className={(failedCount ?? 0) > 0 ? "section-danger-text" : ""}>{stageCounts ? "Pagos en estado fallido" : "Impactan la facturación"}</small></article>
+        <article><span>Facturas emitidas</span><strong>{formatKpi(paymentSummary?.complete)}</strong><small>{paymentSummary ? formatCurrency(paymentSummary.totalAmount) + " registrados" : "—"}</small></article>
       </section>
 
       {dashboardErrorMessage ? (
         <section className="section-table__state section-table__state--danger">{dashboardErrorMessage}</section>
       ) : null}
 
-      <section className="section-toolbar" aria-label="Filtros de facturacion">
+      <section className="section-toolbar" aria-label="Filtros de facturación">
         <label className="section-search">
           <SectionIcon name="search" />
           <input
@@ -756,7 +829,7 @@ export function BillingSectionPage() {
             setPage(1);
           }}
         >
-          <option value="">Todos los providers</option>
+          <option value="">Todos los proveedores</option>
           <option value="MERCADOPAGO">Mercado Pago</option>
         </select>
         <button type="button" className="section-button section-button--soft" onClick={resetFilters}>
@@ -767,10 +840,10 @@ export function BillingSectionPage() {
       <section className="section-table-card section-table-card--scrollable">
         <div className="section-table section-table--billing">
           <div className="section-table__head">
-            <span>Fecha pago</span><span>Comprobante</span><span>Cliente</span><span>Proveedor</span><span>Monto</span><span>Etapa actual</span><span>Ultimo error</span><span>Accion</span>
+            <span>Fecha pago</span><span>Comprobante</span><span>Cliente</span><span>Proveedor</span><span>Monto</span><span>Etapa actual</span><span>Último error</span><span>Acción</span>
           </div>
           {arePaymentsLoading ? (
-            <div className="section-table__state">Cargando actividad de facturacion...</div>
+            <div className="section-table__state">Cargando actividad de facturación…</div>
           ) : paymentsErrorMessage ? (
             <div className="section-table__state section-table__state--danger">{paymentsErrorMessage}</div>
           ) : payments && payments.items.length > 0 ? payments.items.map((payment) => (
@@ -795,7 +868,7 @@ export function BillingSectionPage() {
             </div>
           )) : (
             <div className="section-table__state">
-              No hay pagos registrados con esos filtros. Cuando Mercado Pago informe cobros, apareceran aca.
+              No hay pagos registrados con esos filtros. Cuando Mercado Pago informe cobros, van a aparecer acá.
             </div>
           )}
         </div>
@@ -847,7 +920,7 @@ export function IntegrationsSectionPage() {
   return (
     <main className="admin-section-page">
       <SectionHeader title="Integraciones" detail="Estado real de conexiones, infraestructura, workers y colas." actions={<button type="button" className="section-button section-button--soft" onClick={() => void reload()}>Verificar ahora</button>} />
-      {isLoading ? <section className="section-table-card"><div className="section-table__state">Verificando servicios...</div></section> : null}
+      {isLoading ? <section className="section-table-card"><div className="section-table__state">Verificando servicios…</div></section> : null}
       {errorMessage ? <section className="section-table-card"><div className="section-table__state section-table__state--danger">{errorMessage}</div></section> : null}
       {data ? <>
       <section className="section-table-card">
@@ -857,16 +930,16 @@ export function IntegrationsSectionPage() {
         </div>
         <div className="section-table section-table--integrations">
           <div className="section-table__head">
-            <span>Servicio</span><span>Estado</span><span>Detalle</span><span>Ultima actividad</span><span>Accion</span>
+            <span>Servicio</span><span>Estado</span><span>Detalle</span><span>Última actividad</span><span>Acción</span>
           </div>
           {data.integrations.map((item) => {
-            const presentation = providerPresentation[item.provider] ?? { label: item.provider, icon: "integrations" as SectionIconName };
+            const presentation = providerPresentation[item.provider] ?? { label: item.provider, icon: "integrations" };
             return <div key={item.provider} className="section-table__row">
               <strong className="section-service-name"><span className="integration-logo-frame"><SectionIcon name={presentation.icon} /></span>{presentation.label}</strong>
               <span><StatusBadge tone={getTone(item.status)}>{getLabel(item.status)}</StatusBadge></span>
-              <span>{`${item.configuredCount}/${item.enabledCount} habilitadas configuradas; ${item.needsAttentionCount} requieren atencion`}</span>
+              <span>{`${item.configuredCount}/${item.enabledCount} habilitadas configuradas; ${item.needsAttentionCount} requieren atención`}</span>
               <span>{formatDateTime(data.checkedAt)}</span>
-              <Link to="/tenants?attention=1" className="section-mini-button">Ver clientes</Link>
+              <Link to="/admin/tenants?health=attention" className="section-mini-button">Ver clientes</Link>
             </div>
           })}
         </div>
@@ -878,7 +951,7 @@ export function IntegrationsSectionPage() {
         </div>
         <div className="section-table section-table--integrations">
           <div className="section-table__head">
-            <span>Servicio</span><span>Estado</span><span>Detalle</span><span>Ultima actividad</span><span>Accion</span>
+            <span>Servicio</span><span>Estado</span><span>Detalle</span><span>Última actividad</span><span>Acción</span>
           </div>
           {[...data.infrastructure, ...data.queues].map((item) => (
             <div key={item.name} className="section-table__row">
@@ -889,7 +962,7 @@ export function IntegrationsSectionPage() {
           ))}
         </div>
         {false ? <SectionIcon name="guide" /> : null}
-        <div><strong>¿Necesitas conectar un servicio?</strong><p>Consulta nuestra guia de integraciones o contacta a soporte.</p></div>
+        <div><strong>¿Necesitás conectar un servicio?</strong><p>Consultá nuestra guía de integraciones o contactá a soporte.</p></div>
         {false ? <button type="button" className="section-button section-button--soft">Ver guia</button> : null}
       </section>
       </> : null}
@@ -927,7 +1000,7 @@ export function AlertsSectionPage() {
       });
       await reload();
     } catch (error) {
-      setActionErrorMessage(getApiErrorMessage(error, "No se pudo actualizar la asignacion."));
+      setActionErrorMessage(getApiErrorMessage(error, "No se pudo actualizar la asignación."));
     } finally {
       setUpdatingAlertId(null);
     }
@@ -937,35 +1010,35 @@ export function AlertsSectionPage() {
     <main className="admin-section-page">
       <SectionHeader
         title="Alertas"
-        detail="Problemas, errores y eventos que requieren atencion."
+        detail="Problemas, errores y eventos que requieren atención."
         actions={<button type="button" className="section-button section-button--soft" onClick={() => void reload()}>Actualizar</button>}
       />
       <div className="section-tabs">
         <button type="button" className={`section-tab${queueFilter === "all" ? " section-tab--active" : ""}`} onClick={() => setQueueFilter("all")}>Todas <b>{allRows.length}</b></button>
         <button type="button" className={`section-tab${queueFilter === "unassigned" ? " section-tab--active" : ""}`} onClick={() => setQueueFilter("unassigned")}>Sin asignar <b>{allRows.filter((item) => !item.assignment).length}</b></button>
         <button type="button" className={`section-tab${queueFilter === "mine" ? " section-tab--active" : ""}`} onClick={() => setQueueFilter("mine")}>Mis alertas <b>{allRows.filter((item) => item.assignment?.adminUser?.id === user?.id).length}</b></button>
-        <span className="section-tab">Criticas <b>{criticalCount}</b></span><span className="section-tab">Advertencias <b>{warningCount}</b></span>
+        <span className="section-tab">Críticas <b>{criticalCount}</b></span><span className="section-tab">Advertencias <b>{warningCount}</b></span>
       </div>
       <section className="section-table-card">
         <div className="section-table section-table--alerts">
           <div className="section-table__head">
-            <span>Alerta</span><span>Cliente</span><span>Severidad</span><span>Impacto</span><span>Responsable</span><span>Accion</span>
+            <span>Alerta</span><span>Cliente</span><span>Severidad</span><span>Impacto</span><span>Responsable</span><span>Acción</span>
           </div>
           {isLoading ? (
-            <div className="section-table__state">Cargando alertas...</div>
+            <div className="section-table__state">Cargando alertas…</div>
           ) : errorMessage ? (
             <div className="section-table__state section-table__state--danger">{errorMessage}</div>
           ) : rows.length > 0 ? rows.map((item) => (
             <div key={item.id} className="section-table__row">
               <span>{item.title}</span><strong>{item.tenant.name}</strong>
-              <span><StatusBadge tone={item.priority === "danger" ? "danger" : item.priority === "warning" ? "warning" : "info"}>{item.priority === "danger" ? "Critica" : item.priority === "warning" ? "Advertencia" : "Informativa"}</StatusBadge></span>
+              <span><StatusBadge tone={item.priority === "danger" ? "danger" : item.priority === "warning" ? "warning" : "info"}>{item.priority === "danger" ? "Crítica" : item.priority === "warning" ? "Advertencia" : "Informativa"}</StatusBadge></span>
               <span>{item.detail}</span>
               <span>{item.assignment?.adminUser?.name ?? item.assignment?.adminUser?.email ?? "Sin asignar"}</span>
               <span className="section-row-actions">
                 <Link to={item.actionPath} className="section-mini-button">{item.actionLabel}</Link>
                 {can("payments:manage") ? (
                   <button type="button" className="section-mini-button" disabled={updatingAlertId === item.id} onClick={() => void updateAssignment(item.id, !item.assignment)}>
-                    {updatingAlertId === item.id ? "Guardando..." : item.assignment ? "Liberar" : "Tomar"}
+                    {updatingAlertId === item.id ? "Guardando…" : item.assignment ? "Liberar" : "Tomar"}
                   </button>
                 ) : null}
               </span>
@@ -978,9 +1051,7 @@ export function AlertsSectionPage() {
       {actionErrorMessage ? <p className="form-error">{actionErrorMessage}</p> : null}
       <section className="section-help-card">
         <SectionIcon name="alert" />
-        <div><strong>Las alertas criticas pueden afectar la facturacion automatica.</strong><p>Resolvelas cuanto antes para evitar interrupciones.</p></div>
-        <button type="button" className="section-button section-button--soft">Ver todas las alertas</button>
-      </section>
+        <div><strong>Las alertas críticas pueden afectar la facturación automática.</strong><p>Resolvelas cuanto antes para evitar interrupciones.</p></div>      </section>
     </main>
   );
 }

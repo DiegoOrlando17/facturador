@@ -69,7 +69,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setToken(null);
       setUser(null);
       setAuthNotice("Tu sesion vencio. Ingresa nuevamente para continuar.");
-    });
+    }, "admin");
   }, []);
 
   async function bootstrapSession() {

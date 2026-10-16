@@ -4659,7 +4659,9 @@ button.section-tab {
 .marketing-page { min-height: 100vh; background: #f7f8f4; color: #18231e; }
 .marketing-nav { max-width: 1180px; margin: auto; padding: 24px; display: flex; align-items: center; justify-content: space-between; gap: 24px; }
 .marketing-nav > div, .marketing-actions, .marketing-footer { display: flex; align-items: center; gap: 18px; }
-.marketing-nav a, .marketing-footer a { color: inherit; text-decoration: none; }
+.marketing-nav a:not(.primary-button):not(.secondary-button), .marketing-footer a { color: inherit; text-decoration: none; }
+.marketing-footer { flex-wrap: wrap; }
+.marketing-footer a:hover, .marketing-nav a:not(.primary-button):not(.secondary-button):hover { text-decoration: underline; }
 .marketing-brand { font-size: 1.3rem; font-weight: 800; }
 .marketing-hero { max-width: 1180px; margin: 40px auto 80px; padding: 56px 24px; display: grid; grid-template-columns: 1.5fr 0.8fr; gap: 54px; align-items: center; }
 .marketing-hero h1, .tutorial-hero h1 { max-width: 850px; margin: 12px 0 20px; font-size: clamp(2.6rem, 6vw, 5.4rem); line-height: .98; letter-spacing: -.055em; }
@@ -4677,9 +4679,56 @@ button.section-tab {
 .marketing-footer { max-width: 1180px; margin: auto; padding: 32px 24px; border-top: 1px solid #d8e0da; }
 .public-form-page { min-height: 100vh; display: grid; place-items: center; padding: 32px; background: #eef3ef; }
 .public-form-card { width: min(100%, 560px); padding: 36px; display: grid; gap: 18px; border-radius: 24px; background: white; box-shadow: var(--shadow); }
-.public-form-card > a { color: var(--primary); text-decoration: none; }
+.public-back-link { justify-self: start; color: #1455d9; font-weight: 600; text-decoration: none; }
+.public-back-link:hover { text-decoration: underline; }
+.public-form-card h1 { margin: 0; }
+.public-form-card p { margin: 0; }
 .public-consent { display: flex; gap: 10px; align-items: flex-start; }
+.public-consent a, .public-inline-link { color: #1455d9; font-weight: 600; text-decoration: underline; }
+.field-help { color: #526159; font-size: 0.86rem; }
+.field-help strong { color: #18231e; }
+.public-form-actions { display: flex; flex-wrap: wrap; gap: 12px; }
+.public-resend { display: grid; gap: 12px; padding: 18px; border: 1px solid #dde5df; border-radius: 16px; background: #f7f8f4; }
+.public-resend h2 { margin: 0; font-size: 1.05rem; }
+.public-resend p { margin: 0; }
+.login-card .public-resend { margin-top: 18px; }
+.public-resend form { display: grid; gap: 12px; }
+.public-success { color: #17603f; }
+.dev-only-note { padding: 12px 14px; border: 1px dashed #b7791f; border-radius: 12px; background: #fff8eb; color: #6b4410; font-size: 0.9rem; }
+.legal-page { max-width: 820px; margin: 0 auto; padding: 32px 24px 72px; }
+.legal-page h1 { margin: 12px 0 8px; font-size: clamp(2rem, 4vw, 3rem); line-height: 1.05; letter-spacing: -.03em; }
+.legal-page h2 { margin: 32px 0 8px; font-size: 1.25rem; }
+.legal-page p, .legal-page li { color: #36443d; line-height: 1.65; }
+.legal-page p a { color: #1455d9; font-weight: 600; text-decoration: underline; }
+.legal-draft-note { margin: 20px 0; padding: 14px 16px; border-left: 4px solid #b7791f; border-radius: 8px; background: #fff8eb; color: #6b4410; }
+.legal-nav { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-top: 40px; padding-top: 20px; border-top: 1px solid #d8e0da; }
+.legal-nav a { color: #1455d9; font-weight: 600; }
+.not-found-page { min-height: 100vh; display: grid; place-items: center; padding: 32px 16px; background: #eef3ef; }
+.not-found-card { width: min(100%, 560px); padding: 36px; display: grid; gap: 16px; border-radius: 24px; background: white; box-shadow: var(--shadow); text-align: center; }
+.not-found-card h1 { margin: 0; font-size: clamp(1.8rem, 4vw, 2.4rem); }
+.not-found-card p { margin: 0; color: #526159; }
+.not-found-card .public-form-actions { justify-content: center; }
 .tutorial-hero { max-width: 1180px; margin: auto; padding: 72px 24px 20px; }
 .tutorial-grid { grid-template-columns: repeat(2, 1fr); }
 .tutorial-grid li { margin: 12px 0; }
-@media (max-width: 900px) { .marketing-hero, .marketing-benefits, .marketing-plans, .tutorial-grid { grid-template-columns: 1fr; } .marketing-nav > div { gap: 10px; } .marketing-nav > div > a:not(.primary-button) { display: none; } .marketing-hero { margin-top: 0; padding-top: 30px; } }
+@media (max-width: 900px) { .marketing-hero, .marketing-benefits, .marketing-plans, .tutorial-grid { grid-template-columns: 1fr; } .marketing-nav { padding: 16px; gap: 12px; } .marketing-nav > div { gap: 12px; } .marketing-nav > div > a:not(.primary-button):not(.marketing-nav-login) { display: none; } .marketing-nav-login { font-weight: 700; } .marketing-hero { margin-top: 0; padding-top: 30px; } .public-form-page { padding: 16px; } .public-form-card, .not-found-card { padding: 24px; } }
+
+/* phase1-admin */
+.phase1-nav-badge { width: auto; min-width: 18px; padding: 0 5px; }
+a.phase1-user-card { color: inherit; text-decoration: none; transition: border-color 0.15s ease, background 0.15s ease; }
+a.phase1-user-card:hover { border-color: #b9cbe4; background: #f3f8ff; }
+a.phase1-user-card:focus-visible { outline: 2px solid #1d64d8; outline-offset: 2px; }
+.phase1-kpi-placeholder { color: #8a97ab; }
+/* end phase1-admin */
+
+/* phase1-tenant-detail */
+.detail-section-tabs button { position: relative; }
+.tenant-detail-tab-dot { display: inline-block; width: 7px; height: 7px; margin-left: 6px; border-radius: 50%; background: #b45309; vertical-align: middle; }
+.tenant-readiness-action { margin: 0 0 12px; font-size: 0.85rem; color: #3d4b5c; }
+.tenant-readiness-action strong { color: #1f2933; }
+.tenant-readiness-note { display: block; margin-top: 2px; font-size: 0.78rem; color: #5b6676; }
+.client-checklist__item:disabled { cursor: default; opacity: 1; }
+.tenant-onboarding-history { margin: 12px 0 0; padding-left: 18px; font-size: 0.85rem; color: #3d4b5c; }
+.integration-mode-panel .integration-segmented-control { margin-top: 4px; }
+.integration-mode-panel small.form-error { display: block; margin-top: 4px; }
+/* end phase1-tenant-detail */

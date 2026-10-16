@@ -1,7 +1,7 @@
 import crypto from "crypto";
 import { PrismaClient } from "@prisma/client";
 import { resolvePlanPolicy } from "../domain/planPolicy.js";
-import { normalizePublicRegistration } from "../domain/publicRegistration.js";
+import { classifyContactVerification, normalizePublicRegistration, PublicRequestError, shouldExposeDevVerification } from "../domain/publicRegistration.js";
 import { hashPassword } from "../utils/password.js";
 import { isMercadoPagoBillingConfigured } from "./mercadoPagoBilling.service.js";
 import { sendVerificationEmail } from "./email.service.js";
@@ -22,18 +22,18 @@ export async function listPublicPlans() {
   return plans.map(presentPlan);
 }
 
-export async function registerPublicTenant(payload, { exposeVerificationToken = process.env.NODE_ENV !== "production" } = {}) {
+export async function registerPublicTenant(payload, { exposeVerificationToken = shouldExposeDevVerification() } = {}) {
   const data = normalizePublicRegistration(payload);
   const plan = await prisma.plan.findUnique({ where: { code: data.planCode } });
-  if (!plan || plan.status !== "ACTIVE") throw new Error("El plan seleccionado no esta disponible");
+  if (!plan || plan.status !== "ACTIVE") throw new PublicRequestError("El plan elegido no está disponible. Elegí otro.", { code: "PLAN_UNAVAILABLE" });
   const passwordHash = await hashPassword(data.password);
   const token = crypto.randomBytes(32).toString("base64url");
 
   const result = await prisma.$transaction(async (tx) => {
     const existingTenant = await tx.tenant.findUnique({ where: { slug: data.slug } });
-    if (existingTenant) throw new Error("El identificador de empresa ya esta en uso");
+    if (existingTenant) throw new PublicRequestError("Ese identificador de empresa ya está en uso. Probá con otro.", { code: "SLUG_TAKEN", status: 409 });
     const existingUser = await tx.tenantUser.findFirst({ where: { email: data.email } });
-    if (existingUser) throw new Error("El email ya esta registrado");
+    if (existingUser) throw new PublicRequestError("Ya existe una cuenta con ese email. Ingresá al portal o, si no verificaste el email, pedí un nuevo enlace.", { code: "EMAIL_TAKEN", status: 409 });
 
     const tenant = await tx.tenant.create({ data: { name: data.businessName, slug: data.slug, status: "ACTIVE" } });
     await tx.tenantProfile.create({ data: { tenantId: tenant.id, tradeName: data.businessName, contactEmail: data.email, responsibleEmail: data.email } });
@@ -49,7 +49,7 @@ export async function registerPublicTenant(payload, { exposeVerificationToken = 
   return { tenantSlug: result.slug, email: data.email, verificationRequired: true, emailSent: emailDelivery.sent, billingStatus: "provider_pending", ...(exposeVerificationToken ? { verificationToken: token } : {}) };
 }
 
-export async function resendPublicContactVerification(email, { exposeVerificationToken = process.env.NODE_ENV !== "production" } = {}) {
+export async function resendPublicContactVerification(email, { exposeVerificationToken = shouldExposeDevVerification() } = {}) {
   const normalizedEmail = String(email || "").trim().toLowerCase();
   const user = await prisma.tenantUser.findFirst({ where: { email: normalizedEmail, status: "DISABLED" }, include: { tenant: true } });
   if (!user) return { accepted: true };
@@ -66,14 +66,19 @@ export async function resendPublicContactVerification(email, { exposeVerificatio
 
 export async function verifyPublicContact(token) {
   const normalized = String(token || "").trim();
-  if (!normalized) throw new Error("token es obligatorio");
-  const verification = await prisma.contactVerification.findUnique({ where: { tokenHash: tokenHash(normalized) } });
-  if (!verification || verification.verifiedAt || verification.expiresAt <= new Date()) throw new Error("El enlace de verificacion es invalido o vencio");
+  if (!normalized) throw new PublicRequestError("El enlace de verificación está incompleto. Abrilo de nuevo desde el email o pedí uno nuevo.", { code: "VERIFICATION_INVALID" });
+  const verification = await prisma.contactVerification.findUnique({ where: { tokenHash: tokenHash(normalized) }, include: { tenant: { select: { slug: true } } } });
+  const state = classifyContactVerification(verification);
+  if (state === "invalid") throw new PublicRequestError("El enlace de verificación no es válido. Pedí uno nuevo con tu email.", { code: "VERIFICATION_INVALID" });
+  const identity = { tenantSlug: verification.tenant?.slug ?? null, email: verification.email };
+  // Idempotente: abrir el mismo enlace dos veces (o el doble efecto de StrictMode) no es un error.
+  if (state === "already_verified") return { verified: true, alreadyVerified: true, ...identity };
+  if (state === "expired") throw new PublicRequestError("El enlace de verificación venció. Pedí uno nuevo con tu email.", { code: "VERIFICATION_EXPIRED" });
   await prisma.$transaction([
     prisma.contactVerification.update({ where: { id: verification.id }, data: { verifiedAt: new Date() } }),
     prisma.tenantUser.update({ where: { tenantId_email: { tenantId: verification.tenantId, email: verification.email } }, data: { status: "ACTIVE" } }),
   ]);
-  return { verified: true };
+  return { verified: true, alreadyVerified: false, ...identity };
 }
 
 export function getBillingAvailability() {
