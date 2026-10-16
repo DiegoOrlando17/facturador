@@ -1,156 +1,236 @@
-import { useState, type FormEvent } from "react";
-import { useNavigate } from "react-router-dom";
-import { useTenantAuth } from "@/app/TenantAuthContext";
-import { getPortalErrorMessage, usePortalApi, usePortalResource } from "@/hooks/usePortalResource";
-import { formatDateTime } from "@/lib/formatters";
+import { useState, type FormEvent, type ReactNode } from "react";
+import { Link } from "react-router-dom";
+import { Button } from "@/components/ui/Button";
+import { Callout } from "@/components/ui/Callout";
+import { Card } from "@/components/ui/Card";
+import { ErrorState } from "@/components/ui/EmptyState";
+import { TextareaField, TextField } from "@/components/ui/Field";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Skeleton } from "@/components/ui/Skeleton";
+import { StatusBadge } from "@/components/ui/StatusBadge";
+import { Stamp } from "@/components/ui/Ticket";
+import { useToast } from "@/components/ui/Toast";
+import { getPortalErrorMessage, usePortalApi, usePortalQuery } from "@/hooks/usePortalResource";
+import { formatArgentinaDateTime } from "@/lib/formatters";
+import { getStatus } from "@/lib/statusLabels";
+import { useTenantCan } from "@/lib/tenantPermissions";
 
-type SubmissionStatus = "pending" | "approved" | "rejected";
 type Submission = {
   id: string;
-  status: SubmissionStatus;
-  data: { business?: Record<string, string>; processingStartDate?: string | null };
-  documents: string[];
+  status: "pending" | "approved" | "rejected";
   reviewNotes: string | null;
   reviewedAt: string | null;
   createdAt: string;
 };
-type OnboardingResponse = { items: Submission[]; total: number };
-
-const submissionStatus: Record<string, { label: string; tone: string }> = {
-  pending: { label: "En revisión", tone: "warning" },
-  approved: { label: "Aprobado", tone: "success" },
-  rejected: { label: "Requiere cambios", tone: "danger" },
+type OnboardingData = {
+  submissions: Submission[];
+  profileStatus: string;
+  profileNotes: string | null;
+  mercadoPago: boolean;
+  arca: boolean;
 };
 
-function getSubmissionStatus(status: string) {
-  return submissionStatus[status] ?? { label: "En revisión", tone: "muted" };
+type StepState = "done" | "current" | "waiting" | "attention";
+
+const STEP_LABEL: Record<StepState, string> = { done: "Listo", current: "Pendiente", waiting: "En revisión", attention: "Para corregir" };
+
+function Step({ index, state, title, children, action }: { index: number; state: StepState; title: string; children: ReactNode; action?: ReactNode }) {
+  return (
+    <li className={`portal-step portal-step--${state}`}>
+      <span className="portal-step__mark" aria-hidden="true">
+        {state === "done" ? "✓" : index}
+      </span>
+      <div className="portal-step__body">
+        <p className="portal-step__title">
+          <strong>{title}</strong>
+          <span className="ui-sr-only"> · {STEP_LABEL[state]}</span>
+        </p>
+        <div className="portal-step__text">{children}</div>
+        {action ? <div className="portal-step__action">{action}</div> : null}
+      </div>
+    </li>
+  );
 }
 
-export function ClientOnboardingPage() {
-  const navigate = useNavigate();
-  const { user } = useTenantAuth();
-  const api = usePortalApi();
-  const { data, isLoading, isRefreshing, errorMessage: loadError, reload } = usePortalResource<OnboardingResponse>(
-    "/portal/onboarding",
-    { fallbackErrorMessage: "No pudimos cargar la puesta en marcha. Reintentá." },
-  );
-  const [business, setBusiness] = useState({ activity: "", website: "", notes: "" });
-  const [processingStartDate, setProcessingStartDate] = useState("");
-  const [documents, setDocuments] = useState("");
-  const [isSaving, setIsSaving] = useState(false);
-  const [submitError, setSubmitError] = useState("");
-  const [successMessage, setSuccessMessage] = useState("");
-  const canSubmit = user?.role === "owner" || user?.role === "admin";
-  const items = data?.items ?? [];
-  const latestSubmission = items[0];
+const emptyForm = { activity: "", website: "", notes: "", processingStartDate: "", documents: "" };
 
-  function handleReload() {
-    setSubmitError("");
-    setSuccessMessage("");
-    void reload();
-  }
+export function ClientOnboardingPage() {
+  const api = usePortalApi();
+  const toast = useToast();
+  const can = useTenantCan();
+  const canSubmit = can("tenant.submitOnboarding");
+  const [form, setForm] = useState(emptyForm);
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const query = usePortalQuery<OnboardingData>(
+    "onboarding",
+    async (portal, signal) => {
+      const [onboarding, profile, integrations] = await Promise.all([
+        portal.request<{ items: Submission[] }>("/portal/onboarding", { signal }),
+        portal.request<{ approvalStatus: string; reviewNotes: string | null } | null>("/portal/profile", { signal }),
+        portal.request<{ provider: string; enabled: boolean; configured?: boolean }[]>("/portal/integrations", { signal }),
+      ]);
+      const connected = (provider: string) => integrations.some((item) => item.provider === provider && (item.configured ?? item.enabled));
+      return {
+        submissions: onboarding.items,
+        profileStatus: profile?.approvalStatus ?? "DRAFT",
+        profileNotes: profile?.reviewNotes ?? null,
+        mercadoPago: connected("MERCADOPAGO"),
+        arca: connected("AFIP"),
+      };
+    },
+    { fallbackErrorMessage: "No pudimos cargar la puesta en marcha." },
+  );
 
   async function submit(event: FormEvent) {
     event.preventDefault();
-    if (!canSubmit) return;
-    setIsSaving(true);
-    setSubmitError("");
-    setSuccessMessage("");
+    setSaving(true);
+    setError("");
     try {
       await api.request("/portal/onboarding", {
         method: "POST",
         body: {
-          business,
-          processingStartDate: processingStartDate || null,
-          documents: documents.split(/\r?\n/).map((item) => item.trim()).filter(Boolean),
+          business: { activity: form.activity, website: form.website, notes: form.notes },
+          processingStartDate: form.processingStartDate || null,
+          documents: form.documents.split(/\r?\n/).map((item) => item.trim()).filter(Boolean),
           integrations: {},
         },
       });
-      setBusiness({ activity: "", website: "", notes: "" });
-      setProcessingStartDate("");
-      setDocuments("");
-      setSuccessMessage("Listo, recibimos tu envío. Te avisamos cuando el equipo lo revise.");
-      await reload();
-    } catch (error) {
-      setSubmitError(getPortalErrorMessage(error, "No pudimos enviar la información. Reintentá."));
+      setForm(emptyForm);
+      toast.success("Recibimos tu envío", { description: "Te avisamos cuando lo revisemos." });
+      await query.reload();
+    } catch (cause) {
+      setError(getPortalErrorMessage(cause, "No pudimos enviar la información. Reintentá."));
     } finally {
-      setIsSaving(false);
+      setSaving(false);
     }
   }
 
-  const errorMessage = submitError || loadError;
+  const header = <PageHeader title="Puesta en marcha" description="Los pasos para empezar a facturar. Te acompañamos en cada uno." />;
+
+  if (query.errorMessage) {
+    return (
+      <div className="portal-page">
+        {header}
+        <ErrorState message={query.errorMessage} onRetry={() => void query.reload()} retrying={query.isRefreshing} />
+      </div>
+    );
+  }
+
+  if (!query.data) {
+    return (
+      <div className="portal-page" aria-busy="true">
+        {header}
+        <Skeleton variant="block" height="22rem" />
+      </div>
+    );
+  }
+
+  const data = query.data;
+  const latest = data.submissions[0];
+  const approved = latest?.status === "approved";
+  const profileState: StepState = data.profileStatus === "APPROVED" ? "done" : data.profileStatus === "PENDING" ? "waiting" : data.profileStatus === "REJECTED" ? "attention" : "current";
+  const connectionsState: StepState = data.mercadoPago && data.arca ? "done" : "current";
+  const submissionState: StepState = !latest ? "current" : latest.status === "rejected" ? "attention" : "done";
+  const approvalState: StepState = approved ? "done" : latest?.status === "pending" ? "waiting" : "current";
+  const showForm = canSubmit && (!latest || latest.status === "rejected");
 
   return (
-    <div className="client-main client-onboarding-page">
-      <header className="app-topbar">
-        <div><strong>Puesta en marcha</strong><span>Enviá la información inicial y seguí su revisión.</span></div>
-        <button className="secondary-button" type="button" onClick={handleReload} disabled={isLoading || isRefreshing}>
-          {isRefreshing ? "Actualizando…" : "Actualizar"}
-        </button>
-      </header>
-      {errorMessage ? <p className="form-error" role="alert">{errorMessage}</p> : null}
-      {successMessage ? <p className="form-success" role="status">{successMessage}</p> : null}
-      <section className="panel client-onboarding-checklist">
-        <div className="section-subheading">
-          <span className="eyebrow">Tu puesta en marcha</span>
-          <h2>Checklist guiado</h2>
-          <p>Completá estos pasos antes de empezar a procesar ventas.</p>
-        </div>
-        <div className="onboarding-list">
-          <button className="onboarding-item" type="button" onClick={() => navigate("/portal-cliente/perfil-fiscal")}>
-            <span className="onboarding-item__mark">1</span>
-            <span><strong>Completar datos fiscales</strong><small>Cargá CUIT, condición frente al IVA, domicilio y contacto.</small></span>
-          </button>
-          <button className="onboarding-item" type="button" onClick={() => navigate("/portal-cliente/integraciones")}>
-            <span className="onboarding-item__mark">2</span>
-            <span><strong>Conectar integraciones</strong><small>Configurá Mercado Pago, ARCA y los destinos que incluye tu plan.</small></span>
-          </button>
-          <a className="onboarding-item" href="#onboarding-form">
-            <span className={`onboarding-item__mark${latestSubmission ? " onboarding-item__mark--complete" : ""}`}>{latestSubmission ? "✓" : "3"}</span>
-            <span>
-              <strong>Enviar la configuración a revisión</strong>
-              <small>{latestSubmission ? `Último envío: ${getSubmissionStatus(latestSubmission.status).label.toLowerCase()}.` : "Indicá la fecha de inicio y sumá enlaces a documentos no sensibles."}</small>
-            </span>
-          </a>
-          <span className="onboarding-item">
-            <span className={`onboarding-item__mark${latestSubmission?.status === "approved" ? " onboarding-item__mark--complete" : ""}`}>{latestSubmission?.status === "approved" ? "✓" : "4"}</span>
-            <span><strong>Recibir la aprobación</strong><small>El equipo valida la configuración antes de habilitar la operación.</small></span>
-          </span>
-        </div>
-      </section>
-      {canSubmit ? (
-        <form id="onboarding-form" className="panel client-onboarding-form" onSubmit={(event) => void submit(event)}>
-          <div className="section-subheading">
-            <h2>Nuevo envío</h2>
-            <p>No incluyas contraseñas, tokens ni certificados: las credenciales se configuran por canales protegidos.</p>
+    <div className="portal-page portal-onboarding">
+      {header}
+
+      {approved ? (
+        <section className="portal-onboarding__done" aria-label="Puesta en marcha aprobada">
+          <Stamp label="EN MARCHA" size="md" />
+          <div>
+            <h2>Ya está todo en marcha.</h2>
+            <p>Aprobamos tu configuración{latest.reviewedAt ? ` el ${formatArgentinaDateTime(latest.reviewedAt)}` : ""}. Las ventas se facturan según tu plan.</p>
           </div>
-          <div className="client-profile-form__grid">
-            <label className="field"><span>Actividad comercial</span><input value={business.activity} onChange={(event) => setBusiness((value) => ({ ...value, activity: event.target.value }))} /></label>
-            <label className="field"><span>Sitio web</span><input type="url" value={business.website} onChange={(event) => setBusiness((value) => ({ ...value, website: event.target.value }))} /></label>
-            <label className="field"><span>Procesar ventas desde</span><input type="date" value={processingStartDate} onChange={(event) => setProcessingStartDate(event.target.value)} /></label>
-            <label className="field client-profile-form__wide"><span>Comentarios</span><textarea value={business.notes} onChange={(event) => setBusiness((value) => ({ ...value, notes: event.target.value }))} /></label>
-            <label className="field client-profile-form__wide"><span>Enlaces a documentos (uno por línea)</span><textarea value={documents} onChange={(event) => setDocuments(event.target.value)} placeholder="https://..." /></label>
+        </section>
+      ) : null}
+
+      <Card title="Tus pasos">
+        <ol className="portal-steps">
+          <Step
+            index={1}
+            state={profileState}
+            title="Datos fiscales"
+            action={profileState === "done" ? null : <Link className="portal-link" to="/portal-cliente/perfil-fiscal">{profileState === "attention" ? "Corregir datos" : profileState === "waiting" ? "Ver datos" : "Completar datos"}</Link>}
+          >
+            {profileState === "done"
+              ? "Aprobados."
+              : profileState === "waiting"
+                ? "Los estamos revisando."
+                : profileState === "attention"
+                  ? data.profileNotes || "Hay algo para corregir."
+                  : "CUIT, condición frente al IVA, domicilio y contacto."}
+          </Step>
+          <Step index={2} state={connectionsState} title="Conexiones con Mercado Pago y ARCA" action={<Link className="portal-link" to="/portal-cliente/integraciones">Ver conexiones</Link>}>
+            {connectionsState === "done"
+              ? "Mercado Pago y ARCA conectados."
+              : `Las configuramos con vos, sin pedirte contraseñas. ${data.mercadoPago ? "Mercado Pago ya está." : "Falta Mercado Pago."} ${data.arca ? "ARCA ya está." : "Falta ARCA."}`}
+          </Step>
+          <Step index={3} state={submissionState} title="Enviar a revisión">
+            {!latest
+              ? "Contanos desde cuándo querés facturar y sumá lo que nos ayude a configurar tu cuenta."
+              : latest.status === "rejected"
+                ? latest.reviewNotes || "Revisamos tu envío y hay cambios para hacer. Mandá uno nuevo."
+                : `Enviado el ${formatArgentinaDateTime(latest.createdAt)}.`}
+          </Step>
+          <Step index={4} state={approvalState} title="Aprobación">
+            {approved ? "Aprobada. Ya podés facturar." : latest?.status === "pending" ? "Lo estamos revisando. Te avisamos por email." : "Validamos todo antes de habilitar la facturación."}
+          </Step>
+        </ol>
+      </Card>
+
+      {showForm ? (
+        <Card title={latest ? "Nuevo envío" : "Enviar a revisión"} description="No incluyas contraseñas, tokens ni certificados: esas credenciales las configuramos por canales protegidos.">
+          <form className="portal-form" onSubmit={(event) => void submit(event)}>
+            <div className="portal-form__row">
+              <TextField label="Actividad comercial" optional value={form.activity} placeholder="Kiosco, almacén, ropa…" onChange={(event) => setForm({ ...form, activity: event.target.value })} />
+              <TextField label="Sitio web o red social" optional type="url" value={form.website} placeholder="https://" onChange={(event) => setForm({ ...form, website: event.target.value })} />
+              <TextField label="Facturar ventas desde" optional type="date" value={form.processingStartDate} onChange={(event) => setForm({ ...form, processingStartDate: event.target.value })} />
+            </div>
+            <TextareaField label="Comentarios" optional value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} />
+            <TextareaField label="Enlaces a documentos" optional hint="Uno por línea. Solo documentos sin datos sensibles." value={form.documents} placeholder="https://..." onChange={(event) => setForm({ ...form, documents: event.target.value })} />
+            {error ? (
+              <Callout tone="danger" role="alert">
+                {error}
+              </Callout>
+            ) : null}
+            <div>
+              <Button type="submit" variant="primary" loading={saving} loadingLabel="Enviando…">
+                Enviar a revisión
+              </Button>
+            </div>
+          </form>
+        </Card>
+      ) : !canSubmit && !approved ? (
+        <p className="portal-muted">Solo el dueño o un administrador de tu empresa puede enviar la información.</p>
+      ) : null}
+
+      {data.submissions.length ? (
+        <section className="portal-section" aria-labelledby="onboarding-history-title">
+          <div className="portal-section__header">
+            <h2 id="onboarding-history-title">Envíos</h2>
           </div>
-          <button className="primary-button" type="submit" disabled={isSaving}>{isSaving ? "Enviando…" : "Enviar a revisión"}</button>
-        </form>
-      ) : <p className="client-empty-state">Tu rol tiene acceso de solo lectura.</p>}
-      <section className="panel">
-        <div className="section-subheading"><h2>Historial</h2></div>
-        {isLoading ? <div className="panel-state">Cargando envíos…</div> : items.length ? (
-          <div className="client-onboarding-history">
-            {items.map((item, index) => {
-              const status = getSubmissionStatus(item.status);
+          <ol className="portal-timeline">
+            {data.submissions.map((item, index) => {
+              const status = getStatus("onboarding", item.status);
               return (
-                <article key={item.id}>
-                  <div><strong>Envío {items.length - index}</strong><span>{formatDateTime(item.createdAt)}</span></div>
-                  <small className={`status-pill status-pill--${status.tone}`}>{status.label}</small>
-                  {item.reviewNotes ? <p>{item.reviewNotes}</p> : null}
-                </article>
+                <li key={item.id}>
+                  <span className="portal-mono portal-muted">{formatArgentinaDateTime(item.createdAt)}</span>
+                  <span>
+                    <strong>Envío {data.submissions.length - index}</strong> <StatusBadge tone={status.tone}>{status.label}</StatusBadge>
+                    {item.reviewNotes ? <span className="portal-muted"> · {item.reviewNotes}</span> : null}
+                  </span>
+                </li>
               );
             })}
-          </div>
-        ) : <div className="panel-state">Todavía no hay envíos.</div>}
-      </section>
+          </ol>
+        </section>
+      ) : null}
     </div>
   );
 }

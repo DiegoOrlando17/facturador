@@ -16,6 +16,7 @@ import {
   listAdminPayments,
 } from "./adminMonitor.service.js";
 import { db } from "../models/db.js";
+import { isValidCuit } from "../domain/tenantInvoice.js";
 
 function sanitizeTenantUser(tenantUser) {
   if (!tenantUser) return null;
@@ -162,16 +163,28 @@ export async function listTenantPortalPaymentsForExport(tenantId, filters = {}) 
   });
 }
 
+// Condición frente al IVA de quien emite. "Consumidor final" no aplica a un emisor.
+const ISSUER_IVA_CONDITIONS = new Set(["responsable_inscripto", "monotributo", "exento"]);
+const EMAIL_FIELDS = { contactEmail: "email de contacto", responsibleEmail: "email del responsable" };
+
 export function validateTenantProfileInput(body = {}) {
   const cuit = String(body.cuit || "").replace(/\D/g, "");
   if (cuit && cuit.length !== 11) {
-    throw new Error("El CUIT debe tener 11 digitos");
+    throw new Error("El CUIT tiene que tener 11 dígitos.");
+  }
+  if (cuit && !isValidCuit(cuit)) {
+    throw new Error("Revisá el CUIT: el dígito verificador no coincide.");
   }
 
-  for (const field of ["contactEmail", "responsibleEmail"]) {
+  const ivaCondition = String(body.ivaCondition || "").trim();
+  if (ivaCondition && !ISSUER_IVA_CONDITIONS.has(ivaCondition)) {
+    throw new Error("Elegí tu condición frente al IVA: responsable inscripto, monotributo o exento.");
+  }
+
+  for (const [field, label] of Object.entries(EMAIL_FIELDS)) {
     const value = String(body[field] || "").trim();
     if (value && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
-      throw new Error(`${field} no tiene un formato valido`);
+      throw new Error(`Revisá el ${label}: no parece válido.`);
     }
   }
 

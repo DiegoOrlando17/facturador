@@ -1,12 +1,20 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { useTenantAuth } from "@/app/TenantAuthContext";
-import { AppIcon } from "@/components/ui/AppIcon";
+import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { Button } from "@/components/ui/Button";
+import { Callout } from "@/components/ui/Callout";
+import { Card } from "@/components/ui/Card";
+import { ErrorState } from "@/components/ui/EmptyState";
+import { SelectField, TextField } from "@/components/ui/Field";
+import { FiscalNumber } from "@/components/ui/Money";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Skeleton } from "@/components/ui/Skeleton";
+import { useToast } from "@/components/ui/Toast";
 import { getPortalErrorMessage, usePortalApi, usePortalResource } from "@/hooks/usePortalResource";
-import { formatDateTime } from "@/lib/formatters";
+import { formatCuit, isValidCuit } from "@/lib/fiscalLabels";
+import { formatArgentinaDateTime } from "@/lib/formatters";
+import { getStatus } from "@/lib/statusLabels";
+import { useTenantCan } from "@/lib/tenantPermissions";
 
-type ApprovalStatus = "DRAFT" | "PENDING" | "APPROVED" | "REJECTED";
 type FiscalProfile = {
-  id: string;
   legalName: string | null;
   tradeName: string | null;
   cuit: string | null;
@@ -16,136 +24,203 @@ type FiscalProfile = {
   contactPhone: string | null;
   responsibleName: string | null;
   responsibleEmail: string | null;
-  approvalStatus: ApprovalStatus;
+  approvalStatus: "DRAFT" | "PENDING" | "APPROVED" | "REJECTED";
   reviewNotes: string | null;
   reviewedAt: string | null;
-  updatedAt: string;
 };
 
-type ProfileForm = {
-  legalName: string; tradeName: string; cuit: string; ivaCondition: string;
-  fiscalAddress: string; contactEmail: string; contactPhone: string;
-  responsibleName: string; responsibleEmail: string;
+type ProfileForm = Omit<FiscalProfile, "approvalStatus" | "reviewNotes" | "reviewedAt"> extends infer T ? { [K in keyof T]: string } : never;
+
+const FIELDS: (keyof ProfileForm)[] = ["legalName", "tradeName", "cuit", "ivaCondition", "fiscalAddress", "contactEmail", "contactPhone", "responsibleName", "responsibleEmail"];
+const REQUIRED: (keyof ProfileForm)[] = ["legalName", "cuit", "ivaCondition", "fiscalAddress", "contactEmail"];
+
+/** Condición frente al IVA de quien emite (consumidor final no aplica a un emisor). */
+const IVA_OPTIONS = [
+  { value: "monotributo", label: "Monotributo" },
+  { value: "responsable_inscripto", label: "Responsable inscripto" },
+  { value: "exento", label: "Exento" },
+];
+
+const STATUS_DETAIL: Record<FiscalProfile["approvalStatus"], string> = {
+  DRAFT: "Completá los campos obligatorios y enviá tus datos a revisión.",
+  PENDING: "Estamos revisando tus datos. Te avisamos cuando estén aprobados.",
+  APPROVED: "Tus datos están aprobados. Si los cambiás, vuelven a revisión.",
+  REJECTED: "Revisá las observaciones, corregí los datos y volvé a enviarlos.",
 };
 
-const emptyForm: ProfileForm = {
-  legalName: "", tradeName: "", cuit: "", ivaCondition: "", fiscalAddress: "",
-  contactEmail: "", contactPhone: "", responsibleName: "", responsibleEmail: "",
-};
+function toForm(profile: FiscalProfile | null): ProfileForm {
+  return Object.fromEntries(FIELDS.map((field) => [field, String(profile?.[field] ?? "")])) as ProfileForm;
+}
 
-const statusPresentation: Record<ApprovalStatus, { label: string; detail: string; tone: string }> = {
-  DRAFT: { label: "Borrador", detail: "Completá los campos obligatorios para enviar tus datos a revisión.", tone: "muted" },
-  PENDING: { label: "Pendiente de revisión", detail: "El equipo está revisando tus datos fiscales.", tone: "warning" },
-  APPROVED: { label: "Aprobado", detail: "Tus datos fiscales fueron aprobados.", tone: "success" },
-  REJECTED: { label: "Requiere cambios", detail: "Revisá las observaciones, corregí los datos y volvé a guardarlos.", tone: "danger" },
-};
-
-function toForm(current: FiscalProfile | null): ProfileForm {
-  return current ? {
-    legalName: current.legalName ?? "", tradeName: current.tradeName ?? "", cuit: current.cuit ?? "",
-    ivaCondition: current.ivaCondition ?? "", fiscalAddress: current.fiscalAddress ?? "",
-    contactEmail: current.contactEmail ?? "", contactPhone: current.contactPhone ?? "",
-    responsibleName: current.responsibleName ?? "", responsibleEmail: current.responsibleEmail ?? "",
-  } : emptyForm;
+function ReadOnlyProfile({ profile }: { profile: FiscalProfile | null }) {
+  const rows: [string, ReactNode][] = [
+    ["Razón social", profile?.legalName],
+    ["Nombre comercial", profile?.tradeName],
+    ["CUIT", profile?.cuit ? <FiscalNumber kind="cuit" value={profile.cuit} /> : null],
+    ["Condición frente al IVA", IVA_OPTIONS.find((option) => option.value === profile?.ivaCondition)?.label],
+    ["Domicilio fiscal", profile?.fiscalAddress],
+    ["Email de contacto", profile?.contactEmail],
+    ["Teléfono", profile?.contactPhone],
+    ["Responsable", profile?.responsibleName],
+    ["Email del responsable", profile?.responsibleEmail],
+  ];
+  return (
+    <Card title="Tus datos" description="Tu rol puede verlos pero no cambiarlos.">
+      <dl className="portal-detail">
+        {rows.map(([label, value]) => (
+          <div key={label} className="portal-detail__row">
+            <dt>{label}</dt>
+            <dd>{value || <span className="portal-muted">Sin dato</span>}</dd>
+          </div>
+        ))}
+      </dl>
+    </Card>
+  );
 }
 
 export function ClientFiscalProfilePage() {
-  const { user } = useTenantAuth();
   const api = usePortalApi();
-  const {
-    data: profile,
-    setData: setProfile,
-    isLoading,
-    isRefreshing,
-    errorMessage: loadError,
-    lastLoadedAt,
-    reload: loadProfile,
-  } = usePortalResource<FiscalProfile | null>("/portal/profile", {
-    fallbackErrorMessage: "No pudimos cargar tus datos fiscales. Reintentá.",
-  });
-  const [form, setForm] = useState<ProfileForm>(emptyForm);
-  const [isSaving, setIsSaving] = useState(false);
+  const toast = useToast();
+  const can = useTenantCan();
+  const canEdit = can("tenant.manageProfile");
+  const query = usePortalResource<FiscalProfile | null>("/portal/profile", { fallbackErrorMessage: "No pudimos cargar tus datos fiscales." });
+  const [form, setForm] = useState<ProfileForm>(toForm(null));
+  const [errors, setErrors] = useState<Partial<Record<keyof ProfileForm, string>>>({});
   const [saveError, setSaveError] = useState("");
-  const [successMessage, setSuccessMessage] = useState("");
-  const errorMessage = saveError || loadError;
+  const [saving, setSaving] = useState(false);
+  const profile = query.data;
 
-  // Cada carga completa del servidor reemplaza el formulario con lo guardado.
+  // Cada carga del servidor reemplaza el formulario con lo guardado.
   useEffect(() => {
-    if (lastLoadedAt) setForm(toForm(profile));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lastLoadedAt]);
+    if (query.lastLoadedAt) setForm(toForm(query.data));
+  }, [query.lastLoadedAt]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const canEdit = user?.role === "owner" || user?.role === "admin";
-  const requiredValues = [form.legalName, form.cuit, form.ivaCondition, form.fiscalAddress, form.contactEmail];
-  const completedRequired = requiredValues.filter((value) => value.trim()).length;
-  const status = profile?.approvalStatus ?? "DRAFT";
-  const presentation = statusPresentation[status];
-  const hasChanges = useMemo(() => {
-    if (!profile) return Object.values(form).some(Boolean);
-    return Object.entries(form).some(([key, value]) => value !== String(profile[key as keyof FiscalProfile] ?? ""));
-  }, [form, profile]);
+  const completed = REQUIRED.filter((field) => form[field].trim()).length;
+  const hasChanges = useMemo(() => FIELDS.some((field) => form[field] !== String(profile?.[field] ?? "")), [form, profile]);
 
-  function updateField(field: keyof ProfileForm, value: string) {
+  function update(field: keyof ProfileForm, value: string) {
     setForm((current) => ({ ...current, [field]: field === "cuit" ? value.replace(/\D/g, "").slice(0, 11) : value }));
+    setErrors((current) => ({ ...current, [field]: undefined }));
     setSaveError("");
-    setSuccessMessage("");
   }
 
-  async function saveProfile(event: FormEvent<HTMLFormElement>) {
+  async function save(event: FormEvent) {
     event.preventDefault();
-    if (!canEdit) return;
-    setIsSaving(true);
-    setSaveError("");
-    setSuccessMessage("");
+    const nextErrors: typeof errors = {};
+    if (form.cuit && !isValidCuit(form.cuit)) nextErrors.cuit = form.cuit.length === 11 ? "El dígito verificador no coincide. Revisalo." : "Tiene que tener 11 dígitos.";
+    setErrors(nextErrors);
+    if (Object.keys(nextErrors).length) return;
+    setSaving(true);
     try {
       const updated = await api.request<FiscalProfile>("/portal/profile", { method: "PUT", body: form });
-      setProfile(updated);
-      setSuccessMessage(updated.approvalStatus === "PENDING" ? "Listo, guardamos tus datos y los enviamos a revisión." : "Guardamos el borrador. Completá los campos obligatorios para enviarlo a revisión.");
-    } catch (error) {
-      setSaveError(getPortalErrorMessage(error, "No pudimos guardar tus datos fiscales. Reintentá."));
+      query.setData(updated);
+      if (updated.approvalStatus === "PENDING") toast.success("Enviamos tus datos a revisión", { description: "Te avisamos cuando estén aprobados." });
+      else toast.success("Guardamos el borrador", { description: "Completá los obligatorios para enviarlos a revisión." });
+    } catch (cause) {
+      setSaveError(getPortalErrorMessage(cause, "No pudimos guardar tus datos. Reintentá."));
     } finally {
-      setIsSaving(false);
+      setSaving(false);
     }
   }
 
+  const header = <PageHeader title="Datos fiscales" description="Los datos con los que emitimos tus comprobantes en ARCA." />;
+
+  if (query.errorMessage) {
+    return (
+      <div className="portal-page">
+        {header}
+        <ErrorState message={query.errorMessage} onRetry={() => void query.reload()} retrying={query.isRefreshing} />
+      </div>
+    );
+  }
+
+  if (query.isLoading) {
+    return (
+      <div className="portal-page" aria-busy="true">
+        {header}
+        <Skeleton variant="block" height="24rem" />
+      </div>
+    );
+  }
+
+  const status = profile?.approvalStatus ?? "DRAFT";
+  const presentation = getStatus("fiscalProfile", status);
+
   return (
-    <div className="client-main client-fiscal-profile-page">
-      <header className="app-topbar">
-        <div><strong>Datos fiscales</strong><span>Mantené actualizada la información que usamos para configurar tu facturación.</span></div>
-        <button type="button" className="secondary-button topbar-refresh-button" onClick={() => void loadProfile()} disabled={isLoading || isRefreshing}>{isRefreshing ? "Actualizando…" : "Actualizar"}</button>
-      </header>
+    <div className="portal-page portal-fiscal">
+      {header}
 
-      {isLoading ? <section className="panel"><div className="panel-state"><strong>Cargando tus datos fiscales…</strong></div></section> : <>
-        <section className={`client-profile-status client-profile-status--${presentation.tone}`}>
-          <span><AppIcon name={status === "APPROVED" ? "check-circle" : status === "REJECTED" ? "alert" : "clock"} /></span>
-          <div><strong>{presentation.label}</strong><p>{presentation.detail}</p>{profile?.reviewedAt ? <small>Última revisión: {formatDateTime(profile.reviewedAt)}</small> : null}</div>
-          <b>{completedRequired}/5 obligatorios</b>
-        </section>
+      <Callout
+        tone={status === "APPROVED" ? "success" : status === "REJECTED" ? "danger" : status === "PENDING" ? "info" : "warning"}
+        title={
+          <>
+            {presentation.label}
+            {canEdit && status !== "APPROVED" ? <span className="portal-muted"> · {completed} de {REQUIRED.length} obligatorios</span> : null}
+          </>
+        }
+      >
+        {STATUS_DETAIL[status]}
+        {profile?.reviewedAt ? <> Última revisión: {formatArgentinaDateTime(profile.reviewedAt)}.</> : null}
+      </Callout>
 
-        {profile?.reviewNotes ? <section className="panel client-profile-review"><span className="eyebrow">Observaciones de la revisión</span><p>{profile.reviewNotes}</p></section> : null}
-        {profile?.approvalStatus === "APPROVED" && hasChanges ? <p className="client-profile-warning">Al guardar cambios, tus datos aprobados vuelven a quedar pendientes hasta una nueva revisión.</p> : null}
+      {profile?.reviewNotes ? (
+        <Callout tone="danger" icon="info" title="Observaciones de la revisión">
+          {profile.reviewNotes}
+        </Callout>
+      ) : null}
 
-        <form className="panel client-profile-form" onSubmit={(event) => void saveProfile(event)}>
-          <div className="section-subheading"><h2>Identificación fiscal</h2><p>Los campos marcados con * son necesarios para enviar tus datos a revisión.</p></div>
-          <div className="client-profile-form__grid">
-            <label className="field"><span>Razón social *</span><input value={form.legalName} onChange={(event) => updateField("legalName", event.target.value)} disabled={!canEdit || isSaving} /></label>
-            <label className="field"><span>Nombre comercial</span><input value={form.tradeName} onChange={(event) => updateField("tradeName", event.target.value)} disabled={!canEdit || isSaving} /></label>
-            <label className="field"><span>CUIT *</span><input inputMode="numeric" value={form.cuit} onChange={(event) => updateField("cuit", event.target.value)} disabled={!canEdit || isSaving} placeholder="11 dígitos" /></label>
-            <label className="field"><span>Condición frente al IVA *</span><select value={form.ivaCondition} onChange={(event) => updateField("ivaCondition", event.target.value)} disabled={!canEdit || isSaving}><option value="">Seleccionar</option><option value="responsable_inscripto">Responsable inscripto</option><option value="monotributo">Monotributo</option><option value="exento">Exento</option><option value="consumidor_final">Consumidor final</option></select></label>
-            <label className="field client-profile-form__wide"><span>Domicilio fiscal *</span><input value={form.fiscalAddress} onChange={(event) => updateField("fiscalAddress", event.target.value)} disabled={!canEdit || isSaving} placeholder="Calle, número, localidad y provincia" /></label>
+      {!canEdit ? (
+        <ReadOnlyProfile profile={profile ?? null} />
+      ) : (
+        <form className="portal-form portal-fiscal__form" onSubmit={(event) => void save(event)} noValidate>
+          <Card title="Identificación fiscal">
+            <div className="portal-form">
+            <div className="portal-form__row">
+              <TextField label="Razón social" required value={form.legalName} onChange={(event) => update("legalName", event.target.value)} />
+              <TextField label="Nombre comercial" optional value={form.tradeName} onChange={(event) => update("tradeName", event.target.value)} />
+              <TextField
+                label="CUIT"
+                required
+                inputMode="numeric"
+                placeholder="20123456789"
+                value={form.cuit}
+                hint={form.cuit.length === 11 && isValidCuit(form.cuit) ? formatCuit(form.cuit) : "11 dígitos, sin guiones."}
+                error={errors.cuit}
+                onChange={(event) => update("cuit", event.target.value)}
+              />
+              <SelectField label="Condición frente al IVA" required placeholder="Elegí una opción" value={form.ivaCondition} options={IVA_OPTIONS} onChange={(event) => update("ivaCondition", event.target.value)} />
+            </div>
+            <TextField label="Domicilio fiscal" required placeholder="Calle, número, localidad y provincia" value={form.fiscalAddress} onChange={(event) => update("fiscalAddress", event.target.value)} />
+            </div>
+          </Card>
+
+          <Card title="Contacto">
+            <div className="portal-form__row">
+              <TextField label="Email de contacto" required type="email" value={form.contactEmail} onChange={(event) => update("contactEmail", event.target.value)} />
+              <TextField label="Teléfono" optional type="tel" value={form.contactPhone} onChange={(event) => update("contactPhone", event.target.value)} />
+              <TextField label="Responsable" optional value={form.responsibleName} onChange={(event) => update("responsibleName", event.target.value)} />
+              <TextField label="Email del responsable" optional type="email" value={form.responsibleEmail} onChange={(event) => update("responsibleEmail", event.target.value)} />
+            </div>
+          </Card>
+
+          {status === "APPROVED" && hasChanges ? <Callout tone="warning">Si guardás estos cambios, tus datos vuelven a revisión.</Callout> : null}
+          {saveError ? (
+            <Callout tone="danger" role="alert">
+              {saveError}
+            </Callout>
+          ) : null}
+          <div className="portal-fiscal__actions">
+            <Button type="submit" variant="primary" size="lg" disabled={!hasChanges} loading={saving} loadingLabel="Guardando…">
+              {completed === REQUIRED.length ? "Guardar y enviar a revisión" : "Guardar borrador"}
+            </Button>
+            {hasChanges ? (
+              <Button variant="ghost" onClick={() => setForm(toForm(profile ?? null))} disabled={saving}>
+                Descartar cambios
+              </Button>
+            ) : null}
           </div>
-          <div className="section-subheading"><h2>Contacto</h2></div>
-          <div className="client-profile-form__grid">
-            <label className="field"><span>Email de contacto *</span><input type="email" value={form.contactEmail} onChange={(event) => updateField("contactEmail", event.target.value)} disabled={!canEdit || isSaving} /></label>
-            <label className="field"><span>Teléfono</span><input value={form.contactPhone} onChange={(event) => updateField("contactPhone", event.target.value)} disabled={!canEdit || isSaving} /></label>
-            <label className="field"><span>Responsable</span><input value={form.responsibleName} onChange={(event) => updateField("responsibleName", event.target.value)} disabled={!canEdit || isSaving} /></label>
-            <label className="field"><span>Email responsable</span><input type="email" value={form.responsibleEmail} onChange={(event) => updateField("responsibleEmail", event.target.value)} disabled={!canEdit || isSaving} /></label>
-          </div>
-          {errorMessage ? <p className="form-error" role="alert">{errorMessage}</p> : null}
-          {successMessage ? <p className="form-success" role="status">{successMessage}</p> : null}
-          {canEdit ? <div className="tenant-form__actions"><button type="submit" className="primary-button" disabled={isSaving || !hasChanges}>{isSaving ? "Guardando…" : completedRequired === 5 ? "Guardar y enviar a revisión" : "Guardar borrador"}</button></div> : <p className="client-empty-state">Tu rol tiene acceso de solo lectura.</p>}
         </form>
-      </>}
+      )}
     </div>
   );
 }

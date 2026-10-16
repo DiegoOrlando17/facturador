@@ -45,11 +45,11 @@ test("rechaza horarios, zonas e intervalos invalidos", () => {
   );
   assert.throws(
     () => normalizeTenantSchedule({ POLLING_MODE: "scheduled", TIMEZONE: "Argentina/Falsa" }, policy),
-    /zona IANA/
+    /zona horaria/
   );
   assert.throws(
     () => normalizeTenantSchedule({ POLLING_MODE: "realtime", POLLING_INTERVAL_MS: 1000 }, policy),
-    /POLLING_INTERVAL_MS/
+    /intervalo de lectura/
   );
 });
 

@@ -227,7 +227,7 @@ router.get("/integrations", async (req, res) => {
       configured: Boolean(item.enabled) && hasRequiredIntegrationCredentials(item.provider, item.config),
     }))));
   } catch (error) {
-    return res.status(400).json({ error: error.message || "No se pudieron listar integraciones" });
+    return res.status(400).json({ error: error.message || "No pudimos cargar las conexiones." });
   }
 });
 
@@ -281,7 +281,7 @@ router.get("/profile", async (req, res) => {
   try {
     return res.json(normalizeJsonBigInts(await getTenantPortalProfile(req.tenantAuth.tenantId)));
   } catch (error) {
-    return res.status(400).json({ error: error.message || "No se pudo obtener el perfil fiscal" });
+    return res.status(400).json({ error: error.message || "No pudimos cargar tus datos fiscales." });
   }
 });
 
@@ -290,7 +290,7 @@ router.put("/profile", requireTenantPermission(TENANT_PERMISSIONS.MANAGE_PROFILE
     const profile = await updateTenantPortalProfile(req.tenantAuth.tenantId, req.body);
     return res.json(normalizeJsonBigInts(profile));
   } catch (error) {
-    return res.status(400).json({ error: error.message || "No se pudo guardar el perfil fiscal" });
+    return res.status(400).json({ error: error.message || "No pudimos guardar tus datos fiscales." });
   }
 });
 
@@ -298,7 +298,7 @@ router.put("/integrations/:provider", requireTenantPermission(TENANT_PERMISSIONS
   try {
     const provider = String(req.params.provider || "").trim().toUpperCase();
     if (!TENANT_CONFIGURABLE_PROVIDERS.has(provider)) {
-      throw new Error("El portal no permite configurar esta integracion");
+      throw new Error("Esta conexión la configura nuestro equipo.");
     }
 
     const subscription = await getTenantSubscriptionPolicy(req.tenantAuth.tenantId);
@@ -326,7 +326,7 @@ router.put("/integrations/:provider", requireTenantPermission(TENANT_PERMISSIONS
 
     const existing = await tryGetTenantIntegrationConfig(req.tenantAuth.tenantId, provider);
     if (!existing?.REFRESH_TOKEN) {
-      throw new Error("Un administrador debe conectar Google por OAuth antes de configurar el destino");
+      throw new Error("Primero nuestro equipo tiene que vincular tu cuenta de Google. Escribinos para coordinarlo.");
     }
 
     const config = mergeGoogleTenantIntegrationConfig(provider, existing, req.body?.config);
@@ -341,7 +341,7 @@ router.put("/integrations/:provider", requireTenantPermission(TENANT_PERMISSIONS
         : { SHEETS_ID: config.SHEETS_ID ?? null, SHEET_NAME: config.SHEET_NAME ?? "Hoja1" },
     }));
   } catch (error) {
-    return res.status(400).json({ error: error.message || "No se pudo guardar la integracion" });
+    return res.status(400).json({ error: error.message || "No pudimos guardar la configuración." });
   }
 });
 
@@ -349,7 +349,7 @@ router.post("/integrations/:provider/test", requireTenantPermission(TENANT_PERMI
   try {
     const provider = String(req.params.provider || "").trim().toUpperCase();
     if (!TESTABLE_PROVIDERS.has(provider)) {
-      throw new Error(`Test de conexion no implementado para ${provider}`);
+      throw new Error("No podemos probar esta conexión desde el portal.");
     }
 
     if (provider === "DRIVE" || provider === "SHEETS") {
@@ -370,7 +370,7 @@ router.post("/integrations/:provider/test", requireTenantPermission(TENANT_PERMI
     return res.status(400).json({
       ok: false,
       provider: String(req.params.provider || "").toUpperCase(),
-      error: error.message || "No se pudo probar la integracion",
+      error: error.message || "No pudimos probar la conexión.",
     });
   }
 });
@@ -385,7 +385,7 @@ router.get("/onboarding", async (req, res) => {
       total: items.length,
     }));
   } catch (error) {
-    return res.status(400).json({ error: error.message || "No se pudo listar onboarding" });
+    return res.status(400).json({ error: error.message || "No pudimos cargar la puesta en marcha." });
   }
 });
 
@@ -404,7 +404,7 @@ router.post("/onboarding", requireTenantPermission(TENANT_PERMISSIONS.SUBMIT_ONB
 
     return res.status(201).json(normalizeJsonBigInts(submission));
   } catch (error) {
-    return res.status(400).json({ error: error.message || "No se pudo enviar onboarding" });
+    return res.status(400).json({ error: error.message || "No pudimos enviar la información." });
   }
 });
 

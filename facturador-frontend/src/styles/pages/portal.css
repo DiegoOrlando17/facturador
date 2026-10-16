@@ -636,6 +636,240 @@ a.portal-todo__item:hover .portal-todo__text strong {
   }
 }
 
+/* Integraciones ------------------------------------------------------------- */
+
+.portal-integrations__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 26rem), 1fr));
+  gap: var(--space-6);
+  align-items: start;
+}
+
+.portal-integration {
+  display: grid;
+  gap: var(--space-5);
+  min-width: 0;
+  padding: var(--space-6);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+}
+
+.portal-integration__header {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-4);
+}
+
+.portal-integration__logo {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  padding: var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-paper);
+}
+
+.portal-integration__logo img,
+.portal-integration__logo svg {
+  max-width: 100%;
+  max-height: 100%;
+}
+
+.portal-integration__title {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.portal-integration__title h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+}
+
+.portal-integration__title p {
+  margin: var(--space-1) 0 0;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+
+.portal-integration__body {
+  display: grid;
+  gap: var(--space-4);
+  padding-top: var(--space-4);
+  border-top: var(--rule-dashed);
+}
+
+.portal-integration__body h3 {
+  margin: 0;
+  font-size: var(--text-base);
+}
+
+.portal-integration__body .portal-segmented {
+  justify-self: start;
+}
+
+.portal-integration__footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding-top: var(--space-4);
+  border-top: var(--rule-dashed);
+  font-size: var(--text-sm);
+}
+
+.portal-times {
+  display: grid;
+  gap: var(--space-3);
+  justify-items: start;
+}
+
+.portal-times__label {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+}
+
+.portal-times__list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.portal-times__list li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.portal-upsell {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-muted);
+}
+
+.portal-upsell p {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+
+@media (max-width: 640px) {
+  .portal-integration {
+    padding: var(--space-5) var(--space-4);
+  }
+
+  .portal-integration__header {
+    flex-wrap: wrap;
+  }
+}
+
+/* Puesta en marcha y datos fiscales ----------------------------------------- */
+
+.portal-steps {
+  display: grid;
+  gap: var(--space-5);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.portal-step {
+  display: flex;
+  gap: var(--space-4);
+}
+
+.portal-step__mark {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border: 2px solid var(--color-border-ink);
+  border-radius: 50%;
+  font-family: var(--font-mono);
+  font-weight: var(--weight-bold);
+}
+
+.portal-step--done .portal-step__mark {
+  border-color: var(--color-action);
+  background: var(--color-action);
+  color: var(--color-on-action);
+}
+
+.portal-step--waiting .portal-step__mark {
+  border-color: var(--color-info-solid);
+  color: var(--color-info-text);
+}
+
+.portal-step--attention .portal-step__mark {
+  border-color: var(--color-danger-solid);
+  color: var(--color-danger-text);
+}
+
+.portal-step__body {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.portal-step__title {
+  margin: 0;
+}
+
+.portal-step__text {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+
+.portal-step--attention .portal-step__text {
+  color: var(--color-danger-text);
+}
+
+.portal-onboarding__done {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-5);
+  padding: var(--space-6);
+  border-radius: var(--radius-lg);
+  background: var(--color-success-bg);
+}
+
+.portal-onboarding__done h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-xl);
+}
+
+.portal-onboarding__done p {
+  margin: var(--space-1) 0 0;
+  color: var(--color-text-muted);
+}
+
+.portal-fiscal__form {
+  gap: var(--space-6);
+}
+
+.portal-fiscal__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
 /* Comprobante: "Listo, ya está facturado." ---------------------------------- */
 
 .portal-receipt {
