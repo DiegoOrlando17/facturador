@@ -19,30 +19,99 @@ const taCache = new Map();
 /** Paths de cert/key materializados (p. ej. desde base64). */
 const certKeyPathCache = new Map();
 
+export const AFIP_MISSING_CREDENTIALS_MESSAGE = "La integración de ARCA del cliente no tiene credenciales";
+
+/** Endpoints oficiales por ambiente, usados cuando el tenant define ENV. */
+export const AFIP_ENDPOINTS = Object.freeze({
+  homologacion: Object.freeze({
+    WSAA_URL: "https://wsaahomo.afip.gov.ar/ws/services/LoginCms",
+    WSFE_URL: "https://wswhomo.afip.gov.ar/wsfev1/service.asmx",
+  }),
+  produccion: Object.freeze({
+    WSAA_URL: "https://wsaa.afip.gov.ar/ws/services/LoginCms",
+    WSFE_URL: "https://servicios1.afip.gov.ar/wsfev1/service.asmx",
+  }),
+});
+
+function cleanString(value) {
+  if (value === null || value === undefined) return null;
+  const text = String(value).trim();
+  return text.length > 0 ? text : null;
+}
+
+function positiveNumberOrNull(value) {
+  if (value === null || value === undefined || value === "") return null;
+  const number = Number(value);
+  return Number.isFinite(number) && number > 0 ? number : null;
+}
+
+/** "prod"/"production"/"produccion" -> produccion; "homo"/"homologacion"/"test"/"dev" -> homologacion. */
+export function resolveAfipEnvironment(value) {
+  const env = String(value ?? "").trim().toLowerCase();
+  if (!env) return null;
+  if (["prod", "production", "produccion", "producción"].includes(env)) return "produccion";
+  if (["homo", "homologacion", "homologación", "homologation", "test", "testing", "dev", "sandbox"].includes(env)) return "homologacion";
+  return null;
+}
+
 /**
- * Combina JSON de TenantIntegration (AFIP) con defaults del proceso (.env).
+ * Normaliza el JSON de TenantIntegration (AFIP). CUIT, punto de venta, tipo de
+ * comprobante y certificado/clave salen SOLO del tenant: no hay fallback al .env.
+ * URLs: WSAA_URL/WSFE_URL del tenant > ambiente ENV del tenant > default de plataforma.
  * @param {Record<string, unknown>} afipCfg
  */
-export function normalizeAfipConfig(afipCfg = {}) {
-  const cuit = String(afipCfg.CUIT ?? config.CUIT ?? "").replace(/\D/g, "");
-  const ptoVta = Number(afipCfg.PTO_VTA ?? config.AFIP.PTO_VTA);
-  const cbteTipo = Number(afipCfg.CBTE_TIPO ?? config.AFIP.CBTE_TIPO);
-  const alicIva = Number(afipCfg.ALIC_IVA ?? config.AFIP.ALIC_IVA ?? 21);
-  const wsaaUrl = afipCfg.WSAA_URL || config.AFIP.WSAA_URL;
-  const wsfeUrl = afipCfg.WSFE_URL || config.AFIP.WSFE_URL;
+export function normalizeAfipConfig(afipCfg = {}, platformConfig = config.AFIP) {
+  const cfg = afipCfg && typeof afipCfg === "object" ? afipCfg : {};
+  const cuit = String(cfg.CUIT ?? "").replace(/\D/g, "");
+  const envEndpoints = AFIP_ENDPOINTS[resolveAfipEnvironment(cfg.ENV)] ?? null;
+  const wsaaUrl = cleanString(cfg.WSAA_URL) || envEndpoints?.WSAA_URL || cleanString(platformConfig?.WSAA_URL);
+  const wsfeUrl = cleanString(cfg.WSFE_URL) || envEndpoints?.WSFE_URL || cleanString(platformConfig?.WSFE_URL);
   return {
-    ...afipCfg,
+    ...cfg,
     CUIT: cuit,
-    PTO_VTA: ptoVta,
-    CBTE_TIPO: cbteTipo,
-    ALIC_IVA: alicIva,
-    WSAA_URL: wsaaUrl,
-    WSFE_URL: wsfeUrl,
-    CERT_PATH: afipCfg.CERT_PATH ?? config.AFIP.CERT,
-    KEY_PATH: afipCfg.KEY_PATH ?? config.AFIP.KEY,
-    CERT_B64: afipCfg.CERT_B64,
-    KEY_B64: afipCfg.KEY_B64,
+    PTO_VTA: positiveNumberOrNull(cfg.PTO_VTA),
+    CBTE_TIPO: positiveNumberOrNull(cfg.CBTE_TIPO),
+    ALIC_IVA: Number(cfg.ALIC_IVA ?? 21),
+    WSAA_URL: wsaaUrl || null,
+    WSFE_URL: wsfeUrl || null,
+    CERT_PATH: cleanString(cfg.CERT_PATH),
+    KEY_PATH: cleanString(cfg.KEY_PATH),
+    CERT_B64: cleanString(cfg.CERT_B64) || legacyPemToBase64(cfg.CERT),
+    KEY_B64: cleanString(cfg.KEY_B64) || legacyPemToBase64(cfg.PRIVATE_KEY ?? cfg.KEY),
   };
+}
+
+/**
+ * Integraciones cargadas antes de CERT_B64/KEY_B64 guardaron el certificado y la
+ * clave como CERT/PRIVATE_KEY, en texto PEM o en base64. Se normalizan a base64.
+ */
+function legacyPemToBase64(value) {
+  const text = cleanString(value);
+  if (!text) return null;
+  if (text.includes("-----BEGIN")) return Buffer.from(text, "utf8").toString("base64");
+  return text;
+}
+
+/** Campos AFIP faltantes para emitir/consultar en nombre del tenant. */
+export function getMissingAfipCredentials(afipCfg = {}) {
+  const cfg = normalizeAfipConfig(afipCfg);
+  const missing = [];
+  if (!cfg.CUIT) missing.push("CUIT");
+  if (!cfg.PTO_VTA) missing.push("PTO_VTA");
+  if (!cfg.CBTE_TIPO) missing.push("CBTE_TIPO");
+  const hasB64Pair = Boolean(cfg.CERT_B64 && cfg.KEY_B64);
+  const hasPathPair = Boolean(cfg.CERT_PATH && cfg.KEY_PATH);
+  if (!hasB64Pair && !hasPathPair) missing.push("CERT/KEY");
+  if (!cfg.WSAA_URL) missing.push("WSAA_URL");
+  if (!cfg.WSFE_URL) missing.push("WSFE_URL");
+  return missing;
+}
+
+export function buildMissingAfipCredentialsError(missing) {
+  const error = new Error(`${AFIP_MISSING_CREDENTIALS_MESSAGE} (falta ${missing.join(", ")})`);
+  error.code = "AFIP_MISSING_CREDENTIALS";
+  error.missingFields = [...missing];
+  return error;
 }
 
 function taCacheKey(merged) {
@@ -72,6 +141,9 @@ function resolveCertKeyPaths(merged) {
       certKeyPathCache.set(cuit, { certPath, keyPath });
     }
     return certKeyPathCache.get(cuit);
+  }
+  if (!merged.CERT_PATH || !merged.KEY_PATH) {
+    throw buildMissingAfipCredentialsError(["CERT/KEY"]);
   }
   const certPath = path.isAbsolute(merged.CERT_PATH)
     ? merged.CERT_PATH
@@ -168,8 +240,10 @@ async function getTA(merged) {
 
 export async function getLastInvoiceAFIP(afipCfg, PtoVta, CbteTipo) {
   const merged = normalizeAfipConfig(afipCfg);
-  if (!merged.CUIT) {
-    logger.error("getLastInvoiceAFIP: CUIT vacío tras normalizar config");
+  // PtoVta/CbteTipo llegan por parametro; del tenant se exigen CUIT, cert/clave y URLs.
+  const missing = getMissingAfipCredentials(afipCfg).filter((field) => !["PTO_VTA", "CBTE_TIPO"].includes(field));
+  if (missing.length > 0) {
+    logger.error(`getLastInvoiceAFIP: ${buildMissingAfipCredentialsError(missing).message}`);
     return null;
   }
   try {
@@ -224,8 +298,11 @@ export function buildAssociatedVoucherXml(associatedInvoice) {
 export async function createInvoiceAFIP(cbteNro, paymentTotal, afipCfg, { associatedInvoice = null } = {}) {
   try {
     const merged = normalizeAfipConfig(afipCfg);
-    if (!merged.CUIT) {
-      return { error: "CUIT AFIP vacío o inválido" };
+    const missing = getMissingAfipCredentials(afipCfg);
+    if (missing.length > 0) {
+      const message = buildMissingAfipCredentialsError(missing).message;
+      logger.error(`createInvoiceAFIP: ${message}`);
+      return { error: message };
     }
 
     const ta = await getTA(merged);

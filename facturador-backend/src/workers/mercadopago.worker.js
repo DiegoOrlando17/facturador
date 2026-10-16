@@ -2,7 +2,13 @@ import logger from "../utils/logger.js";
 import { buildQueueJobId, toQueueId } from "../utils/bigint.js";
 
 import { DateTime } from "luxon";
-import { fetchNewPayments, getPaymentInfoMP, fetchLastPayment, normalizeMpConfig } from "../services/mercadopago.service.js";
+import {
+    fetchNewPayments,
+    getPaymentInfoMP,
+    fetchLastPayment,
+    normalizeMpConfig,
+    createMpCredentialsGuard,
+} from "../services/mercadopago.service.js";
 import { upsertPayment, getPaymentByProviderPaymentId } from "../models/Payment.js";
 import { paymentsQueue } from "../queues/payments.queue.js";
 import {
@@ -19,6 +25,8 @@ let isRunning = false;
 const tenantRuntime = new Map();
 
 const LOOP_INTERVAL_MS = 5000;
+// Tenants sin ACCESS_TOKEN/POS_ID propios se saltean (sin fallback al .env).
+const shouldSkipTenantWithoutMpCredentials = createMpCredentialsGuard({ action: "el polling" });
 
 async function shouldRunNow(tenantId, mpCfg) {
     const subscription = await getTenantSubscriptionPolicy(tenantId);
@@ -131,6 +139,8 @@ export async function startMercadopagoWorker() {
             for (const row of tenants) {
                 let slotClaim = null;
                 try {
+                    if (shouldSkipTenantWithoutMpCredentials(row.tenantId, row.config)) continue;
+
                     const decision = await shouldRunNow(row.tenantId, row.config);
                     if (!decision.shouldRun) continue;
 

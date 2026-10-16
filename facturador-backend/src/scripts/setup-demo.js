@@ -9,8 +9,8 @@ async function run() {
 
     await prisma.tenantIntegration.upsert({
         where: { tenantId_provider: { tenantId: tenant.id, provider: "AFIP" } },
-        update: { enabled: true, secretEnc: encryptJson({ CUIT: "20123456789", PTO_VTA: 1, CBTE_TIPO: 6, ENV: "prod" }) },
-        create: { tenantId: tenant.id, provider: "AFIP", enabled: true, secretEnc: encryptJson({ CUIT: "20123456789", PTO_VTA: 1, CBTE_TIPO: 6, ENV: "prod" }) },
+        update: { enabled: true, secretEnc: encryptJson({ CUIT: "20123456789", PTO_VTA: 1, CBTE_TIPO: 6, ENV: "homologacion" }) },
+        create: { tenantId: tenant.id, provider: "AFIP", enabled: true, secretEnc: encryptJson({ CUIT: "20123456789", PTO_VTA: 1, CBTE_TIPO: 6, ENV: "homologacion" }) },
     });
 
     await prisma.tenantIntegration.upsert({

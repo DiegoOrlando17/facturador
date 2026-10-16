@@ -4,7 +4,7 @@ import logger from "../utils/logger.js";
 import { buildQueueJobId, toQueueId } from "../utils/bigint.js";
 import { paymentsQueue } from "../queues/payments.queue.js";
 import { getPaymentByProviderPaymentId, upsertPayment } from "../models/Payment.js";
-import { getPaymentInfoMP, normalizeMpConfig } from "./mercadopago.service.js";
+import { getPaymentInfoMP, requireMpCredentials } from "./mercadopago.service.js";
 import { logPaymentEvent } from "./paymentEvent.service.js";
 import { setIntegrationCheckpoint } from "./tenantConfig.service.js";
 
@@ -40,7 +40,7 @@ async function enqueueAfipJob(tenantId, payment) {
 }
 
 export async function fetchApprovedPaymentsSince(processingStartDate, mpCfg = {}) {
-  const cfg = normalizeMpConfig(mpCfg);
+  const cfg = requireMpCredentials(mpCfg);
   const start = parseProcessingStartDate(processingStartDate);
   const end = DateTime.utc();
   const limit = 200;

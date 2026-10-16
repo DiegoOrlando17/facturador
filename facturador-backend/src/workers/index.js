@@ -1,9 +1,6 @@
 import path from "path";
 import { config } from "../config/index.js";
 import { fork } from "child_process";
-import { writeFilesFromEnv } from "../utils/bootCerts.js";
-
-writeFilesFromEnv();
 
 const workers = [
   "payment.worker.js",

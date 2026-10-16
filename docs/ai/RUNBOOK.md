@@ -57,7 +57,6 @@ PORT=5000
 DATABASE_URL=postgresql://USER:PASSWORD@HOST:5432/DATABASE
 REDIS_URL=redis://HOST:6379
 ENABLE_WORKERS=true
-DEFAULT_TENANT_SLUG=demo
 
 APP_MASTER_KEY=<clave-aleatoria-fuerte>
 ADMIN_TOKEN_SECRET=<secreto-aleatorio-fuerte>
@@ -66,19 +65,17 @@ ADMIN_TOKEN_TTL_HOURS=12
 TENANT_TOKEN_TTL_HOURS=12
 ```
 
-`APP_MASTER_KEY`/`SECRETS_MASTER_KEY` protege credenciales por tenant. No cambiarla sin un procedimiento de rotacion porque puede volver ilegibles los secretos existentes. Los fallbacks incluidos en codigo son solo para desarrollo y no son seguros para produccion.
+`APP_MASTER_KEY`, `ADMIN_TOKEN_SECRET` y `TENANT_TOKEN_SECRET` son **obligatorias en produccion**. `APP_MASTER_KEY`/`SECRETS_MASTER_KEY` protege credenciales por tenant. Si no se define, el codigo usa el fallback de desarrollo `dev-master-key` (inseguro). No cambiarla sin un procedimiento de rotacion porque vuelve ilegibles los secretos existentes: una base cuyos secretos fueron cifrados con `dev-master-key` (caso del entorno local actual) necesita re-cifrarlos antes de definir otra clave. Los secretos de token solo invalidan sesiones al cambiar. Los fallbacks incluidos en codigo son solo para desarrollo y no son seguros para produccion.
+
+**Credenciales por cliente: solo en la DB.** Las credenciales de cada tenant (Mercado Pago `ACCESS_TOKEN`/`POS_ID`, ARCA `CUIT`/`PTO_VTA`/`CBTE_TIPO`/certificado y clave, Google refresh token, carpeta Drive y planilla) viven cifradas en `TenantIntegration` y se cargan desde el panel admin. El backend ya no lee ninguna credencial de cliente del `.env` ni tiene fallback a valores globales: si un tenant no tiene sus credenciales, los workers lo saltean con un error claro (`La integración de Mercado Pago del cliente no tiene credenciales` / `La integración de ARCA del cliente no tiene credenciales`) y siguen con el resto. Variables retiradas que no deben volver a agregarse: `CUIT`, `MP_ACCESS_TOKEN`, `MP_PUBLIC_KEY`, `MP_POLLING_INTERVAL`, `MP_POS_ID`, `AFIP_TRA_PATH`, `AFIP_TRACMS_PATH`, `AFIP_CERT_PATH`, `AFIP_KEY_PATH`, `AFIP_TA_PATH`, `AFIP_PTO_VTA`, `AFIP_CBTE_TIPO`, `AFIP_ALIC_IVA`, `AFIP_*_B64`, `GOOGLE_TOKEN_PATH`, `DRIVE_FOLDER_ID`, `SHEET_ID`, `SHEET_NAME`, `DEFAULT_TENANT_SLUG`.
 
 ### Mercado Pago
 
 ```dotenv
-MP_ACCESS_TOKEN=
-MP_PUBLIC_KEY=
-MP_API_URL=
-MP_POLLING_INTERVAL=
-MP_POS_ID=
+MP_API_URL=https://api.mercadopago.com
 ```
 
-Las variables globales son compatibilidad heredada/default. El modelo objetivo usa configuracion cifrada por tenant.
+Unica variable de plataforma para el POS (si se omite se usa `https://api.mercadopago.com`). El token y el POS de cada cliente se configuran en su integracion `MERCADOPAGO`. El cobro comercial usa aparte `MP_BILLING_ACCESS_TOKEN` (cuenta de Facturador, ver `.env.example`).
 
 Regla critica para `fiebre`: Mercado Pago usa credenciales productivas y es estrictamente de solo lectura para polling y consulta de pagos POS reales. No crear pagos, preferencias, card tokens ni otros recursos en MP. ARCA, Drive y Sheets de este tenant son de prueba. No existe ningun endpoint para crear pagos en Mercado Pago.
 
@@ -87,22 +84,12 @@ Regla critica para `fiebre`: Mercado Pago usa credenciales productivas y es estr
 ### ARCA/AFIP
 
 ```dotenv
-CUIT=
 AFIP_PRODUCTION=false
-AFIP_PTO_VTA=1
-AFIP_CBTE_TIPO=6
-AFIP_ALIC_IVA=21
 AFIP_WSAA_URL=
 AFIP_WSFE_URL=
-
-AFIP_CERT_PATH=
-AFIP_KEY_PATH=
-AFIP_TA_PATH=
-AFIP_TRA_PATH=
-AFIP_TRACMS_PATH=
 ```
 
-Como alternativa de despliegue, el codigo admite `AFIP_CERT_B64`, `AFIP_KEY_B64`, `AFIP_TA_B64`, `AFIP_TRA_B64` y `AFIP_TRACMS_B64`, que se materializan con permisos restringidos en el directorio temporal del sistema al arrancar. Probar primero contra homologacion (`AFIP_PRODUCTION=false`).
+`AFIP_WSAA_URL`/`AFIP_WSFE_URL` son solo los endpoints por defecto de la plataforma. Prioridad por tenant: `WSAA_URL`/`WSFE_URL` de su integracion `AFIP` > su `ENV` (`homologacion`/`produccion`, que resuelve a los endpoints oficiales) > estas variables. `AFIP_PRODUCTION` es una bandera de seguridad que usa `invoice:test-flow`. CUIT, punto de venta, tipo de comprobante, alicuota y certificado/clave (`CERT_B64`/`KEY_B64`, o `CERT_PATH`/`KEY_PATH`) se cargan por tenant; el TA se obtiene y cachea en memoria por CUIT y el TRA se genera en el directorio temporal por CUIT. Probar primero contra homologacion.
 
 ### Google
 
@@ -196,7 +183,7 @@ npm run plans:sync
 
 El comando crea o actualiza `TIER_1` a `TIER_4`, es idempotente y sincroniza nombres, precios mensuales en USD y la politica comercial vigente. Revisar el cambio antes de ejecutarlo en un ambiente compartido.
 
-Antes de usar scripts administrativos, revisar sus argumentos y apuntar explicitamente a la base correcta. `tenant:bootstrap` y `mp:reset-from-checkpoint` modifican estado y requieren backup/checkpoint y validacion del tenant objetivo.
+Antes de usar scripts administrativos, revisar sus argumentos y apuntar explicitamente a la base correcta. `mp:reset-from-checkpoint` modifica estado y requiere backup/checkpoint y validacion del tenant objetivo.
 
 Nota Windows: `prisma generate` puede fallar si un proceso Node mantiene bloqueado el engine; detener API/workers, regenerar y reiniciar.
 

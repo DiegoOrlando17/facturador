@@ -7,14 +7,12 @@ const googleRedirectBase = process.env.GOOGLE_REDIRECT_BASE_URL || ngrokUrl || `
 
 export const config = {
   PORT: port,
-  CUIT: Number(process.env.CUIT),
 
+  // Solo configuracion de plataforma. Las credenciales de cada cliente (token/POS de
+  // Mercado Pago, CUIT y certificado/clave ARCA, Google) viven en TenantIntegration (DB)
+  // y nunca se leen del .env.
   MP: {
-    ACCESS_TOKEN: process.env.MP_ACCESS_TOKEN,
-    PUBLIC_KEY: process.env.MP_PUBLIC_KEY,
-    API_URL: process.env.MP_API_URL,
-    POLLING_INTERVAL: process.env.MP_POLLING_INTERVAL,
-    POS_ID: process.env.MP_POS_ID
+    API_URL: process.env.MP_API_URL || "https://api.mercadopago.com",
   },
 
   BILLING: {
@@ -31,22 +29,11 @@ export const config = {
   },
 
   AFIP: {
-    TRA_B64: process.env.AFIP_TRA_B64,
-    TRACMS_B64: process.env.AFIP_TRACMS_B64,
-    TA_B64: process.env.AFIP_TA_B64,
-    CERT_B64: process.env.AFIP_CERT_B64,
-    KEY_B64: process.env.AFIP_KEY_B64,
-    TRA: process.env.AFIP_TRA_PATH,
-    TRACMS: process.env.AFIP_TRACMS_PATH,
-    TA: process.env.AFIP_TA_PATH,
-    CERT: process.env.AFIP_CERT_PATH,
-    KEY: process.env.AFIP_KEY_PATH,
+    // URLs por defecto de la plataforma. Cada cliente puede elegir ambiente (ENV)
+    // o URLs propias (WSAA_URL/WSFE_URL) en su integracion AFIP, que tienen prioridad.
     WSAA_URL: process.env.AFIP_WSAA_URL,
     WSFE_URL: process.env.AFIP_WSFE_URL,
     PRODUCTION: process.env.AFIP_PRODUCTION || "false",
-    PTO_VTA: Number(process.env.AFIP_PTO_VTA || 1),
-    CBTE_TIPO: Number(process.env.AFIP_CBTE_TIPO || 6),
-    ALIC_IVA: Number(process.env.AFIP_ALIC_IVA || 21),
   },
 
   GOOGLE: {
@@ -83,7 +70,4 @@ export const config = {
   },
 
   ENABLE_WORKERS: process.env.ENABLE_WORKERS,
-
-  DEFAULT_TENANT_SLUG: process.env.DEFAULT_TENANT_SLUG || "demo",
-
 };

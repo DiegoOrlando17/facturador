@@ -49,7 +49,7 @@ Las rutas y workers historicos de webhooks fueron retirados. El ingreso depende 
 ### Fase A - Base y bloqueos
 
 - [x] **A1** - Unificar `payment.worker` con datos solo del tenant (`afipCfg`); alinear `createInvoiceAFIP` con la llamada real
-- [x] **A2** - Refactor AFIP: TA por CUIT (cache en memoria), emision y ultimo comprobante con config del tenant; cert/key desde `.env` o `CERT_B64`/`KEY_B64` en JSON
+- [x] **A2** - Refactor AFIP: TA por CUIT (cache en memoria), emision y ultimo comprobante con config del tenant; cert/key desde `CERT_B64`/`KEY_B64` (o `CERT_PATH`/`KEY_PATH`) en el JSON del tenant (sin fallback al `.env` desde 2026-10)
 - [x] **A4** - Invoice worker: `tenantId` desde el job; PDF / Drive / Sheets con `getGoogleInvoiceContext` + opcionales `PDF_*` en AFIP
 
 ### Fase B - Mercado Pago por tenant
@@ -143,12 +143,10 @@ Runbook:
 - Ver [docs/OPERACION_MULTITENANT.md](OPERACION_MULTITENANT.md)
 
 Comandos operativos:
-- `npm run tenant:bootstrap -- --slug <slug> --name "<nombre>" --plan A --owner-email <mail>`
 - `npm run tenant:setup-demo`
 
 Notas:
-- `tenant:bootstrap` toma credenciales legacy del `.env`, las persiste cifradas en `TenantIntegration` y reasigna `Payment` / `InvoiceSequence` al tenant inicial cuando es seguro hacerlo
-- Si encuentra mas de un `tenantId` distinto en datos operativos, aborta para no mezclar clientes
+- `tenant:bootstrap` (migracion inicial desde credenciales legacy del `.env`) fue retirado en 2026-10: las credenciales de cada tenant solo se cargan desde el panel admin y no hay fallback al `.env`
 - `setup-demo` tambien quedo alineado con el cifrado de `secretEnc`
 
 ---

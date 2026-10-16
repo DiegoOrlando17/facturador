@@ -1,6 +1,6 @@
 import axios from "axios";
-import { getLastInvoiceAFIP, normalizeAfipConfig } from "./afip.service.js";
-import { normalizeMpConfig } from "./mercadopago.service.js";
+import { buildMissingAfipCredentialsError, getLastInvoiceAFIP, getMissingAfipCredentials, normalizeAfipConfig } from "./afip.service.js";
+import { buildMissingMpCredentialsError, normalizeMpConfig } from "./mercadopago.service.js";
 import { config } from "../config/index.js";
 import { buildGoogleTokenRequest as buildTokenRequest, requestGoogleAccessToken } from "./googleToken.service.js";
 
@@ -61,7 +61,7 @@ async function fetchLatestMercadopagoPayment(cfg, { posId = null } = {}) {
 
 export async function testMercadopagoConnection(mpCfg = {}) {
   const cfg = normalizeMpConfig(mpCfg);
-  if (!cfg.ACCESS_TOKEN) throw new Error("MERCADOPAGO.ACCESS_TOKEN es obligatorio");
+  if (!cfg.ACCESS_TOKEN) throw buildMissingMpCredentialsError(["ACCESS_TOKEN"]);
 
   const requestedPosId = Object.prototype.hasOwnProperty.call(mpCfg, "POS_ID") && String(mpCfg.POS_ID || "").trim()
     ? String(mpCfg.POS_ID).trim()
@@ -97,6 +97,9 @@ export async function testAfipConnection(afipCfg = {}) {
   if (!String(afipCfg.CUIT || "").trim()) throw new Error("AFIP.CUIT es obligatorio");
   if (!afipCfg.PTO_VTA) throw new Error("AFIP.PTO_VTA es obligatorio");
   if (!afipCfg.CBTE_TIPO) throw new Error("AFIP.CBTE_TIPO es obligatorio");
+
+  const missing = getMissingAfipCredentials(afipCfg);
+  if (missing.length > 0) throw buildMissingAfipCredentialsError(missing);
 
   const cfg = normalizeAfipConfig(afipCfg);
 

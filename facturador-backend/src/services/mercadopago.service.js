@@ -5,16 +5,77 @@ import { DateTime } from "luxon";
 import { config } from "../config/index.js";
 import { parseUtc } from "../utils/date.js";
 
-export function normalizeMpConfig(mpCfg = {}) {
+export const MP_MISSING_CREDENTIALS_MESSAGE = "La integración de Mercado Pago del cliente no tiene credenciales";
+export const DEFAULT_MP_API_URL = "https://api.mercadopago.com";
+const REQUIRED_MP_FIELDS = ["ACCESS_TOKEN", "POS_ID"];
+
+function cleanString(value) {
+  if (value === null || value === undefined) return null;
+  const text = String(value).trim();
+  return text.length > 0 ? text : null;
+}
+
+/**
+ * Normaliza la config MP de un tenant. Las credenciales (ACCESS_TOKEN, POS_ID)
+ * salen SOLO de la integracion del tenant: nunca hay fallback al .env, para
+ * no consultar la cuenta de otro cliente. API_URL es de plataforma.
+ */
+export function normalizeMpConfig(mpCfg = {}, platformConfig = config.MP) {
+  const cfg = mpCfg && typeof mpCfg === "object" ? mpCfg : {};
   return {
-    ACCESS_TOKEN: mpCfg.ACCESS_TOKEN ?? config.MP.ACCESS_TOKEN,
-    POS_ID: mpCfg.POS_ID ?? config.MP.POS_ID,
-    API_URL: mpCfg.API_URL ?? config.MP.API_URL,
-    POLLING_MODE: mpCfg.POLLING_MODE ?? "realtime",
-    POLLING_INTERVAL_MS: Number(mpCfg.POLLING_INTERVAL_MS ?? config.MP.POLLING_INTERVAL ?? 5000),
-    RUNS_PER_DAY: mpCfg.RUNS_PER_DAY ? Number(mpCfg.RUNS_PER_DAY) : null,
-    RUN_AT_TIMES: Array.isArray(mpCfg.RUN_AT_TIMES) ? mpCfg.RUN_AT_TIMES : [],
-    TIMEZONE: mpCfg.TIMEZONE ?? "America/Argentina/Buenos_Aires",
+    ACCESS_TOKEN: cleanString(cfg.ACCESS_TOKEN),
+    POS_ID: cleanString(cfg.POS_ID),
+    API_URL: cleanString(cfg.API_URL) || cleanString(platformConfig?.API_URL) || DEFAULT_MP_API_URL,
+    POLLING_MODE: cfg.POLLING_MODE ?? "realtime",
+    POLLING_INTERVAL_MS: Number(cfg.POLLING_INTERVAL_MS ?? 5000),
+    RUNS_PER_DAY: cfg.RUNS_PER_DAY ? Number(cfg.RUNS_PER_DAY) : null,
+    RUN_AT_TIMES: Array.isArray(cfg.RUN_AT_TIMES) ? cfg.RUN_AT_TIMES : [],
+    TIMEZONE: cfg.TIMEZONE ?? "America/Argentina/Buenos_Aires",
+  };
+}
+
+/** Campos de credenciales MP que faltan en la integracion del tenant. */
+export function getMissingMpCredentials(mpCfg = {}) {
+  const cfg = normalizeMpConfig(mpCfg);
+  return REQUIRED_MP_FIELDS.filter((field) => !cfg[field]);
+}
+
+export function buildMissingMpCredentialsError(missing = REQUIRED_MP_FIELDS) {
+  const error = new Error(`${MP_MISSING_CREDENTIALS_MESSAGE} (falta ${missing.join(", ")})`);
+  error.code = "MP_MISSING_CREDENTIALS";
+  error.missingFields = [...missing];
+  return error;
+}
+
+/**
+ * Devuelve la config normalizada o lanza un error claro si el tenant no tiene
+ * ACCESS_TOKEN y POS_ID propios. Nunca consulta MP sin credenciales del tenant.
+ */
+export function requireMpCredentials(mpCfg = {}) {
+  const missing = getMissingMpCredentials(mpCfg);
+  if (missing.length > 0) throw buildMissingMpCredentialsError(missing);
+  return normalizeMpConfig(mpCfg);
+}
+
+/**
+ * Guard para workers multitenant: devuelve true si el tenant no tiene credenciales
+ * MP propias y debe saltearse. Avisa una sola vez por tenant (hasta que las cargue)
+ * para no inundar el log; los demas tenants siguen procesandose.
+ */
+export function createMpCredentialsGuard({ log = logger, action = "el procesamiento" } = {}) {
+  const warned = new Set();
+  return function shouldSkipTenant(tenantId, mpCfg) {
+    const key = String(tenantId);
+    const missing = getMissingMpCredentials(mpCfg);
+    if (missing.length === 0) {
+      warned.delete(key);
+      return false;
+    }
+    if (!warned.has(key)) {
+      warned.add(key);
+      log.warn(`⚠️ [t=${key}] ${MP_MISSING_CREDENTIALS_MESSAGE} (falta ${missing.join(", ")}). Se omite ${action} de este cliente.`);
+    }
+    return true;
   };
 }
 
@@ -38,7 +99,7 @@ export function getPaymentInfoMP(payment) {
 
 /** Consulta puntual de una orden de pago por id. */
 export async function fetchPaymentById(paymentId, mpCfg = {}) {
-  const cfg = normalizeMpConfig(mpCfg);
+  const cfg = requireMpCredentials(mpCfg);
 
   try {
     const res = await axios.get(`${cfg.API_URL}/payments/${paymentId}`, {
@@ -59,7 +120,7 @@ export async function fetchPaymentById(paymentId, mpCfg = {}) {
  * - De-duplicamos por provider_payment_id (DB) o por un set en memoria si hace falta
  */
 export async function fetchNewPayments(lastTimestamp, mpCfg = {}) {
-  const cfg = normalizeMpConfig(mpCfg);
+  const cfg = requireMpCredentials(mpCfg);
 
   const limit = 200;
   const maxPages = 20;
@@ -140,7 +201,7 @@ export async function fetchNewPayments(lastTimestamp, mpCfg = {}) {
 }
 
 export async function fetchLastPayment(mpCfg = {}) {
-  const cfg = normalizeMpConfig(mpCfg);
+  const cfg = requireMpCredentials(mpCfg);
 
   try {
     const params = {
@@ -167,7 +228,7 @@ export async function fetchLastPayment(mpCfg = {}) {
 }
 
 export async function fetchLast24HsPayments(mpCfg = {}) {
-  const cfg = normalizeMpConfig(mpCfg);
+  const cfg = requireMpCredentials(mpCfg);
   const nowLocal = DateTime.now().setZone("America/Argentina/Buenos_Aires");
   const windowEndLocal = nowLocal;
   const windowStartLocal = nowLocal.minus({ hours: 25 });

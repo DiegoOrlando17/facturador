@@ -4,11 +4,12 @@ import { buildQueueJobId, toQueueId } from "../utils/bigint.js";
 import { DateTime } from "luxon";
 import { upsertPayment, getAllPaymentsIds } from "../models/Payment.js";
 import { paymentsQueue } from "../queues/payments.queue.js";
-import { fetchLast24HsPayments, getPaymentInfoMP } from "../services/mercadopago.service.js";
+import { createMpCredentialsGuard, fetchLast24HsPayments, getPaymentInfoMP } from "../services/mercadopago.service.js";
 import { listEnabledTenantsByIntegration } from "../services/tenantConfig.service.js";
 
 const CHECK_INTERVAL_MIN = 1;
 let lastRunSlot = null;
+const shouldSkipTenantWithoutMpCredentials = createMpCredentialsGuard({ action: "la auditoria" });
 
 async function addMissingPayments(tenantId, payments) {
     if (payments.length === 0) {
@@ -62,7 +63,12 @@ async function startAuditWorker() {
                     lastRunSlot = slotKey;
                     const tenants = await listEnabledTenantsByIntegration("MERCADOPAGO");
                     for (const row of tenants) {
-                        await auditTenant(row.tenantId, row.config);
+                        if (shouldSkipTenantWithoutMpCredentials(row.tenantId, row.config)) continue;
+                        try {
+                            await auditTenant(row.tenantId, row.config);
+                        } catch (tenantError) {
+                            logger.error(`[t=${row.tenantId}] Error en auditoria MP: ${tenantError.message}`);
+                        }
                     }
                 }
             }
