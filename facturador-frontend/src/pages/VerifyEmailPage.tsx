@@ -1,6 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { ResendVerificationForm } from "@/components/auth/ResendVerificationForm";
+import { AuthLayout } from "@/components/layout/AuthLayout";
+import { ButtonLink } from "@/components/ui/Button";
+import { Callout } from "@/components/ui/Callout";
+import { Spinner } from "@/components/ui/Spinner";
+import { Stamp, Ticket, TicketRow, TicketRows } from "@/components/ui/Ticket";
 import { apiRequest, getApiErrorMessage } from "@/lib/api";
 
 type VerifyResponse = {
@@ -72,59 +77,62 @@ export function VerifyEmailPage() {
       });
   }, [token]);
 
-  return (
-    <main className="public-form-page">
-      <section className="public-form-card">
-        <span className="eyebrow">Verificación de email</span>
-        {state.status === "loading" ? (
-          <>
-            <h1>Un momento...</h1>
-            <p role="status">Estamos verificando tu email.</p>
-          </>
-        ) : null}
+  if (state.status === "loading") {
+    return (
+      <AuthLayout subtitle="Portal del cliente" eyebrow="Verificación de email" title="Un momento…">
+        <p role="status" className="auth-actions">
+          <Spinner size="sm" label={null} />
+          Estamos verificando tu email.
+        </p>
+      </AuthLayout>
+    );
+  }
 
-        {state.status === "success" ? (
-          <>
-            <h1>{state.alreadyVerified ? "Tu email ya estaba verificado" : "Email verificado"}</h1>
-            <p role="status">
-              {state.alreadyVerified
-                ? "No hace falta hacer nada más: ya podés ingresar al portal."
-                : "Listo, tu cuenta quedó activa. Ingresá al portal para completar tus datos y conectar el medio de cobro."}
-            </p>
-            {state.tenantSlug ? (
-              <p>
-                Para ingresar usá el identificador de empresa <strong>{state.tenantSlug}</strong>
-                {state.email ? (
-                  <>
-                    {" "}
-                    y el email <strong>{state.email}</strong>
-                  </>
-                ) : null}
-                .
-              </p>
-            ) : null}
-            <Link className="primary-button" to={buildLoginUrl(state.tenantSlug, state.email)}>
-              Ingresar al portal
+  if (state.status === "error") {
+    return (
+      <AuthLayout
+        subtitle="Portal del cliente"
+        eyebrow="Verificación de email"
+        title="No pudimos verificar tu email"
+        footer={
+          <p>
+            ¿Ya verificaste tu email?{" "}
+            <Link className="auth-link" to="/portal-cliente/login">
+              Ingresá al portal
             </Link>
-          </>
-        ) : null}
+          </p>
+        }
+      >
+        <Callout tone="danger" role="alert">
+          {state.message}
+        </Callout>
+        <ResendVerificationForm />
+      </AuthLayout>
+    );
+  }
 
-        {state.status === "error" ? (
-          <>
-            <h1>No pudimos verificar tu email</h1>
-            <p className="form-error" role="alert">
-              {state.message}
-            </p>
-            <ResendVerificationForm />
-            <p>
-              ¿Ya verificaste tu email?{" "}
-              <Link className="public-inline-link" to="/portal-cliente/login">
-                Ingresá al portal
-              </Link>
-            </p>
-          </>
-        ) : null}
-      </section>
-    </main>
+  return (
+    <AuthLayout
+      subtitle="Portal del cliente"
+      eyebrow="Verificación de email"
+      title={state.alreadyVerified ? "Tu email ya estaba verificado" : "Email verificado"}
+    >
+      <p role="status">
+        {state.alreadyVerified
+          ? "No hace falta hacer nada más: ya podés ingresar al portal."
+          : "Listo, tu cuenta quedó activa. Ingresá al portal para completar tus datos y conectar el medio de cobro."}
+      </p>
+      {state.tenantSlug ? (
+        <Ticket as="div" className="auth-credentials" eyebrow="Tus datos para ingresar" stamp={<Stamp label="OK" size="sm" />}>
+          <TicketRows>
+            <TicketRow label="Empresa" value={state.tenantSlug} mono />
+            {state.email ? <TicketRow label="Email" value={state.email} mono /> : null}
+          </TicketRows>
+        </Ticket>
+      ) : null}
+      <ButtonLink to={buildLoginUrl(state.tenantSlug, state.email)} variant="primary" size="lg" fullWidth>
+        Ingresar al portal
+      </ButtonLink>
+    </AuthLayout>
   );
 }

@@ -7,4 +7,6 @@ export const BRAND = {
   name: "Facturador",
   tagline: "Listo, ya está facturado.",
   supportEmail: "soporte@facturador.app",
+  /** Consultas legales, de datos personales y arrepentimiento. */
+  contactEmail: "contacto@facturador.app",
 } as const;

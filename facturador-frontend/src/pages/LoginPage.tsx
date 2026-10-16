@@ -1,8 +1,10 @@
 import { useState, type FormEvent } from "react";
-import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
+import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/app/AuthContext";
-import { BrandMark } from "@/components/brand/BrandMark";
-import { AppIcon } from "@/components/ui/AppIcon";
+import { AuthAside, AuthLayout, AuthPoints } from "@/components/layout/AuthLayout";
+import { Button } from "@/components/ui/Button";
+import { Callout } from "@/components/ui/Callout";
+import { PasswordField, TextField } from "@/components/ui/Field";
 import { BRAND } from "@/config/brand";
 
 type LocationState = {
@@ -10,6 +12,12 @@ type LocationState = {
     pathname?: string;
   };
 };
+
+const POINTS = [
+  { title: "Ventas y facturas", text: "Seguí los cobros y los comprobantes de cada empresa." },
+  { title: "Datos fiscales", text: "Revisá y aprobá la información antes de habilitar." },
+  { title: "Estado operativo", text: "Pendientes, integraciones y errores, a tiempo." },
+];
 
 export function LoginPage() {
   const navigate = useNavigate();
@@ -38,7 +46,7 @@ export function LoginPage() {
     setErrorMessage("");
     clearAuthNotice();
 
-    const result = await login({ email, password, remember });
+    const result = await login({ email: email.trim(), password, remember });
 
     if (!result.ok) {
       setErrorMessage(result.message ?? "No pudimos iniciar sesión. Probá de nuevo.");
@@ -50,132 +58,65 @@ export function LoginPage() {
   }
 
   return (
-    <main className="login-page">
-      <div className="login-background-mark" aria-hidden="true" />
-      <section className="login-content">
-        <div className="login-brand-row">
-          <BrandMark size="lg" subtitle="Panel interno" />
-        </div>
-
-        <section className="login-hero">
-          <h1>
-            Cada empresa, sus ventas y sus <strong>comprobantes</strong>, en un solo lugar.
-          </h1>
+    <AuthLayout
+      subtitle="Panel interno"
+      title="Iniciar sesión"
+      description="Ingresá con tu email del equipo interno."
+      aside={
+        <AuthAside
+          headline={
+            <>
+              Cada empresa, sus ventas y sus <strong>comprobantes</strong>, en un solo lugar.
+            </>
+          }
+          lead="Revisá la puesta en marcha, las integraciones y lo que necesita atención en cada empresa que factura con nosotros."
+        >
+          <AuthPoints items={POINTS} />
+        </AuthAside>
+      }
+      footer={
+        <>
+          <p>¿Olvidaste tu contraseña? Pedile a un superadmin que te asigne una nueva desde Administradores.</p>
           <p>
-            Revisá la puesta en marcha, las integraciones y lo que necesita atención en cada empresa que factura con
-            nosotros.
+            ¿Otro problema para ingresar? Escribinos a{" "}
+            <a className="auth-link" href={`mailto:${BRAND.supportEmail}`}>
+              {BRAND.supportEmail}
+            </a>
+            .
           </p>
+        </>
+      }
+    >
+      <form className="auth-form" onSubmit={(event) => void handleSubmit(event)}>
+        <TextField
+          label="Email"
+          type="email"
+          required
+          autoComplete="username"
+          value={email}
+          onChange={(event) => setEmail(event.target.value)}
+          placeholder="usuario@empresa.com"
+        />
+        <PasswordField label="Contraseña" required value={password} onChange={(event) => setPassword(event.target.value)} />
+        <label className="auth-check">
+          <input type="checkbox" checked={remember} onChange={(event) => setRemember(event.target.checked)} />
+          <span>Recordar esta sesión en este navegador</span>
+        </label>
 
-          <div className="login-feature-list">
-            <article>
-              <span className="login-feature-icon login-feature-icon--blue" aria-hidden="true">
-                <AppIcon name="invoice" />
-              </span>
-              <strong>Ventas y facturas</strong>
-              <p>Seguí los cobros y los comprobantes de cada empresa.</p>
-            </article>
-            <article>
-              <span className="login-feature-icon login-feature-icon--green" aria-hidden="true">
-                <AppIcon name="tax" />
-              </span>
-              <strong>Datos fiscales</strong>
-              <p>Revisá y aprobá la información antes de habilitar.</p>
-            </article>
-            <article>
-              <span className="login-feature-icon login-feature-icon--violet" aria-hidden="true">
-                <AppIcon name="reports" />
-              </span>
-              <strong>Estado operativo</strong>
-              <p>Pendientes, integraciones y errores, a tiempo.</p>
-            </article>
-          </div>
+        {errorMessage ? (
+          <Callout tone="danger" role="alert">
+            {errorMessage}
+          </Callout>
+        ) : authNotice ? (
+          <Callout tone="success" role="status">
+            {authNotice}
+          </Callout>
+        ) : null}
 
-          <div className="login-security-note">
-            <span aria-hidden="true">
-              <AppIcon name="shield" />
-            </span>
-            <p>Acceso solo para el equipo interno. Cada acción queda registrada en la auditoría.</p>
-          </div>
-        </section>
-      </section>
-
-      <section className="login-card-wrapper">
-        <div className="login-card">
-          <div className="login-card-heading">
-            <h2>Iniciar sesión</h2>
-            <p>Ingresá con tu email del equipo interno.</p>
-          </div>
-
-          <form className="login-form" onSubmit={handleSubmit}>
-            <label className="field">
-              <span>Email</span>
-              <div className="login-input-wrap">
-                <AppIcon name="mail" />
-                <input
-                  type="email"
-                  autoComplete="email"
-                  value={email}
-                  onChange={(event) => setEmail(event.target.value)}
-                  placeholder="usuario@empresa.com"
-                />
-              </div>
-            </label>
-
-            <label className="field">
-              <span>Contraseña</span>
-              <div className="login-input-wrap">
-                <AppIcon name="lock" />
-                <input
-                  type="password"
-                  autoComplete="current-password"
-                  value={password}
-                  onChange={(event) => setPassword(event.target.value)}
-                  placeholder="********"
-                />
-                <AppIcon name="help" />
-              </div>
-            </label>
-
-            <label className="checkbox-field">
-              <input
-                type="checkbox"
-                checked={remember}
-                onChange={(event) => setRemember(event.target.checked)}
-              />
-              <span>Recordar esta sesión en este navegador</span>
-            </label>
-
-            {errorMessage ? <p className="form-error">{errorMessage}</p> : null}
-            {!errorMessage && authNotice ? (
-              <p className="login-status-message login-status-message--success">
-                <span aria-hidden="true">
-                  <AppIcon name="check-circle" />
-                </span>
-                {authNotice}
-              </p>
-            ) : null}
-
-            <button type="submit" className="primary-button primary-button--full" disabled={isSubmitting}>
-              <span>{isSubmitting ? "Ingresando…" : "Ingresar al panel"}</span>
-              <span aria-hidden="true">&rarr;</span>
-            </button>
-          </form>
-
-          <div className="login-help-line">
-            <span aria-hidden="true">
-              <AppIcon name="help" />
-            </span>
-            <p>¿Necesitás ayuda para ingresar? Escribinos a <a href={`mailto:${BRAND.supportEmail}`}>{BRAND.supportEmail}</a>.</p>
-          </div>
-        </div>
-      </section>
-
-      <footer className="login-legal">
-        <span>&copy; 2026 {BRAND.name}. Todos los derechos reservados.</span>
-        <Link to="/terminos">Términos y condiciones</Link>
-        <Link to="/privacidad">Política de privacidad</Link>
-        <Link to="/arrepentimiento">Botón de arrepentimiento</Link>
-      </footer>
-    </main>
+        <Button type="submit" variant="primary" size="lg" fullWidth loading={isSubmitting} loadingLabel="Ingresando…">
+          Ingresar al panel
+        </Button>
+      </form>
+    </AuthLayout>
   );
 }

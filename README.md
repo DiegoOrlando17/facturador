@@ -58,7 +58,7 @@ El sitio publico vive en `/`: presenta el alcance, el catalogo vigente, pregunta
 
 La verificacion devuelve el token en desarrollo para poder probar el circuito local. En produccion, Resend entrega un enlace de 24 horas generado con `PUBLIC_APP_URL`; el remitente de `EMAIL_FROM` debe pertenecer a un dominio verificado. El cobro recurrente usa Mercado Pago Suscripciones: los precios USD se convierten a ARS con vendedor billete BNA y una suscripcion solo concede capacidades al quedar `ACTIVE`.
 
-`/portal-cliente/login` permite ingresar con identificador de empresa, email y password de `TenantUser`. La sesion del cliente se almacena de forma independiente de la sesion administrativa y protege `/portal-cliente`.
+`/portal-cliente/login` permite ingresar con identificador de empresa, email y password de `TenantUser`. La sesion del cliente se almacena de forma independiente de la sesion administrativa y protege `/portal-cliente`. `/recuperar-contrasena` envia por email un enlace de un solo uso (vence en 1 hora) y `/restablecer-contrasena` permite elegir la nueva contraseña; los admins la piden a un superadmin.
 
 El dashboard inicial consume datos reales del tenant autenticado y muestra importes y pagos procesados, pendientes o con alertas. La seccion `Pagos y facturas` permite buscar y filtrar operaciones, abrir su detalle, revisar la trazabilidad, descargar el PDF cuando ARCA ya emitio el comprobante y exportar hasta 10.000 pagos filtrados en CSV.
 

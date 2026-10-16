@@ -2,6 +2,7 @@ import { Router } from "express";
 import { getBillingAvailability, listPublicPlans, registerPublicTenant, resendPublicContactVerification, verifyPublicContact } from "../services/publicCommercial.service.js";
 import { processMercadoPagoBillingNotification } from "../services/mercadoPagoBilling.service.js";
 import { PublicRequestError } from "../domain/publicRegistration.js";
+import { confirmPasswordReset, requestPasswordReset } from "../services/passwordReset.service.js";
 
 const router = Router();
 const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
@@ -30,6 +31,8 @@ export function createRateLimit({ max, windowMs = RATE_LIMIT_WINDOW_MS, now = ()
 const registerRateLimit = createRateLimit({ max: 5 });
 const resendRateLimit = createRateLimit({ max: 5 });
 const verifyRateLimit = createRateLimit({ max: 30 });
+const passwordResetRequestRateLimit = createRateLimit({ max: 5 });
+const passwordResetConfirmRateLimit = createRateLimit({ max: 20 });
 
 function sendPublicError(res, error, fallback) {
   if (error instanceof PublicRequestError) {
@@ -70,6 +73,22 @@ router.post("/resend-verification", resendRateLimit, async (req, res) => {
     return res.status(202).json(await resendPublicContactVerification(req.body?.email));
   } catch (error) {
     return sendPublicError(res, error, "No pudimos reenviar el enlace. Probá de nuevo en unos minutos.");
+  }
+});
+
+router.post("/password-reset/request", passwordResetRequestRateLimit, async (req, res) => {
+  try {
+    return res.status(202).json(await requestPasswordReset(req.body));
+  } catch (error) {
+    return sendPublicError(res, error, "No pudimos enviar el enlace. Probá de nuevo en unos minutos.");
+  }
+});
+
+router.post("/password-reset/confirm", passwordResetConfirmRateLimit, async (req, res) => {
+  try {
+    return res.json(await confirmPasswordReset(req.body));
+  } catch (error) {
+    return sendPublicError(res, error, "No pudimos cambiar la contraseña. Probá de nuevo en unos minutos.");
   }
 });
 

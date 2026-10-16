@@ -30,6 +30,8 @@ import { RegisterPage } from "@/pages/RegisterPage";
 import { TutorialsPage } from "@/pages/TutorialsPage";
 import { ClientSubscriptionPage } from "@/pages/ClientSubscriptionPage";
 import { VerifyEmailPage } from "@/pages/VerifyEmailPage";
+import { ForgotPasswordPage } from "@/pages/ForgotPasswordPage";
+import { ResetPasswordPage } from "@/pages/ResetPasswordPage";
 import { NotFoundPage, RouteErrorPage } from "@/pages/NotFoundPage";
 import { PrivacyPage, TermsPage, WithdrawalPage } from "@/pages/LegalPage";
 
@@ -41,6 +43,8 @@ export const router = createBrowserRouter([{
   { path: "/registro", element: <RegisterPage /> },
   { path: "/tutoriales", element: <TutorialsPage /> },
   { path: "/verificar-email", element: <VerifyEmailPage /> },
+  { path: "/recuperar-contrasena", element: <ForgotPasswordPage /> },
+  { path: "/restablecer-contrasena", element: <ResetPasswordPage /> },
   { path: "/terminos", element: <TermsPage /> },
   { path: "/privacidad", element: <PrivacyPage /> },
   { path: "/arrepentimiento", element: <WithdrawalPage /> },

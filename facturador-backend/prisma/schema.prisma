@@ -259,10 +259,25 @@ model TenantUser {
   createdAt    DateTime         @default(now())
   updatedAt    DateTime         @updatedAt
 
-  tenant Tenant @relation(fields: [tenantId], references: [id])
+  tenant         Tenant               @relation(fields: [tenantId], references: [id])
+  passwordResets PasswordResetToken[]
 
   @@unique([tenantId, email])
   @@index([tenantId])
+}
+
+model PasswordResetToken {
+  id           BigInt    @id @default(autoincrement())
+  tenantUserId BigInt
+  tokenHash    String    @unique
+  expiresAt    DateTime
+  usedAt       DateTime?
+  createdAt    DateTime  @default(now())
+
+  tenantUser TenantUser @relation(fields: [tenantUserId], references: [id])
+
+  @@index([tenantUserId])
+  @@index([expiresAt])
 }
 
 model AdminUser {

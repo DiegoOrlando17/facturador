@@ -18,13 +18,20 @@ export class ApiError extends Error {
   status: number;
   /** true cuando el mensaje vino del backend (no es el texto genérico del cliente). */
   hasServerMessage: boolean;
+  /** Código de error del backend ("RESET_EXPIRED"), si lo mandó. */
+  code?: string;
 
-  constructor(message: string, status: number, hasServerMessage = true) {
+  constructor(message: string, status: number, hasServerMessage = true, code?: string) {
     super(message);
     this.name = "ApiError";
     this.status = status;
     this.hasServerMessage = hasServerMessage;
+    this.code = code;
   }
+}
+
+export function isApiError(error: unknown): error is ApiError {
+  return error instanceof ApiError;
 }
 
 export class NetworkError extends Error {
@@ -112,7 +119,12 @@ function buildApiError(payload: unknown, response: Response, options: { token?: 
     notifyUnauthorized(options.authScope ?? "admin");
   }
 
-  return new ApiError(serverMessage || GENERIC_API_ERROR, response.status, Boolean(serverMessage));
+  const code =
+    payload && typeof payload === "object" && typeof (payload as { code?: unknown }).code === "string"
+      ? (payload as { code: string }).code
+      : undefined;
+
+  return new ApiError(serverMessage || GENERIC_API_ERROR, response.status, Boolean(serverMessage), code);
 }
 
 export async function apiRequest<T>(path: string, options: RequestOptions = {}) {

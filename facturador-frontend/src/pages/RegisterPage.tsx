@@ -1,9 +1,14 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { ResendVerificationForm } from "@/components/auth/ResendVerificationForm";
+import { AuthAside, AuthLayout } from "@/components/layout/AuthLayout";
+import { Button, ButtonLink } from "@/components/ui/Button";
+import { Callout } from "@/components/ui/Callout";
+import { PasswordField, SelectField, TextField } from "@/components/ui/Field";
+import { Stamp, Ticket, TicketDivider, TicketRow, TicketRows } from "@/components/ui/Ticket";
 import { apiRequest, getApiErrorMessage } from "@/lib/api";
-
-type Plan = { code: string; name: string; price: number | null; currency: string };
+import { formatNumber } from "@/lib/formatters";
+import { enabledPlanFeatures, isMonthlyPlan, PLAN_BILLING_NOTE, planFeatureLabel, type PublicPlan } from "@/lib/publicPlans";
 
 type Result = {
   tenantSlug: string;
@@ -13,6 +18,8 @@ type Result = {
   billingStatus: string;
   verificationToken?: string;
 };
+
+type PlansState = { status: "loading" } | { status: "error" } | { status: "ready"; items: PublicPlan[] };
 
 const SLUG_MIN_LENGTH = 3;
 const SLUG_MAX_LENGTH = 50;
@@ -45,9 +52,40 @@ function buildLoginUrl(slug: string, email: string) {
   return `/portal-cliente/login?${params.toString()}`;
 }
 
+function formatPlanPrice(plan: PublicPlan) {
+  if (plan.price == null) return "Precio a confirmar";
+  return `${plan.currency} ${formatNumber(plan.price)}${isMonthlyPlan(plan) ? " /mes" : ""}`;
+}
+
+function PlanTicket({ plan }: { plan: PublicPlan }) {
+  return (
+    <Ticket as="div" className="auth-plan" eyebrow="Tu plan" title={plan.name}>
+      <p className="auth-plan__price">
+        {plan.price == null ? (
+          "Precio a confirmar"
+        ) : (
+          <>
+            {plan.currency} {formatNumber(plan.price)}
+            {isMonthlyPlan(plan) ? <small> /mes</small> : null}
+          </>
+        )}
+      </p>
+      <p className="auth-plan__note">{PLAN_BILLING_NOTE}</p>
+      <TicketDivider />
+      <ul className="auth-plan__features">
+        {enabledPlanFeatures(plan).map((key) => (
+          <li key={key}>{planFeatureLabel(key)}</li>
+        ))}
+      </ul>
+    </Ticket>
+  );
+}
+
 export function RegisterPage() {
   const [params] = useSearchParams();
-  const [plans, setPlans] = useState<Plan[]>([]);
+  const requestedPlan = (params.get("plan") ?? "").toUpperCase();
+  const [plans, setPlans] = useState<PlansState>({ status: "loading" });
+  const [planNotice, setPlanNotice] = useState("");
   const [result, setResult] = useState<Result | null>(null);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
@@ -57,15 +95,32 @@ export function RegisterPage() {
     slug: "",
     email: "",
     password: "",
-    planCode: params.get("plan") || "TIER_1",
+    planCode: "",
     acceptedTerms: false,
   });
 
+  const loadPlans = useCallback(() => {
+    setPlans({ status: "loading" });
+    apiRequest<{ items: PublicPlan[] }>("/public/plans")
+      .then(({ items }) => {
+        setPlans({ status: "ready", items });
+        const valid = items.some((plan) => plan.code === requestedPlan);
+        if (requestedPlan && !valid) setPlanNotice("El plan del enlace ya no está disponible. Elegí uno de la lista.");
+        setForm((current) => ({
+          ...current,
+          planCode: items.some((plan) => plan.code === current.planCode)
+            ? current.planCode
+            : valid
+              ? requestedPlan
+              : (items[0]?.code ?? ""),
+        }));
+      })
+      .catch(() => setPlans({ status: "error" }));
+  }, [requestedPlan]);
+
   useEffect(() => {
-    void apiRequest<{ items: Plan[] }>("/public/plans")
-      .then((value) => setPlans(value.items))
-      .catch(() => setError("No pudimos cargar los planes. Recargá la página para intentar de nuevo."));
-  }, []);
+    loadPlans();
+  }, [loadPlans]);
 
   function handleBusinessNameChange(value: string) {
     setForm((current) => ({
@@ -98,130 +153,166 @@ export function RegisterPage() {
   if (result) {
     const devToken = import.meta.env.DEV ? result.verificationToken : undefined;
     return (
-      <main className="public-form-page">
-        <section className="public-form-card">
-          <span className="eyebrow">Cuenta creada</span>
-          <h1>Verificá tu email para ingresar</h1>
-          <p>
-            Creamos el espacio de tu empresa con el identificador <strong>{result.tenantSlug}</strong>. Lo vas a usar
-            junto con tu email para ingresar al portal.
-          </p>
-          <p>La suscripción queda pendiente hasta que conectes el medio de cobro.</p>
-          {result.verificationRequired ? (
-            <>
-              <p role="status">
-                {result.emailSent
-                  ? `Te mandamos un enlace de verificación a ${result.email}. Abrilo para activar tu cuenta.`
-                  : "No pudimos enviarte el email de verificación. Pedí uno nuevo desde acá abajo."}
-              </p>
-              {devToken ? (
-                <div className="dev-only-note">
-                  <p>Modo desarrollo: podés verificar sin abrir el email.</p>
-                  <Link className="primary-button" to={`/verificar-email?token=${encodeURIComponent(devToken)}`}>
-                    Verificar email (solo desarrollo)
-                  </Link>
-                </div>
-              ) : null}
-              <ResendVerificationForm
-                initialEmail={result.email}
-                title="¿No te llegó el email?"
-                description="Revisá la carpeta de spam o pedí un enlace nuevo."
-              />
-            </>
-          ) : null}
-          <Link className="secondary-button" to={buildLoginUrl(result.tenantSlug, result.email)}>
-            Ir a ingresar
-          </Link>
-        </section>
-      </main>
+      <AuthLayout subtitle="Portal del cliente" eyebrow="Cuenta creada" title="Verificá tu email para ingresar">
+        <Ticket as="div" className="auth-credentials" eyebrow="Tus datos para ingresar" stamp={<Stamp label="ALTA" size="sm" />}>
+          <TicketRows>
+            <TicketRow label="Empresa" value={result.tenantSlug} mono />
+            <TicketRow label="Email" value={result.email} mono />
+          </TicketRows>
+        </Ticket>
+        {result.verificationRequired ? (
+          result.emailSent ? (
+            <Callout tone="info" role="status" title="Revisá tu email">
+              Te mandamos un enlace de verificación a {result.email}. Abrilo para activar tu cuenta.
+            </Callout>
+          ) : (
+            <Callout tone="warning" role="status" title="No pudimos enviarte el email">
+              Pedí uno nuevo desde acá abajo.
+            </Callout>
+          )
+        ) : null}
+        <p>La suscripción queda pendiente hasta que conectes el medio de cobro desde el portal.</p>
+        {devToken ? (
+          <Callout tone="neutral" title="Modo desarrollo" actions={
+            <ButtonLink to={`/verificar-email?token=${encodeURIComponent(devToken)}`} variant="primary" size="sm">
+              Verificar email (solo desarrollo)
+            </ButtonLink>
+          }>
+            Podés verificar sin abrir el email.
+          </Callout>
+        ) : null}
+        {result.verificationRequired ? (
+          <ResendVerificationForm
+            initialEmail={result.email}
+            title="¿No te llegó el email?"
+            description="Revisá la carpeta de spam o pedí un enlace nuevo."
+          />
+        ) : null}
+        <ButtonLink to={buildLoginUrl(result.tenantSlug, result.email)} variant="secondary" fullWidth>
+          Ir a ingresar
+        </ButtonLink>
+      </AuthLayout>
     );
   }
 
   const slugPreview = form.slug.replace(/-+$/g, "");
+  const selectedPlan = plans.status === "ready" ? plans.items.find((plan) => plan.code === form.planCode) : undefined;
+  const plansReady = plans.status === "ready" && plans.items.length > 0;
 
   return (
-    <main className="public-form-page">
-      <form className="public-form-card" onSubmit={(event) => void submit(event)}>
-        <Link className="public-back-link" to="/">
-          ← Volver
-        </Link>
-        <span className="eyebrow">Alta autoservicio</span>
-        <h1>Creá el espacio de tu empresa</h1>
-        <label className="field">
-          <span>Nombre comercial</span>
-          <input
-            required
-            minLength={2}
-            maxLength={120}
-            autoComplete="organization"
-            value={form.businessName}
-            onChange={(event) => handleBusinessNameChange(event.target.value)}
-          />
-        </label>
-        <label className="field">
-          <span>Identificador de empresa</span>
-          <input
-            required
-            minLength={SLUG_MIN_LENGTH}
-            maxLength={SLUG_MAX_LENGTH}
-            pattern="[a-z0-9]+(?:-[a-z0-9]+)*"
-            title="Usá al menos 3 caracteres: letras minúsculas, números y guiones."
-            autoComplete="off"
-            autoCapitalize="none"
-            spellCheck={false}
-            aria-describedby="register-slug-help"
-            value={form.slug}
-            onChange={(event) => handleSlugChange(event.target.value)}
-            onBlur={() => setForm((current) => ({ ...current, slug: current.slug.replace(/-+$/g, "") }))}
-          />
-          <small id="register-slug-help" className="field-help">
-            {slugPreview.length >= SLUG_MIN_LENGTH ? (
+    <AuthLayout
+      subtitle="Alta autoservicio"
+      title="Creá el espacio de tu empresa"
+      description="En dos minutos. Después completás tus datos fiscales y conectás Mercado Pago."
+      backTo="/"
+      aside={
+        <AuthAside
+          headline={
+            <>
+              Vendés con Mercado Pago. <strong>La factura sale sola.</strong>
+            </>
+          }
+          lead="Antes de emitir revisamos tus datos fiscales y las conexiones. No te pedimos contraseñas de nada."
+        >
+          {selectedPlan ? <PlanTicket plan={selectedPlan} /> : null}
+        </AuthAside>
+      }
+      footer={
+        <p>
+          ¿Ya tenés cuenta?{" "}
+          <Link className="auth-link" to="/portal-cliente/login">
+            Ingresá al portal
+          </Link>
+        </p>
+      }
+    >
+      <form className="auth-form" onSubmit={(event) => void submit(event)}>
+        <TextField
+          label="Nombre comercial"
+          required
+          minLength={2}
+          maxLength={120}
+          autoComplete="organization"
+          value={form.businessName}
+          onChange={(event) => handleBusinessNameChange(event.target.value)}
+        />
+        <TextField
+          label="Identificador de empresa"
+          required
+          minLength={SLUG_MIN_LENGTH}
+          maxLength={SLUG_MAX_LENGTH}
+          pattern="[a-z0-9]+(?:-[a-z0-9]+)*"
+          title="Usá al menos 3 caracteres: letras minúsculas, números y guiones."
+          autoComplete="off"
+          autoCapitalize="none"
+          spellCheck={false}
+          value={form.slug}
+          onChange={(event) => handleSlugChange(event.target.value)}
+          onBlur={() => setForm((current) => ({ ...current, slug: current.slug.replace(/-+$/g, "") }))}
+          hint={
+            slugPreview.length >= SLUG_MIN_LENGTH ? (
               <>
                 Lo vas a usar para ingresar: <strong>{slugPreview}</strong>
               </>
             ) : (
               "Lo vas a usar para ingresar. Mínimo 3 caracteres: letras minúsculas, números y guiones."
-            )}
-          </small>
-        </label>
-        <label className="field">
-          <span>Email del responsable</span>
-          <input
+            )
+          }
+        />
+        <TextField
+          label="Email del responsable"
+          required
+          type="email"
+          autoComplete="email"
+          value={form.email}
+          onChange={(event) => setForm({ ...form, email: event.target.value })}
+        />
+        <PasswordField
+          label="Contraseña"
+          required
+          minLength={8}
+          maxLength={128}
+          autoComplete="new-password"
+          hint="Mínimo 8 caracteres."
+          value={form.password}
+          onChange={(event) => setForm({ ...form, password: event.target.value })}
+        />
+        {plans.status === "error" ? (
+          <Callout
+            tone="danger"
+            role="alert"
+            title="No pudimos cargar los planes"
+            actions={
+              <Button size="sm" variant="secondary" onClick={loadPlans}>
+                Reintentar
+              </Button>
+            }
+          >
+            Sin plan no podemos crear la cuenta.
+          </Callout>
+        ) : plans.status === "ready" && plans.items.length === 0 ? (
+          <Callout tone="warning" role="status" title="No hay planes disponibles">
+            Por ahora no estamos tomando altas nuevas. Escribinos y te avisamos cuando abramos.
+          </Callout>
+        ) : (
+          <SelectField
+            label="Plan"
             required
-            type="email"
-            autoComplete="email"
-            value={form.email}
-            onChange={(event) => setForm({ ...form, email: event.target.value })}
+            disabled={!plansReady}
+            value={form.planCode}
+            hint={planNotice || (plans.status === "loading" ? "Cargando planes…" : undefined)}
+            onChange={(event) => {
+              setPlanNotice("");
+              setForm({ ...form, planCode: event.target.value });
+            }}
+            options={
+              plans.status === "ready"
+                ? plans.items.map((plan) => ({ value: plan.code, label: `${plan.name} · ${formatPlanPrice(plan)}` }))
+                : [{ value: "", label: "Cargando planes…" }]
+            }
           />
-        </label>
-        <label className="field">
-          <span>Contraseña</span>
-          <input
-            required
-            minLength={8}
-            maxLength={128}
-            type="password"
-            autoComplete="new-password"
-            aria-describedby="register-password-help"
-            value={form.password}
-            onChange={(event) => setForm({ ...form, password: event.target.value })}
-          />
-          <small id="register-password-help" className="field-help">
-            Mínimo 8 caracteres.
-          </small>
-        </label>
-        <label className="field">
-          <span>Plan</span>
-          <select value={form.planCode} onChange={(event) => setForm({ ...form, planCode: event.target.value })}>
-            {plans.map((plan) => (
-              <option key={plan.code} value={plan.code}>
-                {plan.name}
-                {plan.price == null ? " · precio a confirmar" : ` · ${plan.currency} ${plan.price}`}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="public-consent">
+        )}
+        <label className="auth-check">
           <input
             required
             type="checkbox"
@@ -230,31 +321,25 @@ export function RegisterPage() {
           />
           <span>
             Acepto los{" "}
-            <Link to="/terminos" target="_blank" rel="noopener">
+            <Link className="auth-link" to="/terminos" target="_blank" rel="noopener">
               términos y condiciones
             </Link>{" "}
             y la{" "}
-            <Link to="/privacidad" target="_blank" rel="noopener">
+            <Link className="auth-link" to="/privacidad" target="_blank" rel="noopener">
               política de privacidad
             </Link>
             .
           </span>
         </label>
         {error ? (
-          <p className="form-error" role="alert">
+          <Callout tone="danger" role="alert">
             {error}
-          </p>
+          </Callout>
         ) : null}
-        <button className="primary-button" type="submit" disabled={saving}>
-          {saving ? "Creando cuenta..." : "Crear cuenta"}
-        </button>
-        <p>
-          ¿Ya tenés cuenta?{" "}
-          <Link className="public-inline-link" to="/portal-cliente/login">
-            Ingresá al portal
-          </Link>
-        </p>
+        <Button type="submit" variant="accent" size="lg" fullWidth loading={saving} loadingLabel="Creando cuenta…" disabled={!plansReady}>
+          Crear cuenta
+        </Button>
       </form>
-    </main>
+    </AuthLayout>
   );
 }

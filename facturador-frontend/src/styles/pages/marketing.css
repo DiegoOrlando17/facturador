@@ -15,7 +15,6 @@
 /* Etiqueta chica en mono, en versalitas. */
 .marketing-kicker,
 .marketing-page .eyebrow,
-.public-form-card .eyebrow,
 .not-found-card .eyebrow {
   display: block;
   color: var(--color-text-subtle);
@@ -221,10 +220,11 @@
   font-size: 1.625rem;
 }
 
+/* Alineado a la derecha: la esquina izquierda queda libre para el sello. */
 .marketing-hero__cae {
   display: flex;
   flex-wrap: wrap;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: var(--space-1) var(--space-4);
   margin: var(--space-3) 0 0;
   color: var(--color-text-subtle);
@@ -232,10 +232,12 @@
   font-size: var(--text-xs);
 }
 
-/* El sello pisa el borde derecho, al lado del nombre del comercio (sin tapar importes). */
+/* El sello pisa la esquina inferior izquierda, fuera de las filas: no tapa importes. */
 .marketing-hero__ticket .ui-ticket__stamp {
-  top: 3.25rem;
-  right: -3.25rem;
+  top: auto;
+  right: auto;
+  bottom: -4rem;
+  left: -3rem;
 }
 
 /* Franja "Funciona con" ----------------------------------------------------- */
@@ -651,98 +653,12 @@
   font-weight: var(--weight-semibold);
 }
 
-/* Formularios públicos (registro, verificación) ----------------------------- */
-
-.public-form-page {
-  display: grid;
-  place-items: center;
-  min-height: 100vh;
-  padding: var(--space-8);
-  background: var(--color-bg);
-}
-
-.public-form-card {
-  display: grid;
-  gap: var(--space-4);
-  width: min(100%, 35rem);
-  padding: var(--space-10);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  background: var(--color-surface);
-  box-shadow: var(--shadow-md);
-}
-
-.public-form-card h1 {
-  margin: 0;
-  font-size: var(--text-3xl);
-  line-height: var(--leading-tight);
-}
-
-.public-form-card p {
-  margin: 0;
-}
-
-.public-back-link {
-  justify-self: start;
-  color: var(--color-link);
-  font-weight: var(--weight-semibold);
-  text-decoration: none;
-}
-
-.public-back-link:hover {
-  color: var(--color-link-hover);
-  text-decoration: underline;
-}
-
-.public-consent {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-2);
-}
-
-.public-consent a,
-.public-inline-link {
-  color: var(--color-link);
-  font-weight: var(--weight-semibold);
-  text-decoration: underline;
-}
+/* Acciones de tarjetas públicas (404) ------------------------------------- */
 
 .public-form-actions {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-3);
-}
-
-.public-resend {
-  display: grid;
-  gap: var(--space-3);
-  padding: var(--space-5);
-  border: 1px dashed var(--color-border-strong);
-  border-radius: var(--radius-lg);
-  background: var(--color-surface-muted);
-}
-
-.public-resend h2 {
-  margin: 0;
-  font-size: var(--text-base);
-  letter-spacing: 0;
-}
-
-.public-resend p {
-  margin: 0;
-}
-
-.login-card .public-resend {
-  margin-top: var(--space-4);
-}
-
-.public-resend form {
-  display: grid;
-  gap: var(--space-3);
-}
-
-.public-success {
-  color: var(--color-success-text);
 }
 
 /* Legales ------------------------------------------------------------------- */
@@ -887,11 +803,6 @@
     padding: var(--space-10) var(--space-6);
   }
 
-  .public-form-page {
-    padding: var(--space-4);
-  }
-
-  .public-form-card,
   .not-found-card {
     padding: var(--space-6);
   }
@@ -929,8 +840,8 @@
   }
 
   .marketing-hero__ticket .ui-ticket__stamp {
-    top: 3rem;
-    right: -0.75rem;
+    bottom: -2rem;
+    left: -0.5rem;
   }
 
   .marketing-actions .ui-button {

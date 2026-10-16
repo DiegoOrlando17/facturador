@@ -38,7 +38,7 @@ const viewports = [
   { tag: "mobile", width: 390, height: 844 },
 ];
 
-const publicRoutes = ["/", "/registro", "/tutoriales", "/verificar-email?token=invalido", "/login", "/portal-cliente/login", "/ruta-inexistente"];
+const publicRoutes = ["/", "/registro", "/tutoriales", "/verificar-email?token=invalido", "/recuperar-contrasena", "/restablecer-contrasena?token=invalido", "/login", "/portal-cliente/login", "/ruta-inexistente"];
 const adminRoutes = [
   "/admin",
   "/admin/tenants",

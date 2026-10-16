@@ -1,6 +1,7 @@
 import { MarketingFooter, MarketingNav } from "@/components/layout/MarketingChrome";
 import { ButtonLink } from "@/components/ui/Button";
 import { Ticket } from "@/components/ui/Ticket";
+import { usePageTitle } from "@/hooks/usePageTitle";
 
 const guides = [
   {
@@ -38,6 +39,7 @@ const guides = [
 ];
 
 export function TutorialsPage() {
+  usePageTitle("Centro de ayuda");
   return (
     <main className="marketing-page">
       <MarketingNav />

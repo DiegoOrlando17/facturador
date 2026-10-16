@@ -1,6 +1,8 @@
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { MarketingFooter, MarketingNav } from "@/components/layout/MarketingChrome";
+import { BRAND } from "@/config/brand";
+import { usePageTitle } from "@/hooks/usePageTitle";
 
 type LegalSection = { title: string; body: ReactNode };
 
@@ -11,14 +13,14 @@ type LegalDocument = {
   sections: LegalSection[];
 };
 
-const CONTACT_EMAIL = "contacto@facturador.app";
+const CONTACT_EMAIL = BRAND.contactEmail;
 
 const documents: Record<"terms" | "privacy" | "withdrawal", LegalDocument> = {
   terms: {
     eyebrow: "Legal",
     title: "Términos y condiciones",
     intro:
-      "Estos términos regulan el uso de Facturador, el servicio que toma tus ventas de Mercado Pago POS y emite los comprobantes electrónicos correspondientes ante ARCA.",
+      `Estos términos regulan el uso de ${BRAND.name}, el servicio que toma tus ventas de Mercado Pago POS y emite los comprobantes electrónicos correspondientes ante ARCA.`,
     sections: [
       {
         title: "1. Aceptación",
@@ -26,11 +28,11 @@ const documents: Record<"terms" | "privacy" | "withdrawal", LegalDocument> = {
       },
       {
         title: "2. El servicio",
-        body: "Facturador automatiza la lectura de ventas, la emisión de comprobantes y la generación de PDFs según el plan contratado. La habilitación para operar en producción está sujeta a la revisión del perfil fiscal y de las integraciones.",
+        body: `${BRAND.name} automatiza la lectura de ventas, la emisión de comprobantes y la generación de PDFs según el plan contratado. La habilitación para operar en producción está sujeta a la revisión del perfil fiscal y de las integraciones.`,
       },
       {
         title: "3. Responsabilidades de tu empresa",
-        body: "Sos responsable de la exactitud de tus datos fiscales, de mantener vigentes tus credenciales y certificados, y de revisar los comprobantes emitidos. Facturador no reemplaza el asesoramiento contable ni impositivo.",
+        body: `Sos responsable de la exactitud de tus datos fiscales, de mantener vigentes tus credenciales y certificados, y de revisar los comprobantes emitidos. ${BRAND.name} no reemplaza el asesoramiento contable ni impositivo.`,
       },
       {
         title: "4. Planes, precios y pagos",
@@ -91,7 +93,7 @@ const documents: Record<"terms" | "privacy" | "withdrawal", LegalDocument> = {
     eyebrow: "Defensa del consumidor",
     title: "Botón de arrepentimiento",
     intro:
-      "Si contrataste Facturador a distancia, tenés derecho a revocar la aceptación dentro de los 10 días corridos desde la contratación, sin costo y sin necesidad de explicar el motivo (Resolución 424/2020 de la Secretaría de Comercio Interior).",
+      `Si contrataste ${BRAND.name} a distancia, tenés derecho a revocar la aceptación dentro de los 10 días corridos desde la contratación, sin costo y sin necesidad de explicar el motivo (Resolución 424/2020 de la Secretaría de Comercio Interior).`,
     sections: [
       {
         title: "Cómo pedirlo",
@@ -111,6 +113,7 @@ const documents: Record<"terms" | "privacy" | "withdrawal", LegalDocument> = {
 
 export function LegalPage({ document }: { document: keyof typeof documents }) {
   const content = documents[document];
+  usePageTitle(content.title);
 
   return (
     <main className="marketing-page">

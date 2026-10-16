@@ -202,12 +202,13 @@ router.post("/auth/login", async (req, res) => {
     const email = String(req.body.email || "").trim().toLowerCase();
     const password = String(req.body.password || "");
 
-    if (!email) throw new Error("email es obligatorio");
-    if (!password) throw new Error("password es obligatoria");
+    if (!email || !password) {
+      return res.status(400).json({ error: "Completá el email y la contraseña.", code: "MISSING_FIELDS" });
+    }
 
     const adminUser = await authenticateAdminUser(email, password);
     if (!adminUser) {
-      return res.status(401).json({ error: "Credenciales invalidas" });
+      return res.status(401).json({ error: "El email o la contraseña no son correctos.", code: "INVALID_CREDENTIALS" });
     }
 
     const token = createAdminToken(adminUser);
@@ -216,7 +217,8 @@ router.post("/auth/login", async (req, res) => {
       adminUser: normalizeJsonBigInts(adminUser),
     });
   } catch (error) {
-    return res.status(400).json({ error: error.message || "No se pudo iniciar sesion" });
+    console.error("[admin] login", error);
+    return res.status(500).json({ error: "No pudimos iniciar sesión. Probá de nuevo en unos minutos.", code: "UNEXPECTED_ERROR" });
   }
 });
 

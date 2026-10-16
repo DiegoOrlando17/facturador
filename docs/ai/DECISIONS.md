@@ -440,6 +440,20 @@ Rationale: Resend ofrece una API pequeña, idempotencia y verificacion de domini
 
 Consecuencias: produccion requiere `RESEND_API_KEY`, `EMAIL_FROM` y `PUBLIC_APP_URL`; SPF y DKIM deben estar verificados; una falla de entrega no revierte el tenant ya creado y el usuario puede solicitar reenvio sin revelar si otra cuenta existe.
 
+## D-025 - Recuperacion de contraseña del portal con tabla propia
+
+Estado: vigente
+
+Decision: los usuarios del portal recuperan la contraseña con un enlace de un solo uso que vence en 1 hora, guardado como hash en `PasswordResetToken` (por `TenantUser`). Los admins no tienen autoservicio: un superadmin les asigna una contraseña nueva.
+
+Contexto: no existia recuperacion; un cliente que olvidaba la contraseña quedaba afuera del portal.
+
+Alternativas consideradas: reutilizar `ContactVerification` (sin migracion, pero mezcla dos propositos con TTL y semantica de "verificado" distintos); recuperacion para admins por email (superficie de ataque sobre cuentas con mas permisos, para un equipo chico).
+
+Rationale: tabla separada con `usedAt` explicito, ligada al usuario y no al tenant+email; respuesta neutra para no revelar cuentas; pedir un enlace nuevo invalida los anteriores.
+
+Consecuencias: requiere la migracion `20261016120000_password_reset`; cambiar la contraseña no revoca JWT ya emitidos (hasta que se agregue un `passwordChangedAt` o similar); si `emailSent` falla se informa al usuario, igual que en el reenvio de verificacion.
+
 ## Decisiones pendientes
 
 No estan aprobadas; deben resolverse antes de las fases que dependen de ellas.

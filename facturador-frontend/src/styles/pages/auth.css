@@ -1,0 +1,408 @@
+/*
+ * Pantallas públicas con formulario (AuthLayout): ingresos, registro,
+ * verificación y contraseña. Escritorio: marca a la izquierda, tarjeta a la
+ * derecha. Móvil: logo, formulario y recién después el texto de marca.
+ */
+
+.auth-page {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(22rem, 30rem);
+  grid-template-areas:
+    "brand main"
+    "aside main"
+    "legal legal";
+  grid-template-rows: auto 1fr auto;
+  column-gap: clamp(3rem, 8vw, 6rem);
+  row-gap: var(--space-8);
+  width: min(75rem, 100% - 4rem);
+  min-height: 100vh;
+  margin: 0 auto;
+  padding: var(--space-10) 0 var(--space-6);
+  color: var(--color-text);
+}
+
+.auth-page__brand {
+  grid-area: brand;
+  align-self: end;
+}
+
+/* Sin costado de marca (verificación, contraseña): una columna centrada. */
+.auth-page--solo {
+  grid-template-columns: minmax(0, 30rem);
+  grid-template-areas:
+    "brand"
+    "main"
+    "legal";
+  grid-template-rows: auto 1fr auto;
+  justify-content: center;
+}
+
+.auth-page--solo .auth-page__brand {
+  justify-self: center;
+}
+
+.auth-page--solo .auth-page__main {
+  align-self: start;
+}
+
+.auth-page--solo .auth-page__legal {
+  width: min(75rem, 100vw - 4rem);
+  justify-self: center;
+}
+
+.auth-page__brand a {
+  display: inline-flex;
+  color: inherit;
+  text-decoration: none;
+}
+
+.auth-page__aside {
+  grid-area: aside;
+  align-self: start;
+  min-width: 0;
+  max-width: 38rem;
+}
+
+.auth-page__main {
+  grid-area: main;
+  align-self: center;
+  min-width: 0;
+}
+
+.auth-page__legal {
+  grid-area: legal;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-2) var(--space-5);
+  padding-top: var(--space-5);
+  border-top: var(--rule-dashed);
+  color: var(--color-text-subtle);
+  font-size: var(--text-sm);
+}
+
+.auth-page__legal a {
+  color: var(--color-text-muted);
+}
+
+.auth-page__legal a:hover {
+  color: var(--color-link-hover);
+  text-decoration: underline;
+}
+
+/* Costado de marca ---------------------------------------------------------- */
+
+.auth-aside__headline {
+  max-width: 36rem;
+  margin: 0 0 var(--space-5);
+  font-family: var(--font-display);
+  font-size: clamp(2.5rem, 3.4vw + 1rem, 3.75rem);
+  font-weight: var(--weight-black);
+  letter-spacing: -0.035em;
+  line-height: 1.04;
+}
+
+.auth-aside__headline strong {
+  color: var(--color-action);
+  font-weight: inherit;
+}
+
+.auth-aside__lead {
+  max-width: 32rem;
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--text-md);
+  line-height: var(--leading-normal);
+}
+
+.auth-points {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-5);
+  margin: var(--space-10) 0 0;
+  padding: var(--space-6) 0 0;
+  border-top: var(--rule-dashed);
+  list-style: none;
+}
+
+.auth-points li {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.auth-points strong {
+  font-weight: var(--weight-bold);
+}
+
+.auth-points span {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+}
+
+/* Plan elegido en el registro. */
+.auth-plan {
+  max-width: 24rem;
+  margin-top: var(--space-8);
+}
+
+.auth-plan__price {
+  margin: 0 0 var(--space-1);
+  font-family: var(--font-mono);
+  font-size: var(--text-xl);
+  font-weight: var(--weight-semibold);
+}
+
+.auth-plan__price small {
+  color: var(--color-text-muted);
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+}
+
+.auth-plan__note {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  line-height: var(--leading-normal);
+}
+
+.auth-plan__features {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-sm);
+}
+
+.auth-plan__features li::before {
+  content: "✓ ";
+  color: var(--color-action);
+  font-weight: var(--weight-bold);
+}
+
+/* Tarjeta ------------------------------------------------------------------- */
+
+.auth-card {
+  display: grid;
+  gap: var(--space-6);
+  width: 100%;
+  padding: var(--space-10);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-lg);
+}
+
+.auth-card__back {
+  justify-self: start;
+  color: var(--color-link);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  text-decoration: none;
+}
+
+.auth-card__back:hover {
+  color: var(--color-link-hover);
+  text-decoration: underline;
+}
+
+.auth-card__eyebrow {
+  margin: 0 0 var(--space-2);
+  color: var(--color-text-subtle);
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  font-weight: var(--weight-medium);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+}
+
+.auth-card__heading h1 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-2xl);
+  font-weight: var(--weight-black);
+  letter-spacing: var(--tracking-tight);
+  line-height: var(--leading-tight);
+}
+
+.auth-card__description {
+  margin: var(--space-2) 0 0;
+  color: var(--color-text-muted);
+}
+
+.auth-card__body {
+  display: grid;
+  gap: var(--space-5);
+}
+
+.auth-card__body > p {
+  margin: 0;
+}
+
+.auth-card__footer {
+  padding-top: var(--space-5);
+  border-top: var(--rule-dashed);
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+
+.auth-card__footer p {
+  margin: 0;
+}
+
+.auth-card__footer p + p {
+  margin-top: var(--space-2);
+}
+
+.auth-form {
+  display: grid;
+  gap: var(--space-5);
+}
+
+/* "Recordar sesión" y "¿Olvidaste tu contraseña?" en el mismo renglón. */
+.auth-form__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-4);
+  font-size: var(--text-sm);
+}
+
+.auth-check {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+}
+
+.auth-check input {
+  flex: none;
+  width: 1.125rem;
+  height: 1.125rem;
+  margin: 0.125rem 0 0;
+  accent-color: var(--color-action);
+}
+
+.auth-link {
+  color: var(--color-link);
+  font-weight: var(--weight-semibold);
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+}
+
+.auth-link:hover {
+  color: var(--color-link-hover);
+}
+
+.auth-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+/* Pedido de un enlace nuevo dentro de una tarjeta. */
+.auth-resend {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-5);
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-muted);
+}
+
+.auth-resend h2 {
+  margin: 0;
+  font-size: var(--text-base);
+  letter-spacing: 0;
+}
+
+.auth-resend p {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+
+.auth-resend form {
+  display: grid;
+  gap: var(--space-3);
+}
+
+/* Datos para ingresar (empresa + email) en la pantalla de éxito. */
+.auth-credentials {
+  max-width: 100%;
+}
+
+.auth-credentials .ui-ticket__row dd {
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 1099px) {
+  .auth-page {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "brand"
+      "main"
+      "aside"
+      "legal";
+    grid-template-rows: auto;
+    width: min(100% - 4rem, 36rem);
+    row-gap: var(--space-6);
+  }
+
+  .auth-page--solo {
+    grid-template-areas:
+      "brand"
+      "main"
+      "legal";
+  }
+
+  .auth-page__brand,
+  .auth-page--solo .auth-page__brand {
+    align-self: start;
+    justify-self: start;
+  }
+
+  .auth-page--solo .auth-page__legal {
+    width: auto;
+    justify-self: stretch;
+  }
+
+  .auth-page__aside {
+    padding-top: var(--space-4);
+  }
+
+  .auth-aside__headline {
+    font-size: var(--text-3xl);
+  }
+
+  .auth-points {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-4);
+    margin-top: var(--space-6);
+  }
+}
+
+@media (max-width: 759px) {
+  .auth-page {
+    width: calc(100% - 2rem);
+    padding-top: var(--space-5);
+  }
+
+  .auth-card {
+    gap: var(--space-5);
+    padding: var(--space-6) var(--space-5);
+  }
+
+  .auth-aside__headline {
+    font-size: var(--text-2xl);
+  }
+
+  .auth-page__legal {
+    justify-content: flex-start;
+  }
+}

@@ -2,8 +2,10 @@ import { useState, type FormEvent } from "react";
 import { Link, Navigate, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useTenantAuth } from "@/app/TenantAuthContext";
 import { ResendVerificationForm } from "@/components/auth/ResendVerificationForm";
-import { BrandMark } from "@/components/brand/BrandMark";
-import { BRAND } from "@/config/brand";
+import { AuthAside, AuthLayout, AuthPoints } from "@/components/layout/AuthLayout";
+import { Button } from "@/components/ui/Button";
+import { Callout } from "@/components/ui/Callout";
+import { PasswordField, TextField } from "@/components/ui/Field";
 
 type LocationState = { from?: { pathname?: string } };
 
@@ -12,6 +14,12 @@ type LocationState = { from?: { pathname?: string } };
 function isUnverifiedMessage(message: string) {
   return /no verificaste tu email/i.test(message);
 }
+
+const POINTS = [
+  { title: "Tus comprobantes", text: "Cada factura con su CAE y su PDF, para descargar cuando quieras." },
+  { title: "Tus cobros", text: "Qué venta ya se facturó y cuál está esperando." },
+  { title: "Tu puesta en marcha", text: "Datos fiscales e integraciones, paso a paso." },
+];
 
 export function ClientLoginPage() {
   const navigate = useNavigate();
@@ -48,93 +56,91 @@ export function ClientLoginPage() {
     navigate(redirectTo, { replace: true });
   }
 
+  const forgotParams = new URLSearchParams();
+  if (tenantSlug.trim()) forgotParams.set("empresa", tenantSlug.trim().toLowerCase());
+  if (email.trim()) forgotParams.set("email", email.trim());
+  const forgotQuery = forgotParams.toString();
+
   return (
-    <main className="login-page client-login-page">
-      <section className="login-content">
-        <div className="login-brand-row">
-          <BrandMark size="lg" subtitle="Portal del cliente" />
+    <AuthLayout
+      subtitle="Portal del cliente"
+      title="Ingresar"
+      description="Usá el identificador de tu empresa, tu email y tu contraseña."
+      aside={
+        <AuthAside
+          headline={
+            <>
+              Tu facturación y tus cobros, <strong>en un solo lugar.</strong>
+            </>
+          }
+          lead="Mirá qué se facturó, descargá los comprobantes y seguí la puesta en marcha de tu empresa."
+        >
+          <AuthPoints items={POINTS} />
+        </AuthAside>
+      }
+      footer={
+        <p>
+          ¿Todavía no tenés cuenta?{" "}
+          <Link className="auth-link" to="/registro">
+            Creá tu cuenta
+          </Link>
+        </p>
+      }
+    >
+      <form className="auth-form" onSubmit={(event) => void handleSubmit(event)}>
+        <TextField
+          label="Identificador de empresa"
+          hint="Lo elegiste al crear la cuenta. Ejemplo: kiosco-don-luis."
+          required
+          name="empresa"
+          value={tenantSlug}
+          onChange={(event) => setTenantSlug(event.target.value)}
+          placeholder="mi-empresa"
+          autoComplete="off"
+          autoCapitalize="none"
+          spellCheck={false}
+        />
+        <TextField
+          label="Email"
+          type="email"
+          required
+          value={email}
+          onChange={(event) => setEmail(event.target.value)}
+          placeholder="usuario@empresa.com"
+          autoComplete="username"
+        />
+        <PasswordField
+          label="Contraseña"
+          required
+          value={password}
+          onChange={(event) => setPassword(event.target.value)}
+          autoFocus={Boolean(initialSlug && initialEmail)}
+        />
+        <div className="auth-form__row">
+          <label className="auth-check">
+            <input type="checkbox" checked={remember} onChange={(event) => setRemember(event.target.checked)} />
+            <span>Recordar esta sesión</span>
+          </label>
+          <Link className="auth-link" to={`/recuperar-contrasena${forgotQuery ? `?${forgotQuery}` : ""}`}>
+            ¿Olvidaste tu contraseña?
+          </Link>
         </div>
-        <section className="login-hero">
-          <h1>
-            Tu facturación y tus pagos, <strong>en un solo lugar</strong>
-          </h1>
-          <p>Consultá la actividad fiscal de tu empresa con acceso seguro y separado del panel administrativo.</p>
-        </section>
-      </section>
-      <section className="login-card-wrapper">
-        <div className="login-card">
-          <div className="login-card-heading">
-            <h2>Ingresar</h2>
-            <p>Usá el identificador de tu empresa, tu email y tu contraseña.</p>
-          </div>
-          <form className="login-form" onSubmit={handleSubmit}>
-            <label className="field">
-              <span>Identificador de empresa</span>
-              <input
-                required
-                name="empresa"
-                value={tenantSlug}
-                onChange={(event) => setTenantSlug(event.target.value)}
-                placeholder="mi-empresa"
-                autoCapitalize="none"
-                spellCheck={false}
-              />
-            </label>
-            <label className="field">
-              <span>Email</span>
-              <input
-                required
-                type="email"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                placeholder="usuario@empresa.com"
-                autoComplete="email"
-              />
-            </label>
-            <label className="field">
-              <span>Contraseña</span>
-              <input
-                required
-                type="password"
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                autoComplete="current-password"
-                autoFocus={Boolean(initialSlug && initialEmail)}
-              />
-            </label>
-            <label className="checkbox-field">
-              <input type="checkbox" checked={remember} onChange={(event) => setRemember(event.target.checked)} />
-              <span>Recordar esta sesión</span>
-            </label>
-            {sessionNotice && !errorMessage ? (
-              <p className="login-status-message" role="status">
-                {sessionNotice}
-              </p>
-            ) : null}
-            {errorMessage ? (
-              <p className="form-error" role="alert">
-                {errorMessage}
-              </p>
-            ) : null}
-            <button className="primary-button primary-button--full" type="submit" disabled={isSubmitting}>
-              {isSubmitting ? "Ingresando…" : "Ingresar al portal"}
-            </button>
-          </form>
-          {needsVerification ? <ResendVerificationForm initialEmail={email.trim()} /> : null}
-          <p className="login-help-line">
-            ¿Todavía no tenés cuenta?{" "}
-            <Link className="public-inline-link" to="/registro">
-              Creá tu cuenta
-            </Link>
-          </p>
-        </div>
-      </section>
-      <footer className="login-legal">
-        <span>&copy; 2026 {BRAND.name}</span>
-        <Link to="/terminos">Términos y condiciones</Link>
-        <Link to="/privacidad">Política de privacidad</Link>
-        <Link to="/arrepentimiento">Botón de arrepentimiento</Link>
-      </footer>
-    </main>
+
+        {errorMessage ? (
+          <Callout tone="danger" role="alert">
+            {errorMessage}
+          </Callout>
+        ) : sessionNotice ? (
+          <Callout tone="info" role="status">
+            {sessionNotice}
+          </Callout>
+        ) : null}
+
+        <Button type="submit" variant="primary" size="lg" fullWidth loading={isSubmitting} loadingLabel="Ingresando…">
+          Ingresar al portal
+        </Button>
+      </form>
+      {needsVerification ? <ResendVerificationForm initialEmail={email.trim()} /> : null}
+    </AuthLayout>
   );
 }

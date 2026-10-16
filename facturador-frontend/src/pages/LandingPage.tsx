@@ -4,38 +4,10 @@ import { ButtonLink } from "@/components/ui/Button";
 import { Money } from "@/components/ui/Money";
 import { Stamp, Ticket, TicketDivider, TicketRow, TicketRows } from "@/components/ui/Ticket";
 import { BRAND } from "@/config/brand";
+import { usePageTitle } from "@/hooks/usePageTitle";
 import { apiRequest } from "@/lib/api";
 import { formatNumber } from "@/lib/formatters";
-
-type Plan = {
-  code: string;
-  name: string;
-  description: string | null;
-  price: number | null;
-  currency: string;
-  billingCycle?: string | null;
-  policy: { tier?: number; entitlements?: Record<string, boolean> };
-};
-
-/** Qué incluye cada plan, en el orden en que se muestra. Las claves salen de policy.entitlements. */
-const FEATURE_LABELS: [key: string, label: string][] = [
-  ["automaticInvoicing", "Facturación automática de tus ventas"],
-  ["pdfDownload", "PDF de cada comprobante"],
-  ["clientPortal", "Portal para tu equipo"],
-  ["realtimeProcessing", "Lectura de ventas al instante"],
-  ["scheduledProcessing", "Emisión en los horarios que elijas"],
-  ["clientApproval", "Confirmás antes de emitir"],
-  ["deferredAutomaticInvoicing", "Emisión diferida"],
-  ["creditNotes", "Notas de crédito"],
-  ["manualInvoicing", "Facturas manuales"],
-  ["googleDriveSheets", "Google Drive y Sheets"],
-  ["ocrImport", "Carga asistida con OCR"],
-];
-
-function enabledFeatures(plan: Plan | undefined) {
-  const entitlements = plan?.policy.entitlements ?? {};
-  return FEATURE_LABELS.filter(([key]) => entitlements[key]).map(([key]) => key);
-}
+import { enabledPlanFeatures as enabledFeatures, isMonthlyPlan, PLAN_BILLING_NOTE, planFeatureLabel, type PublicPlan as Plan } from "@/lib/publicPlans";
 
 function tierLabel(plan: Plan, index: number) {
   const tier = plan.policy.tier ?? (Number(plan.code.replace(/\D+/g, "")) || index + 1);
@@ -48,7 +20,7 @@ function PlanPrice({ plan }: { plan: Plan }) {
   return (
     <p className="marketing-plan__price">
       <span className="marketing-plan__amount">{amount}</span>
-      {plan.billingCycle === "monthly" || !plan.billingCycle ? <span className="marketing-plan__cycle"> /mes</span> : null}
+      {isMonthlyPlan(plan) ? <span className="marketing-plan__cycle"> /mes</span> : null}
     </p>
   );
 }
@@ -60,6 +32,7 @@ const HERO_ITEMS = [
 ];
 
 export function LandingPage() {
+  usePageTitle(null);
   const [plans, setPlans] = useState<Plan[]>([]);
   const [plansState, setPlansState] = useState<"loading" | "ready" | "error">("loading");
 
@@ -181,7 +154,7 @@ export function LandingPage() {
               <span className="marketing-kicker marketing-kicker--inverse">Planes</span>
               <h2 id="planes-titulo">Elegí cuánto querés automatizar.</h2>
             </div>
-            <p>Precio mensual en dólares, cobrado en pesos al tipo de cambio vendedor del Banco Nación.</p>
+            <p>{PLAN_BILLING_NOTE}</p>
           </header>
 
           {plansState === "ready" && plans.length ? (
@@ -198,7 +171,7 @@ export function LandingPage() {
                       {previous ? <p className="marketing-plan__includes">Todo {previous.name}, más:</p> : null}
                       <ul className="marketing-plan__features">
                         {features.map((key) => (
-                          <li key={key}>{FEATURE_LABELS.find(([featureKey]) => featureKey === key)?.[1]}</li>
+                          <li key={key}>{planFeatureLabel(key)}</li>
                         ))}
                       </ul>
                       <ButtonLink to={`/registro?plan=${plan.code}`} variant="secondary" fullWidth aria-label={`Elegir el plan ${plan.name}`}>

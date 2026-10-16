@@ -1,5 +1,7 @@
 import { useState, type FormEvent } from "react";
-import { Link } from "react-router-dom";
+import { Button, ButtonLink } from "@/components/ui/Button";
+import { Callout } from "@/components/ui/Callout";
+import { TextField } from "@/components/ui/Field";
 import { apiRequest, getApiErrorMessage } from "@/lib/api";
 
 type ResendResponse = {
@@ -53,40 +55,38 @@ export function ResendVerificationForm({
   }
 
   return (
-    <section className="public-resend" aria-label={title}>
+    <section className="auth-resend" aria-label={title}>
       <h2>{title}</h2>
       <p>{description}</p>
       <form onSubmit={(event) => void handleSubmit(event)}>
-        <label className="field">
-          <span>Email</span>
-          <input
-            required
-            type="email"
-            autoComplete="email"
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-            placeholder="usuario@empresa.com"
-          />
-        </label>
+        <TextField
+          label="Email"
+          type="email"
+          required
+          autoComplete="email"
+          value={email}
+          onChange={(event) => setEmail(event.target.value)}
+          placeholder="usuario@empresa.com"
+        />
         {error ? (
-          <p className="form-error" role="alert">
+          <Callout tone="danger" role="alert">
             {error}
-          </p>
+          </Callout>
         ) : null}
         {sentTo ? (
-          <p className="public-success" role="status">
-            Si hay una cuenta pendiente de verificación para {sentTo}, te mandamos un enlace nuevo. Revisá también la
-            carpeta de spam.
-          </p>
+          <Callout tone="success" role="status">
+            Si hay una cuenta pendiente de verificación para {sentTo}, te mandamos un enlace nuevo. Revisá también la carpeta
+            de spam.
+          </Callout>
         ) : null}
-        <div className="public-form-actions">
-          <button className="secondary-button" type="submit" disabled={isSending}>
-            {isSending ? "Enviando..." : "Reenviar verificación"}
-          </button>
+        <div className="auth-actions">
+          <Button type="submit" variant="secondary" loading={isSending} loadingLabel="Enviando…">
+            Reenviar verificación
+          </Button>
           {devToken ? (
-            <Link className="primary-button" to={`/verificar-email?token=${encodeURIComponent(devToken)}`}>
+            <ButtonLink to={`/verificar-email?token=${encodeURIComponent(devToken)}`} variant="primary">
               Verificar ahora (solo desarrollo)
-            </Link>
+            </ButtonLink>
           ) : null}
         </div>
       </form>
