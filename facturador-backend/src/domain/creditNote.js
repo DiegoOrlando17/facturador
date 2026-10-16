@@ -13,9 +13,9 @@ export function parseIssuedInvoiceNumber(value) {
 }
 
 export function assertCreditNoteEligible(invoice, hasEntitlement) {
-  if (!hasEntitlement) throw new Error("El plan del tenant no incluye notas de credito");
+  if (!hasEntitlement) throw new Error("Tu plan no incluye notas de crédito.");
   if (!invoice || invoice.type !== "INVOICE" || invoice.status !== "ISSUED" || !invoice.cae) {
-    throw new Error("Solo se puede anular una factura emitida en ARCA");
+    throw new Error("Solo se puede anular una factura emitida en ARCA.");
   }
   getCreditNoteType(invoice.cbteTipo);
   parseIssuedInvoiceNumber(invoice.cbteNro);

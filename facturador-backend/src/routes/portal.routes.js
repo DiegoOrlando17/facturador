@@ -186,7 +186,7 @@ router.get("/payments/:id/pdf", async (req, res) => {
     res.setHeader("Content-Disposition", `${asDownload ? "attachment" : "inline"}; filename="${filename}"`);
     return res.send(pdfBuffer);
   } catch (error) {
-    return res.status(400).json({ error: error.message || "No se pudo obtener el PDF" });
+    return res.status(400).json({ error: error.message || "No pudimos generar el PDF." });
   }
 });
 
@@ -232,7 +232,7 @@ router.get("/integrations", async (req, res) => {
 
 router.get("/invoices", async (req, res) => {
   try { return res.json(normalizeJsonBigInts(await listTenantInvoices(req.tenantAuth.tenantId, req.query))); }
-  catch (error) { return res.status(400).json({ error: error.message || "No se pudieron listar comprobantes" }); }
+  catch (error) { return res.status(400).json({ error: error.message || "No pudimos cargar las facturas." }); }
 });
 router.get("/invoices/settings", async (req, res) => {
   try { return res.json(normalizeJsonBigInts(await getTenantInvoiceSettings(req.tenantAuth.tenantId))); }
@@ -244,23 +244,23 @@ router.put("/invoices/settings", requireTenantPermission(TENANT_PERMISSIONS.MANA
 });
 router.post("/invoices/manual", requireTenantPermission(TENANT_PERMISSIONS.MANAGE_INVOICES), async (req, res) => {
   try { return res.status(201).json(normalizeJsonBigInts(await createManualTenantInvoice(req.tenantAuth.tenantId, req.tenantAuth.tenantUser, req.body))); }
-  catch (error) { return res.status(400).json({ error: error.message || "No se pudo crear la factura manual" }); }
+  catch (error) { return res.status(400).json({ error: error.message || "No pudimos crear la factura." }); }
 });
 router.get("/invoices/:id", async (req, res) => {
-  try { const invoice = await getTenantInvoice(req.tenantAuth.tenantId, toBigIntId(req.params.id, "invoiceId")); return invoice ? res.json(normalizeJsonBigInts(invoice)) : res.status(404).json({ error: "Comprobante no encontrado" }); }
+  try { const invoice = await getTenantInvoice(req.tenantAuth.tenantId, toBigIntId(req.params.id, "invoiceId")); return invoice ? res.json(normalizeJsonBigInts(invoice)) : res.status(404).json({ error: "No encontramos esa factura." }); }
   catch (error) { return res.status(400).json({ error: error.message || "No se pudo obtener el comprobante" }); }
 });
 router.post("/invoices/:id/confirm", requireTenantPermission(TENANT_PERMISSIONS.CONFIRM_INVOICES), async (req, res) => {
   try { return res.json(normalizeJsonBigInts(await confirmTenantInvoice(req.tenantAuth.tenantId, toBigIntId(req.params.id, "invoiceId"), req.tenantAuth.tenantUser, { issueAt: req.body?.issueAt }))); }
-  catch (error) { return res.status(400).json({ error: error.message || "No se pudo confirmar el comprobante" }); }
+  catch (error) { return res.status(400).json({ error: error.message || "No pudimos confirmar la factura." }); }
 });
 router.post("/invoices/:id/credit-note", requireTenantPermission(TENANT_PERMISSIONS.MANAGE_INVOICES), async (req, res) => {
-  try { if (req.body.confirmation !== "ANULAR") throw new Error("Debes confirmar escribiendo ANULAR"); return res.status(202).json(normalizeJsonBigInts(await cancelTenantInvoice(req.tenantAuth.tenantId, toBigIntId(req.params.id, "invoiceId"), req.tenantAuth.tenantUser))); }
-  catch (error) { return res.status(400).json({ error: error.message || "No se pudo solicitar la nota de credito" }); }
+  try { if (req.body.confirmation !== "ANULAR") throw new Error("Para anular, escribí ANULAR."); return res.status(202).json(normalizeJsonBigInts(await cancelTenantInvoice(req.tenantAuth.tenantId, toBigIntId(req.params.id, "invoiceId"), req.tenantAuth.tenantUser))); }
+  catch (error) { return res.status(400).json({ error: error.message || "No pudimos pedir la nota de crédito." }); }
 });
 router.get("/invoices/:id/pdf", async (req, res) => {
   try { const { invoice, pdfBuffer } = await generateInvoicePdfById(req.tenantAuth.tenantId, toBigIntId(req.params.id, "invoiceId")); res.setHeader("Content-Type", "application/pdf"); res.setHeader("Content-Disposition", `attachment; filename="${String(invoice.cbteNro || "comprobante").replace(/[^\d-]/g, "")}.pdf"`); return res.send(pdfBuffer); }
-  catch (error) { return res.status(400).json({ error: error.message || "No se pudo obtener el PDF" }); }
+  catch (error) { return res.status(400).json({ error: error.message || "No pudimos generar el PDF." }); }
 });
 
 router.get("/subscription", async (req, res) => {

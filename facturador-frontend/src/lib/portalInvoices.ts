@@ -65,6 +65,32 @@ export function getInvoiceNumberLabel(invoice: Pick<PortalInvoice, "cbteNro" | "
   return prefix ? `${prefix} ${number}` : number;
 }
 
+/** Horario de emisión programada, si el backend lo registró en los eventos. */
+export function getScheduledIssueAt(invoice: Pick<PortalInvoice, "status" | "events">) {
+  if (invoice.status !== "QUEUED") return null;
+  for (const event of invoice.events ?? []) {
+    if (!event.payloadJson) continue;
+    try {
+      const payload = JSON.parse(event.payloadJson) as { kind?: string; scheduledAt?: string };
+      if (payload.kind === "scheduled_issue" && payload.scheduledAt) return payload.scheduledAt;
+    } catch {
+      // payload que no es JSON: se ignora
+    }
+  }
+  return null;
+}
+
+/** Vistas del listado (backend: domain/invoiceViews.js) y su slug en la URL. */
+export const INVOICE_VIEWS = [
+  { view: "all", slug: "todas", label: "Todas" },
+  { view: "pending", slug: "para-confirmar", label: "Para confirmar" },
+  { view: "issued", slug: "emitidas", label: "Emitidas" },
+  { view: "failed", slug: "con-error", label: "Con error" },
+  { view: "voided", slug: "anuladas", label: "Anuladas" },
+] as const;
+
+export type InvoiceView = (typeof INVOICE_VIEWS)[number]["view"];
+
 export function getInvoiceCustomerLabel(invoice: Pick<PortalInvoice, "customer">) {
   return invoice.customer?.trim() || "Consumidor final";
 }

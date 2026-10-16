@@ -20,6 +20,7 @@ import { ClientIntegrationsPage } from "@/pages/ClientIntegrationsPage";
 import { ClientFiscalProfilePage } from "@/pages/ClientFiscalProfilePage";
 import { ClientOnboardingPage } from "@/pages/ClientOnboardingPage";
 import { ClientInvoicesPage } from "@/pages/ClientInvoicesPage";
+import { ClientInvoiceDetailPage } from "@/pages/ClientInvoiceDetailPage";
 import { LoginPage } from "@/pages/LoginPage";
 import { PaymentDetailPage } from "@/pages/PaymentDetailPage";
 import { SettingsPage } from "@/pages/SettingsPage";
@@ -67,6 +68,7 @@ export const router = createBrowserRouter([{
         { path: "perfil-fiscal", element: <ClientFiscalProfilePage /> },
         { path: "onboarding", element: <ClientOnboardingPage /> },
         { path: "comprobantes", element: <ClientInvoicesPage /> },
+        { path: "comprobantes/:id", element: <ClientInvoiceDetailPage /> },
         { path: "suscripcion", element: <ClientSubscriptionPage /> },
       ],
     }],
