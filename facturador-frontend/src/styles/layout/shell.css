@@ -1,0 +1,415 @@
+/*
+ * Shell común de admin y portal (components/layout/Shell.tsx).
+ * Escritorio (≥ 1024px): barra lateral de tinta fija + contenido fluido sobre papel.
+ * Menos de 1024px: barra superior con hamburguesa; la barra lateral pasa a cajón modal.
+ */
+
+.app-frame {
+  display: grid;
+  grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
+  min-height: 100vh;
+  min-height: 100dvh;
+  /* La columna de la barra lateral se pinta de tinta en todo el alto de la página. */
+  background: linear-gradient(to right, var(--color-sidebar-bg) var(--sidebar-width), var(--color-bg) 0);
+}
+
+/* Enlace de salto: primer elemento enfocable, visible solo con foco. */
+.app-frame__skip {
+  position: absolute;
+  top: var(--space-2);
+  left: var(--space-2);
+  z-index: var(--z-toast);
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-weight: var(--weight-semibold);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-200%);
+}
+
+.app-frame__skip:focus,
+.app-frame__skip:focus-visible {
+  transform: none;
+}
+
+/* ---------- Barra lateral ---------- */
+
+.app-frame__sidebar {
+  position: sticky;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  height: 100vh;
+  height: 100dvh;
+  padding: var(--space-6) var(--space-4);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: var(--color-sidebar-bg);
+  color: var(--color-sidebar-text);
+  scrollbar-color: var(--color-sidebar-rule) transparent;
+  scrollbar-width: thin;
+}
+
+.app-frame__sidebar:focus {
+  outline: none;
+}
+
+.app-frame__brand-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: 0 var(--space-2);
+}
+
+.app-frame__brand {
+  display: inline-flex;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-inverse);
+  text-decoration: none;
+}
+
+.app-frame__brand .ui-brand__name {
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  font-weight: var(--weight-black);
+}
+
+.app-frame__nav {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.app-frame__group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.app-frame__group-label {
+  padding: 0 var(--space-3);
+  color: var(--color-sidebar-text-subtle);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+}
+
+.app-frame__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.app-frame__link {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: var(--control-height-md);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  color: var(--color-sidebar-text);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  line-height: var(--leading-snug);
+  text-decoration: none;
+  transition: background var(--duration-fast) var(--ease-out), color var(--duration-fast) var(--ease-out);
+}
+
+.app-frame__link svg,
+.app-frame__logout svg {
+  flex: none;
+  width: 20px;
+  height: 20px;
+}
+
+.app-frame__link-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-frame__link:hover {
+  background: var(--color-sidebar-hover);
+  color: var(--color-text-inverse);
+}
+
+.app-frame__link--active,
+.app-frame__link--active:hover {
+  background: var(--color-sidebar-active-bg);
+  color: var(--color-sidebar-active-text);
+  font-weight: var(--weight-bold);
+}
+
+.app-frame__count {
+  flex: none;
+  min-width: 1.5rem;
+  margin-left: auto;
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-full);
+  background: var(--color-warning-solid);
+  color: var(--color-text);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-bold);
+  line-height: 1.4;
+  text-align: center;
+}
+
+.app-frame__sidebar :focus-visible {
+  outline: 2px solid var(--color-sidebar-active-bg);
+  outline-offset: 2px;
+}
+
+/* Empresa / persona y salida, separadas por una línea punteada. */
+.app-frame__footer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: auto;
+  padding-top: var(--space-4);
+  border-top: 1px dashed var(--color-sidebar-rule);
+}
+
+.app-frame__user {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2);
+  border-radius: var(--radius-md);
+  color: var(--color-text-inverse);
+  text-decoration: none;
+}
+
+.app-frame__user--link:hover {
+  background: var(--color-sidebar-hover);
+  color: var(--color-text-inverse);
+}
+
+.app-frame__avatar {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: var(--radius-full);
+  background: var(--color-sidebar-active-bg);
+  color: var(--color-sidebar-active-text);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-bold);
+}
+
+.app-frame__user-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.app-frame__user-text strong,
+.app-frame__user-text small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-frame__user-text strong {
+  color: var(--color-text-inverse);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-bold);
+}
+
+.app-frame__user-text small {
+  color: var(--color-sidebar-text-subtle);
+  font-size: var(--text-xs);
+}
+
+.app-frame__logout {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: var(--control-height-md);
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-sidebar-text);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  text-align: left;
+  cursor: pointer;
+}
+
+.app-frame__logout:hover {
+  background: var(--color-sidebar-hover);
+  color: var(--color-text-inverse);
+}
+
+/* ---------- Contenido ---------- */
+
+.app-frame__main {
+  min-width: 0;
+  padding: var(--space-8) var(--space-10) var(--space-12);
+}
+
+.app-frame__main:focus {
+  outline: none;
+}
+
+.app-frame__content {
+  width: 100%;
+  max-width: var(--content-max);
+  margin: 0 auto;
+  min-width: 0;
+}
+
+/* ---------- Barra superior y cajón (< 1024px) ---------- */
+
+.app-frame__topbar,
+.app-frame__overlay,
+.app-frame__close-button {
+  display: none;
+}
+
+@media (max-width: 1023.98px) {
+  .app-frame {
+    display: block;
+    background: var(--color-bg);
+  }
+
+  .app-frame__topbar {
+    position: sticky;
+    top: 0;
+    z-index: var(--z-sticky);
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    min-height: 3.5rem;
+    padding: var(--space-2) var(--space-4);
+    border-bottom: var(--rule-dashed);
+    background: var(--color-bg);
+  }
+
+  .app-frame__topbar-brand {
+    display: inline-flex;
+    flex: none;
+    border-radius: var(--radius-sm);
+  }
+
+  .app-frame__topbar-title {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    color: var(--color-text);
+    font-family: var(--font-display);
+    font-size: var(--text-md);
+    font-weight: var(--weight-bold);
+    letter-spacing: var(--tracking-tight);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .app-frame__menu-button,
+  .app-frame__close-button {
+    display: inline-grid;
+    flex: none;
+    place-items: center;
+    width: var(--control-height-md);
+    min-height: var(--control-height-md);
+    height: var(--control-height-md);
+    padding: 0;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+  }
+
+  .app-frame__menu-button {
+    border: 1px solid var(--color-border-strong);
+    background: var(--color-surface);
+    color: var(--color-text);
+  }
+
+  .app-frame__close-button {
+    border: 1px solid var(--color-sidebar-rule);
+    background: transparent;
+    color: var(--color-sidebar-text);
+  }
+
+  .app-frame__menu-button svg,
+  .app-frame__close-button svg {
+    width: 22px;
+    height: 22px;
+  }
+
+  .app-frame__overlay:not([hidden]) {
+    position: fixed;
+    inset: 0;
+    z-index: var(--z-drawer);
+    display: block;
+    background: var(--color-overlay);
+  }
+
+  .app-frame__sidebar {
+    position: fixed;
+    inset: 0 auto 0 0;
+    z-index: calc(var(--z-drawer) + 1);
+    width: min(20rem, 86vw);
+    height: auto;
+    box-shadow: var(--shadow-lg);
+    transform: translateX(-100%);
+    visibility: hidden;
+    transition: transform var(--duration-base) var(--ease-out), visibility 0s linear var(--duration-base);
+  }
+
+  .app-frame--drawer-open .app-frame__sidebar {
+    transform: none;
+    visibility: visible;
+    transition: transform var(--duration-base) var(--ease-out), visibility 0s;
+  }
+
+  .app-frame__main {
+    padding: var(--space-6) var(--space-6) var(--space-10);
+  }
+}
+
+@media (max-width: 640px) {
+  .app-frame__main {
+    padding: var(--space-4) var(--space-4) var(--space-8);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-frame__sidebar,
+  .app-frame--drawer-open .app-frame__sidebar {
+    transition: none;
+  }
+}
+
+/* ---------- Encabezado del dashboard admin (solo en /admin) ---------- */
+
+.app-frame .app-topbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin-bottom: var(--space-6);
+}
+
+.app-frame .app-topbar__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.app-frame .topbar-greeting {
+  font-family: var(--font-display);
+}

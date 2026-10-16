@@ -1,0 +1,146 @@
+/*
+ * Contenido responsive (fase 3). Ninguna página debe desbordar a 390px ni a 900px.
+ * Las tablas legacy son grids de <div> con columnas fijas: hasta migrarlas a
+ * DataTable (fase 4) se desplazan dentro de su tarjeta con un ancho mínimo.
+ */
+
+/* Las raíces de página son grids: sin pista explícita la columna implícita crece
+   hasta el ancho de la tabla más ancha y arrastra a toda la página. */
+.app-frame__content > *,
+.admin-dashboard,
+.admin-section-page,
+.client-detail-page,
+.client-main {
+  min-width: 0;
+}
+
+.admin-dashboard,
+.admin-section-page,
+.client-detail-page {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.admin-dashboard > *,
+.admin-section-page > *,
+.client-detail-page > *,
+.client-main > * {
+  min-width: 0;
+}
+
+/* ---------- Tablas legacy: scroll horizontal dentro de la tarjeta ---------- */
+
+.section-table-card,
+.admin-table-card,
+.client-table-card,
+.admin-attention-table,
+.client-payments-table {
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+}
+
+.section-table {
+  min-width: 720px;
+}
+
+.section-table--clients {
+  min-width: 960px;
+}
+
+.section-table--billing {
+  min-width: 1100px;
+}
+
+.section-table--integrations {
+  min-width: 760px;
+}
+
+.section-table.client-report-table {
+  min-width: 480px;
+}
+
+.admin-attention-table__head,
+.admin-attention-table__row {
+  min-width: 900px;
+}
+
+/* Últimos pagos en el detalle de cliente: el título queda fijo y la tabla se desplaza. */
+.client-payments-table__head,
+.client-payments-table__row,
+.client-payments-table__empty {
+  min-width: 620px;
+}
+
+/* ---------- Filas que deben acomodarse ---------- */
+
+.admin-kpi-grid,
+.client-kpi-grid,
+.section-kpi-row {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr));
+}
+
+.client-activity-kpis {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr));
+}
+
+.admin-section-header,
+.admin-section-header__actions,
+.section-toolbar,
+.app-topbar,
+.app-topbar__actions {
+  flex-wrap: wrap;
+}
+
+.admin-section-header > :first-child {
+  flex: 1 1 18rem;
+  min-width: 0;
+}
+
+/* Paginación legacy: "Anterior"/"Siguiente" no entraban en botones de 30px. */
+.section-pagination {
+  flex-wrap: wrap;
+}
+
+.section-pagination button {
+  width: auto;
+  min-width: 30px;
+  padding: 0 var(--space-2);
+}
+
+/* Filtros de Clientes: 4 columnas fijas en escritorio, se acomodan en angosto. */
+.clients-toolbar {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr));
+}
+
+/* Pestañas (Clientes, detalle de cliente): una sola línea con scroll horizontal. */
+.section-tabs,
+.detail-section-tabs {
+  flex-wrap: nowrap;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+}
+
+.section-tabs > *,
+.detail-section-tabs > * {
+  flex: none;
+  white-space: nowrap;
+}
+
+@media (max-width: 1023.98px) {
+  .admin-alert-card,
+  .client-overview-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .client-detail-page .detail-section-tabs {
+    gap: var(--space-5);
+  }
+
+  .client-detail-page .detail-header {
+    flex-wrap: wrap;
+  }
+}

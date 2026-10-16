@@ -59,7 +59,7 @@ export function ClientReportsPage() {
   const errorMessage = hasInvalidRange ? "La fecha desde no puede ser posterior a la fecha hasta." : loadError;
 
   return (
-    <main className="client-main client-reports-page">
+    <div className="client-main client-reports-page">
       <header className="app-topbar">
         <div><strong>Reportes</strong><span>Analizá importes y cantidad de ventas por período (hora de Argentina).</span></div>
         <button type="button" className="secondary-button topbar-refresh-button" onClick={() => void loadReports()} disabled={isLoading || hasInvalidRange}><AppIcon name="refresh" /><span>{isRefreshing ? "Actualizando…" : "Actualizar"}</span></button>
@@ -93,6 +93,6 @@ export function ClientReportsPage() {
         <div className="admin-section-heading"><h2>Estados del período</h2></div>
         {summary && Object.keys(summary.byStatus).length ? <div className="client-status-grid">{Object.entries(summary.byStatus).map(([status, item]) => <article key={status}><span>{getPaymentStatusLabel(status)}</span><strong>{item.count}</strong><small>{formatCurrency(item.amount)}</small></article>)}</div> : <p className="client-empty-state">Sin estados para mostrar.</p>}
       </section>
-    </main>
+    </div>
   );
 }

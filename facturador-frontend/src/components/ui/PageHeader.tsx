@@ -8,6 +8,8 @@ export type BreadcrumbItem = { label: string; to?: string };
 
 type PageHeaderProps = {
   title: string;
+  /** Línea chica en mono arriba del título ("MIÉRCOLES 15 DE OCTUBRE", "FACTURA C"). */
+  eyebrow?: ReactNode;
   description?: ReactNode;
   actions?: ReactNode;
   breadcrumb?: BreadcrumbItem[];
@@ -19,7 +21,7 @@ type PageHeaderProps = {
 };
 
 /** Encabezado de página: migas, título (h1), descripción, meta y acciones. */
-export function PageHeader({ title, description, actions, breadcrumb, meta, setDocumentTitle = true, className }: PageHeaderProps) {
+export function PageHeader({ title, eyebrow, description, actions, breadcrumb, meta, setDocumentTitle = true, className }: PageHeaderProps) {
   usePageTitle(setDocumentTitle ? title : undefined);
 
   return (
@@ -45,6 +47,7 @@ export function PageHeader({ title, description, actions, breadcrumb, meta, setD
       ) : null}
       <div className="ui-page-header__row">
         <div className="ui-page-header__text">
+          {eyebrow ? <p className="ui-page-header__eyebrow">{eyebrow}</p> : null}
           <h1 className="ui-page-header__title">{title}</h1>
           {description ? <p className="ui-page-header__description">{description}</p> : null}
           {meta ? <div className="ui-page-header__meta">{meta}</div> : null}

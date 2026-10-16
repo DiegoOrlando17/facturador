@@ -235,7 +235,7 @@ export function ClientInvoicesPage() {
   const bounds = scheduleBounds();
 
   return (
-    <main className="client-main client-invoices-page">
+    <div className="client-main client-invoices-page">
       <header className="app-topbar">
         <div>
           <strong>Comprobantes</strong>
@@ -422,6 +422,6 @@ export function ClientInvoicesPage() {
           )}
         </div>
       </section>
-    </main>
+    </div>
   );
 }

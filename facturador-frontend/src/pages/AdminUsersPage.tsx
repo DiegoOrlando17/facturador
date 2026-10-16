@@ -149,7 +149,7 @@ export function AdminUsersPage() {
   }
 
   return (
-    <main className="admin-section-page">
+    <div className="admin-section-page">
       <div className="admin-section-header">
         <div>
           <h1>Usuarios internos</h1>
@@ -300,6 +300,6 @@ export function AdminUsersPage() {
         </article>
         </div>
       ) : null}
-    </main>
+    </div>
   );
 }

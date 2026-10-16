@@ -155,7 +155,7 @@ export function ClientIntegrationsPage() {
   }
 
   return (
-    <main className="client-main client-integrations-page">
+    <div className="client-main client-integrations-page">
       <header className="app-topbar">
         <div><strong>Integraciones</strong><span>Consultá tus conexiones y configurá los destinos que incluye tu plan.</span></div>
         <button type="button" className="secondary-button topbar-refresh-button" onClick={() => { setActionError(""); void loadIntegrations(); }} disabled={isLoading || isRefreshing}>{isRefreshing ? "Actualizando…" : "Actualizar"}</button>
@@ -202,6 +202,6 @@ export function ClientIntegrationsPage() {
           </article>
         );
       })}</section> : null}
-    </main>
+    </div>
   );
 }

@@ -77,7 +77,7 @@ export function ClientPaymentsPage() {
   }
 
   return (
-    <main className="client-main client-payments-page">
+    <div className="client-main client-payments-page">
       <header className="app-topbar">
         <div><strong>Pagos y facturas</strong><span>Consultá los cobros y comprobantes de tu empresa.</span></div>
         <div className="app-topbar__actions">
@@ -120,6 +120,6 @@ export function ClientPaymentsPage() {
         <span>Página <b>{data?.pagination.page ?? page}</b> de {data?.pagination.totalPages ?? 1}</span>
         <button type="button" disabled={page >= (data?.pagination.totalPages ?? 1) || isBusy} onClick={() => setPage((current) => current + 1)}>Siguiente</button>
       </div>
-    </main>
+    </div>
   );
 }

@@ -291,7 +291,7 @@ export function SettingsPage() {
   }
 
   return (
-    <main className="admin-section-page">
+    <div className="admin-section-page">
       <div className="admin-section-header">
         <div>
           <h1>Planes</h1>
@@ -527,6 +527,6 @@ export function SettingsPage() {
         </article>
         </div>
       ) : null}
-    </main>
+    </div>
   );
 }

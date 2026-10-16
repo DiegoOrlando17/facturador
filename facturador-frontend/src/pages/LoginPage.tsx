@@ -41,7 +41,7 @@ export function LoginPage() {
     const result = await login({ email, password, remember });
 
     if (!result.ok) {
-      setErrorMessage(result.message ?? "No se pudo iniciar sesion.");
+      setErrorMessage(result.message ?? "No pudimos iniciar sesión. Probá de nuevo.");
       setIsSubmitting(false);
       return;
     }
@@ -59,11 +59,11 @@ export function LoginPage() {
 
         <section className="login-hero">
           <h1>
-            Gestiona tus facturas, pagos y <strong>datos fiscales</strong> en un solo lugar
+            Cada empresa, sus ventas y sus <strong>comprobantes</strong>, en un solo lugar.
           </h1>
           <p>
-            Consulta comprobantes emitidos, estados de cuenta e integraciones activas desde un portal simple,
-            seguro y siempre disponible.
+            Revisá la puesta en marcha, las integraciones y lo que necesita atención en cada empresa que factura con
+            nosotros.
           </p>
 
           <div className="login-feature-list">
@@ -71,22 +71,22 @@ export function LoginPage() {
               <span className="login-feature-icon login-feature-icon--blue" aria-hidden="true">
                 <AppIcon name="invoice" />
               </span>
-              <strong>Pagos y facturas</strong>
-              <p>Consulta cobros recibidos y comprobantes emitidos.</p>
+              <strong>Ventas y facturas</strong>
+              <p>Seguí los cobros y los comprobantes de cada empresa.</p>
             </article>
             <article>
               <span className="login-feature-icon login-feature-icon--green" aria-hidden="true">
                 <AppIcon name="tax" />
               </span>
               <strong>Datos fiscales</strong>
-              <p>Manten tu informacion actualizada para operar sin demoras.</p>
+              <p>Revisá y aprobá la información antes de habilitar.</p>
             </article>
             <article>
               <span className="login-feature-icon login-feature-icon--violet" aria-hidden="true">
                 <AppIcon name="reports" />
               </span>
-              <strong>Estado de cuenta</strong>
-              <p>Revisa pendientes, integraciones y avances del servicio.</p>
+              <strong>Estado operativo</strong>
+              <p>Pendientes, integraciones y errores, a tiempo.</p>
             </article>
           </div>
 
@@ -94,7 +94,7 @@ export function LoginPage() {
             <span aria-hidden="true">
               <AppIcon name="shield" />
             </span>
-            <p>Tus datos estan protegidos y se procesan de forma segura.</p>
+            <p>Acceso solo para el equipo interno. Cada acción queda registrada en la auditoría.</p>
           </div>
         </section>
       </section>
@@ -102,8 +102,8 @@ export function LoginPage() {
       <section className="login-card-wrapper">
         <div className="login-card">
           <div className="login-card-heading">
-            <h2>Iniciar sesion</h2>
-            <p>Accede a tu portal de gestion.</p>
+            <h2>Iniciar sesión</h2>
+            <p>Ingresá con tu email del equipo interno.</p>
           </div>
 
           <form className="login-form" onSubmit={handleSubmit}>
@@ -122,7 +122,7 @@ export function LoginPage() {
             </label>
 
             <label className="field">
-              <span>Contrasena</span>
+              <span>Contraseña</span>
               <div className="login-input-wrap">
                 <AppIcon name="lock" />
                 <input
@@ -142,7 +142,7 @@ export function LoginPage() {
                 checked={remember}
                 onChange={(event) => setRemember(event.target.checked)}
               />
-              <span>Recordar esta sesion en este navegador</span>
+              <span>Recordar esta sesión en este navegador</span>
             </label>
 
             {errorMessage ? <p className="form-error">{errorMessage}</p> : null}
@@ -156,7 +156,7 @@ export function LoginPage() {
             ) : null}
 
             <button type="submit" className="primary-button primary-button--full" disabled={isSubmitting}>
-              <span>{isSubmitting ? "Ingresando..." : "Ingresar al portal"}</span>
+              <span>{isSubmitting ? "Ingresando…" : "Ingresar al panel"}</span>
               <span aria-hidden="true">&rarr;</span>
             </button>
           </form>

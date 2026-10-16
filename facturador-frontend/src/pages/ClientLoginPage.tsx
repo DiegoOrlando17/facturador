@@ -117,7 +117,7 @@ export function ClientLoginPage() {
               </p>
             ) : null}
             <button className="primary-button primary-button--full" type="submit" disabled={isSubmitting}>
-              {isSubmitting ? "Ingresando..." : "Ingresar al portal"}
+              {isSubmitting ? "Ingresando…" : "Ingresar al portal"}
             </button>
           </form>
           {needsVerification ? <ResendVerificationForm initialEmail={email.trim()} /> : null}

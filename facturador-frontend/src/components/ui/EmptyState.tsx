@@ -5,7 +5,26 @@ import { cx } from "@/components/ui/cx";
 
 type HeadingLevel = "h2" | "h3" | "h4" | "p";
 
+/** Íconos genéricos de "comprobante" que se reemplazan por el ticket en blanco. */
+const TICKET_ICONS = new Set<AppIconName>(["inbox", "receipt", "invoice"]);
+
+/** Ticket en blanco: la ilustración por defecto de los vacíos. */
+function EmptyTicketIllustration() {
+  return (
+    <svg className="ui-empty__ticket" viewBox="0 0 48 56" aria-hidden="true" focusable="false">
+      <path
+        className="ui-empty__ticket-paper"
+        d="M6 10 10.5 6 15 10l4.5-4L24 10l4.5-4L33 10l4.5-4L42 10v36l-4.5 4-4.5-4-4.5 4-4.5-4-4.5 4-4.5-4-4.5 4L6 46Z"
+      />
+      <path className="ui-empty__ticket-line" d="M13 20h22M13 27h13" />
+      <path className="ui-empty__ticket-rule" d="M13 35h22" />
+      <circle className="ui-empty__ticket-dot" cx="33" cy="41" r="3" />
+    </svg>
+  );
+}
+
 export type EmptyStateProps = {
+  /** Ícono en lugar del ticket en blanco (por defecto se muestra el ticket). */
   icon?: AppIconName;
   title: ReactNode;
   /** Qué falta y cuál es el siguiente paso. */
@@ -17,12 +36,16 @@ export type EmptyStateProps = {
   className?: string;
 };
 
-export function EmptyState({ icon = "inbox", title, description, action, titleAs: Heading = "h3", compact = false, className }: EmptyStateProps) {
+export function EmptyState({ icon, title, description, action, titleAs: Heading = "h3", compact = false, className }: EmptyStateProps) {
   return (
     <div className={cx("ui-empty", compact && "ui-empty--compact", className)}>
-      <span className="ui-empty__icon" aria-hidden="true">
-        <AppIcon name={icon} />
-      </span>
+      {icon && !TICKET_ICONS.has(icon) ? (
+        <span className="ui-empty__icon" aria-hidden="true">
+          <AppIcon name={icon} />
+        </span>
+      ) : (
+        <EmptyTicketIllustration />
+      )}
       <Heading className="ui-empty__title">{title}</Heading>
       {description ? <p className="ui-empty__description">{description}</p> : null}
       {action ? <div className="ui-empty__action">{action}</div> : null}

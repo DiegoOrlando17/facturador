@@ -31,6 +31,11 @@ type TabsProps = {
   /** Contenido del panel activo. */
   children?: ReactNode | ((activeId: string) => ReactNode);
   className?: string;
+  /**
+   * underline: pestañas con subrayado de tinta (por defecto) · chips: píldoras
+   * con borde de tinta y la activa rellena (filtros de listados).
+   */
+  variant?: "underline" | "chips";
   /** Clase del panel (por ejemplo para quitar el padding). */
   panelClassName?: string;
 };
@@ -39,7 +44,7 @@ type TabsProps = {
  * Pestañas accesibles (tablist/tab/tabpanel) con activación automática:
  * ← → mueven y seleccionan, Inicio/Fin van a los extremos.
  */
-export function Tabs({ items, label, value, defaultValue, onChange, paramName, children, className, panelClassName }: TabsProps) {
+export function Tabs({ items, label, value, defaultValue, onChange, paramName, children, className, panelClassName, variant = "underline" }: TabsProps) {
   const baseId = useId();
   const [searchParams, setSearchParams] = useSearchParams();
   const enabledItems = items.filter((item) => !item.disabled);
@@ -87,7 +92,7 @@ export function Tabs({ items, label, value, defaultValue, onChange, paramName, c
   const content = typeof children === "function" ? children(activeId) : children;
 
   return (
-    <div className={cx("ui-tabs", className)}>
+    <div className={cx("ui-tabs", variant === "chips" && "ui-tabs--chips", className)}>
       <div className="ui-tabs__scroller">
         <div role="tablist" aria-label={label} className="ui-tabs__list">
           {items.map((item) => {

@@ -47,12 +47,17 @@ type TicketRowProps = {
   value: ReactNode;
   /** Fila destacada (total). */
   emphasis?: boolean;
+  /**
+   * Valor en monoespaciada (fechas, códigos en texto plano). Money y
+   * FiscalNumber ya son mono; el texto común ("Consumidor final") va en sans.
+   */
+  mono?: boolean;
 };
 
 /** Fila "concepto ........ valor" del ticket. */
-export function TicketRow({ label, value, emphasis = false }: TicketRowProps) {
+export function TicketRow({ label, value, emphasis = false, mono = false }: TicketRowProps) {
   return (
-    <div className={cx("ui-ticket__row", emphasis && "ui-ticket__row--emphasis")}>
+    <div className={cx("ui-ticket__row", emphasis && "ui-ticket__row--emphasis", mono && "ui-ticket__row--mono")}>
       <dt>{label}</dt>
       <dd>{value}</dd>
     </div>

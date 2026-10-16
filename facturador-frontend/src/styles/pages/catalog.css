@@ -62,14 +62,15 @@
   display: grid;
   gap: var(--space-1);
   padding-bottom: var(--space-3);
-  border-bottom: 1px solid var(--color-border);
+  border-bottom: var(--rule-dashed);
 }
 
 .catalog-section__header h2 {
   margin: 0;
   color: var(--color-text-brand);
-  font-size: var(--text-xl);
-  font-weight: var(--weight-semibold);
+  font-family: var(--font-display);
+  font-size: var(--text-2xl);
+  font-weight: var(--weight-black);
   letter-spacing: var(--tracking-tight);
 }
 

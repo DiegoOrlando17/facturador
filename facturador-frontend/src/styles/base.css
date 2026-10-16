@@ -34,18 +34,23 @@ body {
   line-height: var(--leading-normal);
 }
 
-/* Títulos: peso firme y tracking apretado en tamaños grandes. */
+/* Títulos en la tipografía de display (Bricolage Grotesque). Tamaños, márgenes
+   y line-height siguen en cada componente o en legacy. */
 h1,
 h2,
 h3 {
+  font-family: var(--font-display);
   font-weight: var(--weight-bold);
   text-wrap: balance;
 }
 
-/* Solo h1: los h2 se usan también como títulos chicos de tarjeta; los h2 grandes
-   aplican el tracking en su propia regla. */
-h1 {
+h1,
+h2 {
   letter-spacing: var(--tracking-tight);
+}
+
+h1 {
+  font-weight: var(--weight-black);
 }
 
 h4,

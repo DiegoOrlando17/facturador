@@ -100,7 +100,7 @@ export function AccountPage() {
   }
 
   return (
-    <main className="shell shell--app">
+    <div className="shell shell--app">
       <section className="hero-panel">
         <div className="hero-copy">
           <span className="eyebrow">Mi cuenta</span>
@@ -209,6 +209,6 @@ export function AccountPage() {
           </form>
         </article>
       </section>
-    </main>
+    </div>
   );
 }

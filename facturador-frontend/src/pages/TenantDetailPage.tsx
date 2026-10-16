@@ -2125,7 +2125,7 @@ export function TenantDetailPage() {
   }
 
   return (
-    <main className="client-detail-page">
+    <div className="client-detail-page">
       <section className="detail-header">
         <div>
           <Link to="/admin/tenants" className="detail-breadcrumb">
@@ -3711,6 +3711,6 @@ export function TenantDetailPage() {
           ) : null}
         </>
       ) : null}
-    </main>
+    </div>
   );
 }

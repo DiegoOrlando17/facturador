@@ -316,7 +316,11 @@ Cada fase termina con: build (`npm run build`), capturas Playwright en 3 anchos 
 
 - **2026-10-15 — Fase 0 completa**: `docs/VOZ_Y_GLOSARIO.md`, `scripts/visual-audit.mjs` (`playwright-core` como devDependency), `docs/NOMBRE_PROPUESTA.md`.
 - **2026-10-15 — Fase 1 completa** (#1–#30 resueltos; #16 parcial: el horario programado se muestra desde un evento, sin columna propia). Build OK, 101 tests backend OK, 75 capturas sin errores de render. Quedan 11 desbordes horizontales en tablet/móvil, previstos para la fase 3.
-- Decisiones tomadas: dirección de marca B + firma de A, nombre nuevo a evaluar (recomendado Troquel), voseo, fixes de backend permitidos, legales genéricos provisorios, `TenantsPage.tsx` eliminado.
+- **2026-10-15 — Backend sin credenciales del `.env`** (`7769c4f`): las credenciales de cada cliente salen solo de la base; `.env` original respaldado en `.env.backup-2026-10-15`.
+- **2026-10-15 — Fase 2 completa** (`1eece3f`): tokens y capas CSS; `global.css` 100 % tokenizado (166 hex → 0, 51 tamaños → 9, 16 radios → 4, 91 clases muertas fuera); kit de componentes compartidos, etiquetas de estado únicas, marca unificada con favicon, catálogo en `/admin/ui`.
+- **2026-10-16 — Marca: se adopta la opción A "Mostrador" completa** (reemplaza la combinación B + firma de A). Paleta tinta / papel / verde yerba / terracota / mostaza; Bricolage Grotesque + Figtree + JetBrains Mono; ticket troquelado y sello en toda la app; menú lateral en tinta. Mock de referencia en el canvas "Mostrador — mock opción A". Tokens reescritos en `src/styles/tokens.css` con contraste AA verificado (el terracota vivo `#C8553D` queda solo como decoración; los botones usan `#B64A33`).
+- **2026-10-16 — Marca "Mostrador" aplicada y fase 3 completa**: logo de ticket, títulos en Bricolage, sellos, landing y logins según el mock; shell único admin/portal con menú lateral en tinta y cajón en móvil; 0 desbordes horizontales en las 75 capturas (antes 10).
+- Decisiones tomadas: dirección de marca B + firma de A (reemplazada el 2026-10-16 por A completa), nombre nuevo a evaluar (recomendado Troquel), voseo, fixes de backend permitidos, legales genéricos provisorios, `TenantsPage.tsx` eliminado.
 
 El copy (§7) y la accesibilidad se resuelven dentro de cada fase, no como pasada aparte, para no tocar dos veces los mismos archivos.
 

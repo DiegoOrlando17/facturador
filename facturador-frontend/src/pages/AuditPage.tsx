@@ -46,7 +46,7 @@ export function AuditPage() {
   }
 
   return (
-    <main className="admin-section-page">
+    <div className="admin-section-page">
       <div className="admin-section-header">
         <div><h1>Auditoria</h1><p>Historial de acciones administrativas sensibles registradas por el backend.</p></div>
         <button type="button" className="section-button section-button--soft" onClick={() => void reload()}>Actualizar</button>
@@ -82,6 +82,6 @@ export function AuditPage() {
           {data && data.total > data.items.length ? <p className="section-next-action">Se muestran las 100 acciones mas recientes.</p> : null}
         </article>
       </section>
-    </main>
+    </div>
   );
 }

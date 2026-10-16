@@ -5,8 +5,8 @@
   --_bg-hover: var(--color-surface-muted);
   --_bg-active: var(--color-surface-sunken);
   --_fg: var(--color-text);
-  --_border: var(--color-border-strong);
-  --_shadow: var(--shadow-sm);
+  --_border: var(--color-border-ink);
+  --_shadow: none;
 
   position: relative;
   display: inline-flex;
@@ -16,7 +16,7 @@
   min-height: var(--control-height-md);
   margin: 0;
   padding: 0 var(--space-4);
-  border: 1px solid var(--_border);
+  border: 2px solid var(--_border);
   border-radius: var(--radius-md);
   background: var(--_bg);
   box-shadow: var(--_shadow);
@@ -24,7 +24,7 @@
   cursor: pointer;
   font-family: var(--font-sans);
   font-size: var(--text-sm);
-  font-weight: var(--weight-semibold);
+  font-weight: var(--weight-bold);
   line-height: 1;
   text-align: center;
   text-decoration: none;
@@ -101,13 +101,26 @@ span.ui-button__icon {
   border-color: var(--color-action-hover);
 }
 
-.ui-button--secondary {
-  --_bg: var(--color-surface);
-  --_fg: var(--color-text);
+/* Terracota de mostrador: CTA de marketing y del sitio público. */
+.ui-button--accent {
+  --_bg: var(--color-accent);
+  --_bg-hover: var(--color-accent-hover);
+  --_bg-active: var(--color-accent-hover);
+  --_fg: var(--color-on-accent);
+  --_border: var(--color-accent);
 }
 
-.ui-button--secondary:hover {
-  border-color: var(--color-text-subtle);
+.ui-button--accent:hover {
+  border-color: var(--color-accent-hover);
+}
+
+/* Secundario: papel con borde de tinta, como en el mostrador. */
+.ui-button--secondary {
+  --_bg: var(--color-surface);
+  --_bg-hover: var(--color-surface-sunken);
+  --_bg-active: var(--color-border);
+  --_fg: var(--color-text);
+  --_border: var(--color-border-ink);
 }
 
 .ui-button--ghost {

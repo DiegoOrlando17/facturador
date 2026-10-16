@@ -24,14 +24,14 @@
 
 .ui-money--lg {
   font-size: var(--text-xl);
-  font-weight: var(--weight-medium);
-  letter-spacing: var(--tracking-tight);
+  font-weight: var(--weight-semibold);
+  letter-spacing: -0.02em;
 }
 
 .ui-money--xl {
   font-size: var(--text-3xl);
-  font-weight: var(--weight-medium);
-  letter-spacing: var(--tracking-tight);
+  font-weight: var(--weight-semibold);
+  letter-spacing: -0.02em;
   line-height: var(--leading-tight);
 }
 

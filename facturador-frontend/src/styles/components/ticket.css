@@ -8,16 +8,17 @@
   font-family: var(--font-sans);
 }
 
+/* El papel "levanta" de la mesa: misma sombra que --shadow-lg, como drop-shadow
+   para que siga el borde troquelado. */
 .ui-ticket__sheet {
-  filter: drop-shadow(0 0 1px var(--color-border-paper)) drop-shadow(var(--shadow-md));
+  filter: drop-shadow(0 18px 30px rgb(28 35 33 / 0.14)) drop-shadow(0 2px 3px rgb(28 35 33 / 0.08));
 }
 
 .ui-ticket__paper {
-  /* Radio del diente = la mitad del diámetro del token. */
-  --_r: calc(var(--ticket-notch) / 2);
+  --_r: var(--ticket-notch);
   --_gap: var(--ticket-notch-gap);
-  --_edge-top: radial-gradient(circle at 50% 0, transparent var(--_r), black calc(var(--_r) + 0.5px)) 50% 0 / var(--_gap) 51% repeat-x;
-  --_edge-bottom: radial-gradient(circle at 50% 100%, transparent var(--_r), black calc(var(--_r) + 0.5px)) 50% 100% / var(--_gap) 51% repeat-x;
+  --_edge-top: radial-gradient(circle var(--_r) at 50% 0, transparent 97%, black) 50% 0 / var(--_gap) 51% repeat-x;
+  --_edge-bottom: radial-gradient(circle var(--_r) at 50% 100%, transparent 97%, black) 50% 100% / var(--_gap) 51% repeat-x;
   --_solid-top: linear-gradient(black, black) 50% 0 / 100% 51% no-repeat;
   --_solid-bottom: linear-gradient(black, black) 50% 100% / 100% 51% no-repeat;
   --_pad: var(--space-6);
@@ -55,7 +56,7 @@
 
 .ui-ticket__header {
   display: grid;
-  gap: var(--space-1);
+  gap: var(--space-2);
   margin-bottom: var(--space-4);
 }
 
@@ -67,39 +68,39 @@
   margin: 0;
   color: var(--color-text-subtle);
   font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  font-weight: var(--weight-medium);
-  letter-spacing: var(--tracking-caps);
+  font-size: 0.8125rem;
+  font-weight: var(--weight-regular);
+  letter-spacing: 0.04em;
   text-transform: uppercase;
 }
 
 .ui-ticket__title {
   margin: 0;
   color: var(--color-text-brand);
-  font-size: var(--text-lg);
-  font-weight: var(--weight-semibold);
-  letter-spacing: 0;
-  line-height: var(--leading-snug);
+  font-family: var(--font-display);
+  font-size: var(--text-xl);
+  font-weight: var(--weight-bold);
+  letter-spacing: -0.02em;
+  line-height: var(--leading-tight);
 }
 
 .ui-ticket__divider {
   height: 0;
   margin: var(--space-4) 0;
   border: 0;
-  border-top: 1.5px dashed var(--color-border-paper);
+  border-top: var(--rule-dashed);
   background: none;
 }
 
 .ui-ticket__rows {
   display: grid;
-  gap: var(--space-2);
+  gap: var(--space-3);
   margin: 0;
 }
 
 .ui-ticket__row {
   display: flex;
-  align-items: baseline;
-  gap: var(--space-2);
+  align-items: flex-end;
   font-size: var(--text-sm);
 }
 
@@ -109,8 +110,8 @@
   order: 1;
   flex: 1;
   min-width: var(--space-4);
-  border-bottom: 1px dotted var(--color-border-strong);
-  transform: translateY(-3px);
+  margin: 0 var(--space-2) 5px;
+  border-bottom: 2px dotted var(--color-rule-dotted);
 }
 
 .ui-ticket__row dt {
@@ -118,23 +119,28 @@
   flex: none;
   margin: 0;
   white-space: nowrap;
-  color: var(--color-text-muted);
+  color: var(--color-text);
 }
 
 .ui-ticket__row dd {
   order: 2;
   margin: 0;
   color: var(--color-text);
-  font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
-  font-weight: var(--weight-medium);
+  font-weight: var(--weight-regular);
   text-align: right;
 }
 
+.ui-ticket__row--mono dd {
+  font-family: var(--font-mono);
+}
+
 .ui-ticket__row--emphasis {
-  margin-top: var(--space-2);
-  padding-top: var(--space-3);
-  border-top: 1.5px dashed var(--color-border-paper);
+  align-items: baseline;
+  justify-content: space-between;
+  margin-top: var(--space-1);
+  padding-top: var(--space-4);
+  border-top: var(--rule-dashed);
   font-size: var(--text-base);
 }
 
@@ -144,12 +150,13 @@
 
 .ui-ticket__row--emphasis dt {
   flex: 1;
-  color: var(--color-text);
-  font-weight: var(--weight-semibold);
+  font-weight: var(--weight-bold);
 }
 
 .ui-ticket__row--emphasis dd {
-  font-size: var(--text-lg);
+  font-size: var(--text-xl);
+  font-weight: var(--weight-semibold);
+  letter-spacing: -0.01em;
 }
 
 /* El sello "pisa" la esquina del papel, como uno real, sin tapar las filas. */
@@ -163,7 +170,7 @@
 
 @media (max-width: 639px) {
   .ui-ticket__paper {
-    --_pad: var(--space-4);
+    --_pad: var(--space-5);
   }
 
   .ui-ticket__header--with-stamp {
@@ -176,99 +183,99 @@
   }
 
   .ui-ticket__stamp .ui-stamp {
-    --_size: 4.5rem;
+    --_size: 4.75rem;
   }
 }
 
 /* Stamp ------------------------------------------------------------------- */
 
+/* Sello de goma de doble aro: borde grueso + aro interior fino separado por
+   una franja de papel. La tinta se "funde" con el papel (multiply). */
 .ui-stamp {
   --_ink: var(--color-stamp);
   --_size: 6rem;
-  --_tilt: -8deg;
+  --_tilt: -12deg;
 
   display: inline-grid;
   place-items: center;
   width: var(--_size);
   height: var(--_size);
   color: var(--_ink);
-  font-family: var(--font-sans);
+  font-family: var(--font-display);
   line-height: 1;
+  mix-blend-mode: multiply;
   transform: rotate(var(--_tilt));
   user-select: none;
 }
 
 .ui-stamp--danger {
-  --_ink: var(--color-danger-action);
+  --_ink: var(--color-stamp-void);
+  --_tilt: -8deg;
 }
 
 .ui-stamp--sm {
-  --_size: 4.25rem;
+  --_size: 4.5rem;
 }
 
 .ui-stamp--lg {
-  --_size: 8.5rem;
+  --_size: 8.25rem;
 }
 
 .ui-stamp__ring {
+  --_border: max(2px, calc(var(--_size) * 0.03));
+  --_gap: max(2px, calc(var(--_size) * 0.022));
+  --_inner: max(1.5px, calc(var(--_size) * 0.016));
+
   position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: calc(var(--_size) * 0.05);
+  gap: calc(var(--_size) * 0.045);
   width: 100%;
   height: 100%;
-  border: calc(var(--_size) * 0.035) solid currentColor;
+  border: var(--_border) solid currentColor;
   border-radius: var(--radius-full);
-  background: color-mix(in srgb, var(--color-surface-paper) 55%, transparent);
+  box-shadow:
+    inset 0 0 0 var(--_gap) var(--color-surface-paper),
+    inset 0 0 0 calc(var(--_gap) + var(--_inner)) currentColor;
   opacity: 0.92;
-}
-
-/* Anillo interior fino, como el de un sello de goma. */
-.ui-stamp__ring::before {
-  content: "";
-  position: absolute;
-  inset: calc(var(--_size) * 0.055);
-  border: 1px solid currentColor;
-  border-radius: var(--radius-full);
-  opacity: 0.8;
 }
 
 .ui-stamp__label {
   position: relative;
-  font-size: calc(var(--_size) * min(0.2, 1.15 / var(--_chars, 6)));
-  font-weight: var(--weight-bold);
-  letter-spacing: 0.04em;
+  font-size: calc(var(--_size) * min(0.2, 1.2 / var(--_chars, 6)));
+  font-weight: var(--weight-black);
+  letter-spacing: 0.02em;
   white-space: nowrap;
 }
 
 .ui-stamp__sublabel {
   position: relative;
-  max-width: 75%;
+  max-width: 72%;
   overflow: hidden;
   font-family: var(--font-mono);
-  font-size: calc(var(--_size) * 0.1);
+  font-size: calc(var(--_size) * 0.085);
   font-weight: var(--weight-medium);
-  letter-spacing: var(--tracking-caps);
+  letter-spacing: 0.02em;
   text-overflow: ellipsis;
   text-transform: uppercase;
   white-space: nowrap;
 }
 
+/* "Sellado": baja desde arriba, golpea, rebota apenas y queda inclinado. */
 .ui-stamp--animate {
-  animation: ui-stamp-in 420ms cubic-bezier(0.3, 1.4, 0.5, 1) both;
+  animation: ui-stamp-in var(--duration-stamp) var(--ease-stamp) both;
 }
 
 @keyframes ui-stamp-in {
   0% {
     opacity: 0;
-    transform: rotate(-22deg) scale(1.6);
+    transform: rotate(calc(var(--_tilt) - 8deg)) scale(1.6);
   }
 
-  55% {
+  60% {
     opacity: 1;
-    transform: rotate(-6deg) scale(0.94);
   }
 
   100% {

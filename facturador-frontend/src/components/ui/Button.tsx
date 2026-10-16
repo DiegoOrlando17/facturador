@@ -4,7 +4,11 @@ import { AppIcon, type AppIconName } from "@/components/ui/AppIcon";
 import { Spinner } from "@/components/ui/Spinner";
 import { cx } from "@/components/ui/cx";
 
-export type ButtonVariant = "primary" | "secondary" | "ghost" | "danger" | "danger-soft" | "link";
+/**
+ * primary: acción principal (yerba) · accent: CTA de marketing (terracota) ·
+ * secondary: papel con borde de tinta · ghost · danger · danger-soft · link.
+ */
+export type ButtonVariant = "primary" | "accent" | "secondary" | "ghost" | "danger" | "danger-soft" | "link";
 export type ButtonSize = "sm" | "md" | "lg";
 
 type ButtonOwnProps = {

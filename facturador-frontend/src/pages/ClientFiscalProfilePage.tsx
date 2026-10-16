@@ -109,7 +109,7 @@ export function ClientFiscalProfilePage() {
   }
 
   return (
-    <main className="client-main client-fiscal-profile-page">
+    <div className="client-main client-fiscal-profile-page">
       <header className="app-topbar">
         <div><strong>Datos fiscales</strong><span>Mantené actualizada la información que usamos para configurar tu facturación.</span></div>
         <button type="button" className="secondary-button topbar-refresh-button" onClick={() => void loadProfile()} disabled={isLoading || isRefreshing}>{isRefreshing ? "Actualizando…" : "Actualizar"}</button>
@@ -146,6 +146,6 @@ export function ClientFiscalProfilePage() {
           {canEdit ? <div className="tenant-form__actions"><button type="submit" className="primary-button" disabled={isSaving || !hasChanges}>{isSaving ? "Guardando…" : completedRequired === 5 ? "Guardar y enviar a revisión" : "Guardar borrador"}</button></div> : <p className="client-empty-state">Tu rol tiene acceso de solo lectura.</p>}
         </form>
       </>}
-    </main>
+    </div>
   );
 }

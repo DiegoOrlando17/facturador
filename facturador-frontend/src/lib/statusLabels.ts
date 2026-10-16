@@ -127,6 +127,9 @@ export const INVOICE_STATUS: StatusMap = {
   ISSUING: { label: "Emitiendo", tone: "info", description: "ARCA está procesando el comprobante." },
   ISSUED: { label: "Emitida", tone: "success", description: "ARCA autorizó el comprobante y asignó el CAE." },
   FAILED: { label: "Con error", tone: "danger", description: "ARCA no autorizó el comprobante. Se puede reintentar." },
+  // El backend todavía no tiene este estado (la anulación es una nota de crédito);
+  // queda listo para cuando la factura anulada se marque como tal.
+  CANCELED: { label: "Anulada", tone: "danger", description: "Se anuló con una nota de crédito." },
 };
 
 export const INVOICE_SOURCE: StatusMap = {

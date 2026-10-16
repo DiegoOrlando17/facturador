@@ -512,7 +512,7 @@ export function ClientsSectionPage() {
   }
 
   return (
-    <main className="admin-section-page clients-page">
+    <div className="admin-section-page clients-page">
       <SectionHeader
         title={activeFilter === "onboarding" ? "Altas" : "Clientes"}
         detail={activeFilter === "onboarding"
@@ -697,7 +697,7 @@ export function ClientsSectionPage() {
         ))}
         <button type="button" disabled={page === totalPages} onClick={() => setPage(page + 1)} aria-label="Página siguiente">{">"}</button>
       </div>
-    </main>
+    </div>
   );
 }
 
@@ -762,7 +762,7 @@ export function BillingSectionPage() {
   }
 
   return (
-    <main className="admin-section-page">
+    <div className="admin-section-page">
       <SectionHeader
         title="Facturación"
         detail="Seguí cada pago por etapa: cobro, ARCA, PDF, Drive y Sheets."
@@ -880,7 +880,7 @@ export function BillingSectionPage() {
         <span>de {totalPages}</span>
         <button type="button" disabled={page >= totalPages} onClick={() => setPage((current) => Math.min(totalPages, current + 1))}>{">"}</button>
       </div>
-    </main>
+    </div>
   );
 }
 
@@ -918,7 +918,7 @@ export function IntegrationsSectionPage() {
   const getLabel = (status: HealthStatus) => status === "healthy" ? "Operativo" : status === "attention" ? "Revisar" : "Sin configurar";
 
   return (
-    <main className="admin-section-page">
+    <div className="admin-section-page">
       <SectionHeader title="Integraciones" detail="Estado real de conexiones, infraestructura, workers y colas." actions={<button type="button" className="section-button section-button--soft" onClick={() => void reload()}>Verificar ahora</button>} />
       {isLoading ? <section className="section-table-card"><div className="section-table__state">Verificando servicios…</div></section> : null}
       {errorMessage ? <section className="section-table-card"><div className="section-table__state section-table__state--danger">{errorMessage}</div></section> : null}
@@ -966,7 +966,7 @@ export function IntegrationsSectionPage() {
         {false ? <button type="button" className="section-button section-button--soft">Ver guia</button> : null}
       </section>
       </> : null}
-    </main>
+    </div>
   );
 }
 
@@ -1007,7 +1007,7 @@ export function AlertsSectionPage() {
   }
 
   return (
-    <main className="admin-section-page">
+    <div className="admin-section-page">
       <SectionHeader
         title="Alertas"
         detail="Problemas, errores y eventos que requieren atención."
@@ -1052,6 +1052,6 @@ export function AlertsSectionPage() {
       <section className="section-help-card">
         <SectionIcon name="alert" />
         <div><strong>Las alertas críticas pueden afectar la facturación automática.</strong><p>Resolvelas cuanto antes para evitar interrupciones.</p></div>      </section>
-    </main>
+    </div>
   );
 }

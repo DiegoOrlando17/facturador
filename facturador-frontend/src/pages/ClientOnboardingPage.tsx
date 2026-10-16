@@ -81,7 +81,7 @@ export function ClientOnboardingPage() {
   const errorMessage = submitError || loadError;
 
   return (
-    <main className="client-main client-onboarding-page">
+    <div className="client-main client-onboarding-page">
       <header className="app-topbar">
         <div><strong>Puesta en marcha</strong><span>Enviá la información inicial y seguí su revisión.</span></div>
         <button className="secondary-button" type="button" onClick={handleReload} disabled={isLoading || isRefreshing}>
@@ -151,6 +151,6 @@ export function ClientOnboardingPage() {
           </div>
         ) : <div className="panel-state">Todavía no hay envíos.</div>}
       </section>
-    </main>
+    </div>
   );
 }

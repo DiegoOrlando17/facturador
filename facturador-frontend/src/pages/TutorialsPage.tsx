@@ -1,11 +1,12 @@
-import { Link } from "react-router-dom";
 import { MarketingFooter, MarketingNav } from "@/components/layout/MarketingChrome";
+import { ButtonLink } from "@/components/ui/Button";
+import { Ticket } from "@/components/ui/Ticket";
 
 const guides = [
   {
-    title: "Conectar Mercado Pago POS",
+    title: "Conectar Mercado Pago",
     steps: [
-      "Identificá el Point/POS que recibe las ventas.",
+      "Identificá la caja (POS) de Mercado Pago que recibe las ventas.",
       "Generá una credencial de lectura para la cuenta correcta.",
       "Cargá la configuración desde Integraciones y ejecutá la prueba.",
     ],
@@ -15,19 +16,19 @@ const guides = [
     steps: [
       "Habilitá los comprobantes electrónicos y el punto de venta.",
       "Generá el certificado y la clave para el ambiente correspondiente.",
-      "Completá el perfil fiscal y pedí su revisión.",
+      "Completá tus datos fiscales y pedí su revisión.",
     ],
   },
   {
     title: "Configurar Drive y Sheets",
     steps: [
-      "Autorizá la cuenta de Google desde Integraciones.",
-      "Elegí una carpeta y una planilla accesibles.",
+      "Conectá tu cuenta de Google desde Integraciones.",
+      "Elegí una carpeta y una planilla a las que tengas acceso.",
       "Ejecutá ambas pruebas antes de procesar ventas.",
     ],
   },
   {
-    title: "Completar el onboarding",
+    title: "Completar la puesta en marcha",
     steps: [
       "Completá los datos fiscales obligatorios.",
       "Conectá y probá las integraciones de tu plan.",
@@ -41,28 +42,30 @@ export function TutorialsPage() {
     <main className="marketing-page">
       <MarketingNav />
       <section className="tutorial-hero">
-        <span className="eyebrow">Centro de ayuda</span>
+        <span className="marketing-kicker marketing-kicker--accent">Centro de ayuda</span>
         <h1>Todo lo necesario para empezar a facturar.</h1>
-        <p>Guías breves para preparar tus cuentas sin compartir datos sensibles por canales inseguros.</p>
+        <p>Guías cortas para preparar tus cuentas sin compartir datos sensibles por canales inseguros.</p>
       </section>
-      <section className="tutorial-grid">
+      <ul className="tutorial-grid">
         {guides.map((guide, index) => (
-          <article key={guide.title}>
-            <span>Guía {index + 1}</span>
-            <h2>{guide.title}</h2>
-            <ol>
-              {guide.steps.map((step) => (
-                <li key={step}>{step}</li>
-              ))}
-            </ol>
-          </article>
+          <li key={guide.title}>
+            <Ticket as="article" padding="lg" eyebrow={`Guía ${String(index + 1).padStart(2, "0")}`} title={guide.title}>
+              <ol className="tutorial-steps">
+                {guide.steps.map((step) => (
+                  <li key={step}>{step}</li>
+                ))}
+              </ol>
+            </Ticket>
+          </li>
         ))}
-      </section>
-      <section className="marketing-cta">
-        <h2>¿Ya tenés la información preparada?</h2>
-        <Link className="primary-button" to="/registro">
-          Crear cuenta
-        </Link>
+      </ul>
+      <section className="marketing-cta" aria-labelledby="tutoriales-cta">
+        <div className="marketing-cta__band">
+          <h2 id="tutoriales-cta">¿Ya tenés todo a mano?</h2>
+          <ButtonLink to="/registro" variant="secondary" size="lg">
+            Crear mi cuenta
+          </ButtonLink>
+        </div>
       </section>
       <MarketingFooter />
     </main>

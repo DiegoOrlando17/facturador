@@ -329,7 +329,7 @@ export function DashboardPage() {
   const loadingNote = isLoading ? "Cargando…" : "Sin datos";
 
   return (
-    <main className="admin-dashboard">
+    <div className="admin-dashboard">
       <section className={`admin-alert-card${alertCardClass}`}>
         <div className="admin-alert-card__main">
           <span className="admin-alert-card__icon">
@@ -493,6 +493,6 @@ export function DashboardPage() {
           <Link to="/admin/billing">Ver toda la actividad</Link>
         </article>
       </section>
-    </main>
+    </div>
   );
 }

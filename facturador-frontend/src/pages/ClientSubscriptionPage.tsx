@@ -96,7 +96,7 @@ export function ClientSubscriptionPage() {
   const billingStatusLabel = billing?.billingStatus ? billingStatusLabels[billing.billingStatus] ?? "Débito automático en revisión" : null;
 
   return (
-    <main className="client-main">
+    <div className="client-main">
       <header className="app-topbar">
         <div>
           <strong>Plan y suscripción</strong>
@@ -187,6 +187,6 @@ export function ClientSubscriptionPage() {
           </div>
         </section>
       )}
-    </main>
+    </div>
   );
 }

@@ -1,0 +1,943 @@
+/*
+ * Sitio público (landing, ayuda, legales), formularios públicos (registro,
+ * verificación) y 404. Dirección "Mostrador": papel, tinta, CTA terracota,
+ * títulos en display y etiquetas en mono. Antes vivía en global.css (legacy);
+ * acá, en la capa `pages`, puede ajustar a los componentes compartidos.
+ */
+
+.marketing-page {
+  min-height: 100vh;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+}
+
+/* Etiqueta chica en mono, en versalitas. */
+.marketing-kicker,
+.marketing-page .eyebrow,
+.public-form-card .eyebrow,
+.not-found-card .eyebrow {
+  display: block;
+  color: var(--color-text-subtle);
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  font-weight: var(--weight-medium);
+  letter-spacing: var(--tracking-caps);
+  line-height: var(--leading-snug);
+  text-transform: uppercase;
+}
+
+.marketing-kicker--accent {
+  color: var(--color-accent-text);
+}
+
+/* Sobre tinta: texto claro con un trazo terracota como acento decorativo. */
+.marketing-kicker--inverse {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-text-inverse-muted);
+}
+
+.marketing-kicker--inverse::before {
+  content: "";
+  width: 1.25rem;
+  height: 2px;
+  background: var(--color-accent-decor);
+}
+
+/* Encabezado y navegación --------------------------------------------------- */
+
+.marketing-nav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  max-width: var(--content-max);
+  margin: 0 auto;
+  padding: var(--space-6) var(--space-8);
+}
+
+.marketing-brand {
+  display: inline-flex;
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  text-decoration: none;
+}
+
+.marketing-nav__links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-6);
+  font-size: 0.9375rem;
+  font-weight: var(--weight-medium);
+}
+
+.marketing-nav__link {
+  color: var(--color-text);
+  text-decoration: none;
+  text-underline-offset: 4px;
+}
+
+.marketing-nav__link:hover {
+  color: var(--color-text);
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+}
+
+/* Hero ---------------------------------------------------------------------- */
+
+.marketing-hero {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-12) var(--space-16);
+  max-width: var(--content-max);
+  margin: 0 auto;
+  padding: var(--space-12) var(--space-8) var(--space-16);
+}
+
+.marketing-hero__copy {
+  display: flex;
+  flex: 1 1 32rem;
+  flex-direction: column;
+  gap: var(--space-6);
+  min-width: 0;
+}
+
+.marketing-hero__copy .marketing-kicker {
+  align-self: flex-start;
+  padding: 6px var(--space-3);
+  border-radius: var(--radius-full);
+  background: var(--color-action-soft);
+  color: var(--color-action);
+}
+
+.marketing-hero h1 {
+  margin: 0;
+  color: var(--color-text);
+  font-family: var(--font-display);
+  font-size: clamp(2.5rem, 4.2vw + 1rem, 4.25rem);
+  font-weight: var(--weight-black);
+  letter-spacing: -0.035em;
+  line-height: 1.02;
+}
+
+.marketing-hero__accent {
+  color: var(--color-action);
+}
+
+.marketing-hero__lead {
+  max-width: 34rem;
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: clamp(var(--text-md), 1vw + 0.8rem, var(--text-lg));
+  line-height: var(--leading-normal);
+}
+
+.marketing-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+}
+
+.marketing-actions .ui-button--lg {
+  min-height: 3.375rem;
+  padding: 0 var(--space-6);
+  border-radius: 12px;
+  font-size: 1.0625rem;
+}
+
+.marketing-hero__visual {
+  position: relative;
+  display: flex;
+  flex: 1 1 24rem;
+  justify-content: center;
+  min-width: 0;
+  margin: 0;
+  padding: var(--space-6) 0;
+}
+
+.marketing-hero__toast {
+  position: absolute;
+  z-index: 2;
+  top: 0;
+  left: 6%;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  background: var(--color-surface-inverse);
+  color: var(--color-text-inverse);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  transform: rotate(-3deg);
+}
+
+.marketing-hero__toast-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+  background: var(--color-success-solid);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-success-solid) 40%, transparent);
+}
+
+.marketing-hero__ticket {
+  width: min(100%, 23.75rem);
+  margin-top: var(--space-8);
+  transform: rotate(2deg);
+}
+
+.marketing-hero__ticket .ui-ticket__header {
+  margin-bottom: var(--space-1);
+  padding-right: 0;
+}
+
+.marketing-hero__ticket .ui-ticket__eyebrow {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.marketing-hero__shop {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.625rem;
+  font-weight: var(--weight-bold);
+  letter-spacing: -0.02em;
+  line-height: var(--leading-tight);
+}
+
+.marketing-hero__ticket .ui-ticket__row {
+  font-size: 0.9375rem;
+}
+
+.marketing-hero__ticket .ui-ticket__row--emphasis dd {
+  font-size: 1.625rem;
+}
+
+.marketing-hero__cae {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--space-1) var(--space-4);
+  margin: var(--space-3) 0 0;
+  color: var(--color-text-subtle);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+}
+
+/* El sello pisa el borde derecho, al lado del nombre del comercio (sin tapar importes). */
+.marketing-hero__ticket .ui-ticket__stamp {
+  top: 3.25rem;
+  right: -3.25rem;
+}
+
+/* Franja "Funciona con" ----------------------------------------------------- */
+
+.marketing-strip {
+  border-block: var(--rule-dashed);
+}
+
+.marketing-strip__inner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3) var(--space-8);
+  max-width: var(--content-max);
+  margin: 0 auto;
+  padding: 22px var(--space-8);
+  color: var(--color-text-muted);
+  font-weight: var(--weight-semibold);
+}
+
+.marketing-strip__label {
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  font-weight: var(--weight-medium);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+}
+
+.marketing-strip ul {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2) var(--space-8);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.marketing-strip li {
+  position: relative;
+}
+
+.marketing-strip li + li::before {
+  content: "·";
+  position: absolute;
+  left: calc(var(--space-4) * -1 - 0.2em);
+  color: var(--color-accent-decor);
+  font-weight: var(--weight-black);
+}
+
+/* Secciones ----------------------------------------------------------------- */
+
+.marketing-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-10);
+  max-width: var(--content-max);
+  margin: 0 auto;
+  padding: 6rem var(--space-8);
+}
+
+.marketing-section__header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  max-width: 40rem;
+}
+
+.marketing-section__header h2,
+.marketing-plans-band__header h2,
+.tutorial-hero h1 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(2rem, 2.6vw + 1rem, 2.875rem);
+  font-weight: var(--weight-black);
+  letter-spacing: var(--tracking-tight);
+  line-height: 1.05;
+}
+
+/* Pasos como tickets */
+.marketing-steps {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  gap: var(--space-6);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.marketing-step .ui-ticket__paper {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-height: 13.75rem;
+}
+
+.marketing-step__number {
+  color: var(--color-accent-text);
+  font-family: var(--font-mono);
+  font-size: 2.5rem;
+  font-weight: var(--weight-semibold);
+  line-height: 1;
+}
+
+.marketing-step h3 {
+  margin: 0;
+  font-size: var(--text-xl);
+  letter-spacing: -0.01em;
+}
+
+.marketing-step p,
+.marketing-faq p {
+  margin: 0;
+  color: var(--color-text-muted);
+  line-height: var(--leading-normal);
+}
+
+/* Planes: banda de tinta con tickets de papel ------------------------------- */
+
+.marketing-plans-band {
+  background: var(--color-surface-inverse);
+  color: var(--color-text-inverse);
+  scroll-margin-top: var(--space-4);
+}
+
+.marketing-plans-band__inner {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-10);
+  max-width: var(--content-max);
+  margin: 0 auto;
+  padding: 6rem var(--space-8);
+}
+
+.marketing-plans-band__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.marketing-plans-band__header > div {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  max-width: 39rem;
+}
+
+.marketing-plans-band__header h2 {
+  color: var(--color-text-inverse);
+}
+
+.marketing-plans-band__header > p,
+.marketing-plans-band__status {
+  max-width: 22.5rem;
+  margin: 0;
+  color: var(--color-text-inverse-muted);
+  line-height: var(--leading-normal);
+}
+
+.marketing-plans {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  gap: var(--space-5);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.marketing-plans > li,
+.marketing-plan,
+.marketing-plan .ui-ticket__sheet {
+  height: 100%;
+}
+
+.marketing-plan .ui-ticket__sheet {
+  filter: none;
+}
+
+.marketing-plan .ui-ticket__paper {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.marketing-plan .ui-ticket__header {
+  margin-bottom: var(--space-2);
+}
+
+.marketing-plan .ui-ticket__title {
+  font-size: 1.625rem;
+}
+
+.marketing-plan__price {
+  margin: 0;
+}
+
+.marketing-plan__amount {
+  font-family: var(--font-mono);
+  font-size: 2.125rem;
+  font-weight: var(--weight-semibold);
+  letter-spacing: -0.02em;
+}
+
+.marketing-plan__amount .ui-money {
+  font-size: inherit;
+  font-weight: inherit;
+}
+
+.marketing-plan__cycle {
+  color: var(--color-text-subtle);
+}
+
+.marketing-plan__price--tbd {
+  color: var(--color-text-muted);
+  font-weight: var(--weight-semibold);
+}
+
+.marketing-plan__includes {
+  margin: 0 0 var(--space-2);
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+
+.marketing-plan__features {
+  display: grid;
+  flex: 1;
+  align-content: start;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-6);
+  padding: 0;
+  list-style: none;
+}
+
+.marketing-plan__features li {
+  position: relative;
+  padding-left: 1.5rem;
+}
+
+.marketing-plan__features li::before {
+  content: "✓";
+  position: absolute;
+  left: 0;
+  color: var(--color-action);
+  font-weight: var(--weight-bold);
+}
+
+/* Preguntas ----------------------------------------------------------------- */
+
+.marketing-faq {
+  flex-flow: row wrap;
+  gap: var(--space-12);
+}
+
+.marketing-faq .marketing-section__header {
+  flex: 1 1 20rem;
+}
+
+.marketing-faq__list {
+  display: flex;
+  flex: 2 1 35rem;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.marketing-faq__list article {
+  padding: var(--space-6) 0;
+  border-bottom: var(--rule-dashed);
+}
+
+.marketing-faq__list article:first-child {
+  padding-top: 0;
+}
+
+.marketing-faq__list h3 {
+  margin: 0 0 var(--space-2);
+  font-family: var(--font-sans);
+  font-size: var(--text-lg);
+  font-weight: var(--weight-bold);
+  letter-spacing: 0;
+}
+
+/* Cierre: banda yerba ------------------------------------------------------- */
+
+.marketing-cta {
+  max-width: var(--content-max);
+  margin: 0 auto;
+  padding: 0 var(--space-8) 6rem;
+}
+
+.marketing-cta__band {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-6);
+  padding: 3.5rem var(--space-12);
+  border-radius: 24px;
+  background: var(--color-action);
+  color: var(--color-on-action);
+}
+
+.marketing-cta__band h2 {
+  max-width: 39rem;
+  margin: 0;
+  color: inherit;
+  font-family: var(--font-display);
+  font-size: clamp(2rem, 2vw + 1.2rem, 2.5rem);
+  font-weight: var(--weight-black);
+  letter-spacing: var(--tracking-tight);
+  line-height: 1.1;
+}
+
+.marketing-cta__band .ui-button {
+  min-height: 3.375rem;
+  padding: 0 var(--space-6);
+  border-color: var(--color-surface-paper);
+  border-radius: 12px;
+  font-size: 1.0625rem;
+}
+
+.marketing-cta__band .ui-button:focus-visible {
+  outline-color: var(--color-on-action);
+}
+
+/* Pie ----------------------------------------------------------------------- */
+
+.marketing-footer {
+  border-top: var(--rule-dashed);
+}
+
+.marketing-footer__inner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  max-width: var(--content-max);
+  margin: 0 auto;
+  padding: var(--space-8);
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+
+.marketing-footer__brand {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.marketing-footer__links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-5);
+}
+
+.marketing-footer__links a {
+  color: var(--color-link);
+  font-weight: var(--weight-medium);
+}
+
+.marketing-footer__links a:hover {
+  color: var(--color-link-hover);
+}
+
+/* Centro de ayuda ----------------------------------------------------------- */
+
+.tutorial-hero {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  max-width: var(--content-max);
+  margin: 0 auto;
+  padding: var(--space-12) var(--space-8) var(--space-6);
+}
+
+.tutorial-hero h1 {
+  max-width: 48rem;
+  font-size: clamp(2.25rem, 3.5vw + 1rem, 3.5rem);
+}
+
+.tutorial-hero p {
+  max-width: 40rem;
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--text-md);
+}
+
+.tutorial-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 26rem), 1fr));
+  gap: var(--space-10) var(--space-6);
+  max-width: var(--content-max);
+  margin: 0 auto;
+  padding: var(--space-8) var(--space-8) 6rem;
+  list-style: none;
+}
+
+.tutorial-steps {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+  padding-left: var(--space-5);
+  color: var(--color-text-muted);
+}
+
+.tutorial-steps li::marker {
+  color: var(--color-accent-text);
+  font-family: var(--font-mono);
+  font-weight: var(--weight-semibold);
+}
+
+/* Formularios públicos (registro, verificación) ----------------------------- */
+
+.public-form-page {
+  display: grid;
+  place-items: center;
+  min-height: 100vh;
+  padding: var(--space-8);
+  background: var(--color-bg);
+}
+
+.public-form-card {
+  display: grid;
+  gap: var(--space-4);
+  width: min(100%, 35rem);
+  padding: var(--space-10);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-md);
+}
+
+.public-form-card h1 {
+  margin: 0;
+  font-size: var(--text-3xl);
+  line-height: var(--leading-tight);
+}
+
+.public-form-card p {
+  margin: 0;
+}
+
+.public-back-link {
+  justify-self: start;
+  color: var(--color-link);
+  font-weight: var(--weight-semibold);
+  text-decoration: none;
+}
+
+.public-back-link:hover {
+  color: var(--color-link-hover);
+  text-decoration: underline;
+}
+
+.public-consent {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+
+.public-consent a,
+.public-inline-link {
+  color: var(--color-link);
+  font-weight: var(--weight-semibold);
+  text-decoration: underline;
+}
+
+.public-form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.public-resend {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-5);
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-muted);
+}
+
+.public-resend h2 {
+  margin: 0;
+  font-size: var(--text-base);
+  letter-spacing: 0;
+}
+
+.public-resend p {
+  margin: 0;
+}
+
+.login-card .public-resend {
+  margin-top: var(--space-4);
+}
+
+.public-resend form {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.public-success {
+  color: var(--color-success-text);
+}
+
+/* Legales ------------------------------------------------------------------- */
+
+.legal-page {
+  max-width: 51.25rem;
+  margin: 0 auto;
+  padding: var(--space-8) var(--space-8) var(--space-16);
+}
+
+.legal-page h1 {
+  margin: var(--space-3) 0 var(--space-2);
+  font-size: clamp(2rem, 2vw + 1.25rem, 2.75rem);
+  line-height: var(--leading-tight);
+}
+
+.legal-page h2 {
+  margin: var(--space-8) 0 var(--space-2);
+  font-size: var(--text-xl);
+}
+
+.legal-page p,
+.legal-page li {
+  color: var(--color-text-muted);
+  line-height: 1.65;
+}
+
+.legal-page p a {
+  color: var(--color-link);
+  font-weight: var(--weight-semibold);
+  text-decoration: underline;
+}
+
+.legal-draft-note {
+  margin: var(--space-5) 0;
+  padding: var(--space-4);
+  border-left: 4px solid var(--color-warning-solid);
+  border-radius: var(--radius-md);
+  background: var(--color-warning-bg);
+  color: var(--color-warning-text);
+}
+
+.legal-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  margin-top: var(--space-10);
+  padding-top: var(--space-5);
+  border-top: var(--rule-dashed);
+}
+
+.legal-nav a {
+  color: var(--color-link);
+  font-weight: var(--weight-semibold);
+}
+
+/* 404 ----------------------------------------------------------------------- */
+
+.not-found-page {
+  display: grid;
+  place-items: center;
+  min-height: 100vh;
+  padding: var(--space-8) var(--space-4);
+  background: var(--color-bg);
+}
+
+.not-found-card {
+  display: grid;
+  gap: var(--space-4);
+  width: min(100%, 35rem);
+  padding: var(--space-10);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-md);
+  text-align: center;
+}
+
+.not-found-card h1 {
+  margin: 0;
+  font-size: var(--text-3xl);
+  line-height: var(--leading-tight);
+}
+
+.not-found-card p {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+
+.not-found-card .public-form-actions {
+  justify-content: center;
+}
+
+/* Responsive ---------------------------------------------------------------- */
+
+@media (max-width: 899px) {
+  .marketing-nav {
+    padding: var(--space-4);
+  }
+
+  .marketing-nav__links {
+    gap: var(--space-4);
+  }
+
+  .marketing-nav__links > .marketing-nav__link:not(.marketing-nav-login) {
+    display: none;
+  }
+
+  .marketing-nav-login {
+    font-weight: var(--weight-bold);
+  }
+
+  .marketing-hero {
+    padding: var(--space-6) var(--space-4) var(--space-12);
+  }
+
+  .marketing-hero__visual {
+    padding-right: var(--space-4);
+  }
+
+  .marketing-section,
+  .marketing-plans-band__inner {
+    padding: var(--space-16) var(--space-4);
+  }
+
+  .marketing-strip__inner,
+  .marketing-footer__inner,
+  .tutorial-hero,
+  .legal-page {
+    padding-inline: var(--space-4);
+  }
+
+  .tutorial-grid {
+    padding: var(--space-6) var(--space-4) var(--space-16);
+  }
+
+  .marketing-cta {
+    padding: 0 var(--space-4) var(--space-16);
+  }
+
+  .marketing-cta__band {
+    padding: var(--space-10) var(--space-6);
+  }
+
+  .public-form-page {
+    padding: var(--space-4);
+  }
+
+  .public-form-card,
+  .not-found-card {
+    padding: var(--space-6);
+  }
+}
+
+@media (max-width: 479px) {
+  .marketing-nav {
+    flex-wrap: nowrap;
+    gap: var(--space-3);
+  }
+
+  .marketing-nav .ui-brand {
+    --_glyph: 1.75rem;
+    gap: var(--space-2);
+  }
+
+  .marketing-nav .ui-brand__name {
+    font-size: var(--text-md);
+  }
+
+  .marketing-nav__links {
+    flex-wrap: nowrap;
+    gap: var(--space-3);
+    font-size: var(--text-sm);
+  }
+
+  .marketing-nav__cta {
+    min-height: var(--control-height-sm);
+    padding: 0 var(--space-3);
+  }
+
+  .marketing-hero__copy .marketing-kicker {
+    font-size: 0.6875rem;
+    letter-spacing: 0.04em;
+  }
+
+  .marketing-hero__ticket .ui-ticket__stamp {
+    top: 3rem;
+    right: -0.75rem;
+  }
+
+  .marketing-actions .ui-button {
+    flex: 1 1 100%;
+  }
+
+  .marketing-cta__band .ui-button {
+    width: 100%;
+  }
+}

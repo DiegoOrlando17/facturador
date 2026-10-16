@@ -34,7 +34,7 @@ export function ClientPortalPage() {
   const displayName = user?.email.split("@")[0] || "cliente";
 
   return (
-    <main className="client-main">
+    <div className="client-main">
       <header className="app-topbar">
         <div><strong>Hola, {displayName}</strong><span>Este es el resumen real de tu facturación.</span></div>
         <div className="app-topbar__actions">
@@ -84,6 +84,6 @@ export function ClientPortalPage() {
           </div>
         ) : <p className="client-empty-state">{isLoading ? "Cargando actividad…" : "No hay actividad para mostrar."}</p>}
       </section>
-    </main>
+    </div>
   );
 }

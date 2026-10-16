@@ -1,50 +1,46 @@
-import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { Outlet, useNavigate } from "react-router-dom";
 import { useTenantAuth } from "@/app/TenantAuthContext";
-import { BrandMark } from "@/components/brand/BrandMark";
-import { AppIcon, type AppIconName } from "@/components/ui/AppIcon";
+import { Shell, type ShellNavGroup } from "@/components/layout/Shell";
 
-const navigation: Array<{ label: string; icon: AppIconName; to?: string }> = [
-  { label: "Inicio", icon: "home", to: "/portal-cliente" },
-  { label: "Pagos y facturas", icon: "payments", to: "/portal-cliente/pagos" },
-  { label: "Comprobantes", icon: "invoice", to: "/portal-cliente/comprobantes" },
-  { label: "Reportes", icon: "reports", to: "/portal-cliente/reportes" },
-  { label: "Datos fiscales", icon: "tax", to: "/portal-cliente/perfil-fiscal" },
-  { label: "Integraciones", icon: "integrations", to: "/portal-cliente/integraciones" },
-  { label: "Puesta en marcha", icon: "onboarding", to: "/portal-cliente/onboarding" },
-  { label: "Plan y suscripción", icon: "invoice", to: "/portal-cliente/suscripcion" },
+const navigation: ShellNavGroup[] = [
+  {
+    items: [
+      { label: "Inicio", icon: "home", to: "/portal-cliente", end: true },
+      { label: "Ventas", icon: "payments", to: "/portal-cliente/pagos" },
+      { label: "Facturas", icon: "invoice", to: "/portal-cliente/comprobantes" },
+      { label: "Reportes", icon: "reports", to: "/portal-cliente/reportes" },
+    ],
+  },
+  {
+    label: "Tu empresa",
+    items: [
+      { label: "Datos fiscales", icon: "tax", to: "/portal-cliente/perfil-fiscal" },
+      { label: "Integraciones", icon: "integrations", to: "/portal-cliente/integraciones" },
+      { label: "Puesta en marcha", icon: "onboarding", to: "/portal-cliente/onboarding" },
+      { label: "Plan y suscripción", icon: "money", to: "/portal-cliente/suscripcion" },
+    ],
+  },
 ];
 
 export function ClientPortalLayout() {
   const navigate = useNavigate();
   const { logout, user } = useTenantAuth();
+  const companyName = user?.tenant?.name ?? "Tu empresa";
   const initials = (user?.tenant?.name || user?.email || "FC").slice(0, 2).toUpperCase();
 
   return (
-    <div className="client-portal-page">
-      <aside className="client-sidebar">
-        <div className="brand-lockup">
-          <BrandMark subtitle="Portal del cliente" />
-        </div>
-        <nav className="app-nav" aria-label="Portal cliente">
-          {navigation.map((item) => item.to ? (
-            <NavLink key={item.label} to={item.to} end={item.to === "/portal-cliente"} className={({ isActive }) => `app-nav__link${isActive ? " app-nav__link--active" : ""}`}>
-              <AppIcon name={item.icon} /><span>{item.label}</span>
-            </NavLink>
-          ) : (
-            <button key={item.label} type="button" className="app-nav__link client-nav-link--pending" disabled title="Disponible próximamente">
-              <AppIcon name={item.icon} /><span>{item.label}</span>
-            </button>
-          ))}
-        </nav>
-        <div className="sidebar-user-card">
-          <span className="sidebar-user-card__avatar">{initials}</span>
-          <div><strong>{user?.tenant?.name ?? "Empresa"}</strong><small>{user?.email}</small></div>
-        </div>
-        <button type="button" className="sidebar-logout-button" onClick={() => { logout(); navigate("/portal-cliente/login", { replace: true }); }}>
-          <AppIcon name="logout" /><span>Cerrar sesión</span>
-        </button>
-      </aside>
+    <Shell
+      brandSubtitle="Portal del cliente"
+      homeTo="/portal-cliente"
+      navLabel="Portal del cliente"
+      groups={navigation}
+      user={{ name: companyName, detail: user?.email, initials }}
+      onLogout={() => {
+        logout();
+        navigate("/portal-cliente/login", { replace: true });
+      }}
+    >
       <Outlet />
-    </div>
+    </Shell>
   );
 }

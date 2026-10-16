@@ -57,7 +57,16 @@ const DEMO_SALES: DemoSale[] = [
   { id: "s5", date: "2026-10-15T12:02:00Z", customer: "Consumidor final", method: "qr", cbteTipo: 11, ptoVta: 3, cbteNro: null, amount: 845, status: "processing" },
 ];
 
-const BUTTON_VARIANTS: ButtonVariant[] = ["primary", "secondary", "ghost", "danger", "danger-soft", "link"];
+const BUTTON_VARIANTS: ButtonVariant[] = ["primary", "accent", "secondary", "ghost", "danger", "danger-soft", "link"];
+const BUTTON_LABELS: Record<ButtonVariant, string> = {
+  primary: "Guardar cambios",
+  accent: "Crear mi cuenta",
+  secondary: "Exportar",
+  ghost: "Cancelar",
+  danger: "Eliminar",
+  "danger-soft": "Anular",
+  link: "Ver detalle",
+};
 const TONES: StatusTone[] = ["success", "warning", "danger", "info", "neutral"];
 const KIND_TITLES: Record<StatusKind, string> = {
   payment: "Ventas (Payment.status)",
@@ -176,14 +185,15 @@ export function ComponentCatalogPage() {
   }
 
   return (
-    <main className="catalog-page">
+    <div className="catalog-page">
       <PageHeader
         title="Catálogo de componentes"
+        eyebrow="Sistema de diseño · Mostrador"
         description="Referencia viva del sistema de diseño: cada componente compartido en todas sus variantes. Usalo para revisar cambios visuales antes de migrar pantallas."
         breadcrumb={[{ label: "Inicio", to: "/admin" }, { label: "Sistema de diseño" }, { label: "Catálogo" }]}
         meta={
           <>
-            <span>Fase 2 · componentes compartidos</span>
+            <span>Dirección de marca “Mostrador” · Bricolage Grotesque, Figtree y JetBrains Mono</span>
             <StatusBadge tone="info" dot>Interno</StatusBadge>
           </>
         }
@@ -232,14 +242,18 @@ export function ComponentCatalogPage() {
         </div>
       </Section>
 
-      <Section id="botones" title="Botones" description="Un único botón con variantes. Navegar = ButtonLink (semántica de enlace).">
+      <Section
+        id="botones"
+        title="Botones"
+        description="Un único botón con variantes. primary (yerba) para la acción principal de la app; accent (terracota) solo para CTA del sitio público. Navegar = ButtonLink."
+      >
         <div className="catalog-stack">
           {(["sm", "md", "lg"] as const).map((size) => (
             <Specimen key={size} label={`Tamaño ${size}`}>
               <div className="catalog-row">
                 {BUTTON_VARIANTS.map((variant) => (
                   <Button key={variant} variant={variant} size={size}>
-                    {variant === "danger-soft" ? "Anular" : variant === "danger" ? "Eliminar" : variant === "link" ? "Ver detalle" : variant === "primary" ? "Guardar cambios" : variant === "ghost" ? "Cancelar" : "Exportar"}
+                    {BUTTON_LABELS[variant]}
                   </Button>
                 ))}
               </div>
@@ -279,6 +293,17 @@ export function ComponentCatalogPage() {
               {TONES.map((tone) => (
                 <StatusBadge key={tone} tone={tone} size="md" dot>{tone}</StatusBadge>
               ))}
+            </div>
+          </Specimen>
+          <Specimen label="Sello (stamp) · automático en kind=invoice ISSUED / CANCELED, o con la prop stamp">
+            <div className="catalog-row">
+              <StatusBadge kind="invoice" value="ISSUED" />
+              <StatusBadge kind="invoice" value="CANCELED" />
+              <StatusBadge tone="success" stamp>CAE OK</StatusBadge>
+              <StatusBadge tone="danger" stamp size="md">Anulada</StatusBadge>
+              <StatusBadge kind="invoice" value="PENDING_CONFIRMATION" />
+              <StatusBadge kind="invoice" value="FAILED" />
+              <StatusBadge kind="invoice" value="ISSUED" stamp={false} dot />
             </div>
           </Specimen>
           <div className="catalog-grid catalog-grid--2">
@@ -346,6 +371,25 @@ export function ComponentCatalogPage() {
             )}
           </Tabs>
         </Card>
+        <Specimen label='variant="chips" · filtros de listados (como en Facturas)'>
+          <Tabs
+            label="Filtrar facturas"
+            variant="chips"
+            items={[
+              { id: "todas", label: "Todas", count: 418 },
+              { id: "confirmar", label: "Para confirmar", count: 3, countTone: "warning" },
+              { id: "emitidas", label: "Emitidas", count: 412 },
+              { id: "error", label: "Con error", count: 1, countTone: "danger" },
+              { id: "anuladas", label: "Anuladas", count: 2 },
+            ]}
+          >
+            {(active) => (
+              <p className="catalog-muted">
+                Filtro activo: <strong>{active}</strong>.
+              </p>
+            )}
+          </Tabs>
+        </Specimen>
       </Section>
 
       <Section id="tablas" title="Tablas" description="Tabla real en escritorio; debajo de 640px cada fila es una tarjeta. Click en una fila (o Enter) dispara la acción.">
@@ -466,7 +510,7 @@ export function ComponentCatalogPage() {
               <TicketRow label="Cliente" value="Consumidor final" />
               <TicketRow label="Medio de pago" value="Tarjeta de débito" />
               <TicketRow label="CAE" value={<FiscalNumber kind="cae" value="75412345678901" />} />
-              <TicketRow label="Vencimiento CAE" value="25/10/2026" />
+              <TicketRow label="Vencimiento CAE" value="25/10/2026" mono />
               <TicketRow label="Total" value={<Money value={18450.5} />} emphasis />
             </TicketRows>
             <TicketDivider />
@@ -479,8 +523,17 @@ export function ComponentCatalogPage() {
             <Specimen label="Stamp · sm / md / lg">
               <div className="catalog-row catalog-row--stamps">
                 <Stamp size="sm" animate={false} />
-                <Stamp sublabel="ARCA" animate={false} />
+                <Stamp sublabel="ARCA" label="AL DÍA" animate={false} />
                 <Stamp size="lg" sublabel="15/10/2026" animate={false} />
+              </div>
+            </Specimen>
+            <Specimen label="Animación de sellado (respeta prefers-reduced-motion)">
+              <div className="catalog-row catalog-row--stamps">
+                <Stamp key={`replay-${stampKey}`} sublabel="15/10/2026" />
+                <Stamp key={`replay-void-${stampKey}`} tone="danger" label="ANULADA" sublabel="16/10/2026" />
+                <Button size="sm" variant="secondary" iconLeft="refresh" onClick={() => setStampKey((value) => value + 1)}>
+                  Volver a sellar
+                </Button>
               </div>
             </Specimen>
             <Specimen label="Stamp · danger (anulada)">
@@ -517,7 +570,6 @@ export function ComponentCatalogPage() {
         <div className="catalog-grid catalog-grid--2">
           <Card padding="sm">
             <EmptyState
-              icon="receipt"
               title="Todavía no hay facturas."
               description="Cuando Mercado Pago registre tu primera venta, la facturamos sola y la vas a ver acá."
               action={<ButtonLink to="/admin/ui" variant="secondary" size="sm">Ver cómo funciona</ButtonLink>}
@@ -601,6 +653,6 @@ export function ComponentCatalogPage() {
       >
         <p className="catalog-muted">Los diálogos se montan en el body con un portal y bloquean el scroll de la página.</p>
       </Modal>
-    </main>
+    </div>
   );
 }

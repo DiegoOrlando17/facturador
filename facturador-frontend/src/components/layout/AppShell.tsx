@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Link, NavLink, useLocation } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 import { useAuth } from "@/app/AuthContext";
-import { BrandMark } from "@/components/brand/BrandMark";
+import { Shell, type ShellNavGroup } from "@/components/layout/Shell";
 import { AppIcon } from "@/components/ui/AppIcon";
 import { BRAND } from "@/config/brand";
 import { useApiResource } from "@/hooks/useApiResource";
@@ -21,7 +21,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const fullName = user?.name?.trim() || user?.email || "";
   const initials = getAdminInitials(user?.name, user?.email);
   const roleName = getAdminRoleName(user?.role);
-  const showTopbar = location.pathname === "/admin";
+  const isDashboard = location.pathname === "/admin";
   const isClientsSection = location.pathname === "/admin/tenants";
   const isOnboardingTab = isClientsSection && new URLSearchParams(location.search).get("tab") === ONBOARDING_TAB;
   const isClientsActive = location.pathname.startsWith("/admin/tenants") && !isOnboardingTab;
@@ -59,119 +59,61 @@ export function AppShell({ children }: { children: ReactNode }) {
     ? lastDashboardUpdate.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" })
     : "Sin actualizar";
 
+  const groups: ShellNavGroup[] = [
+    {
+      label: "Operación diaria",
+      items: [
+        { label: "Inicio", icon: "home", to: "/admin", end: true },
+        { label: "Clientes", icon: "clients", to: "/admin/tenants", isActive: isClientsActive },
+        { label: "Altas", icon: "onboarding", to: `/admin/tenants?tab=${ONBOARDING_TAB}`, isActive: isOnboardingTab },
+        { label: "Facturación", icon: "invoice", to: "/admin/billing" },
+        { label: "Integraciones", icon: "integrations", to: "/admin/integrations" },
+        {
+          label: "Alertas",
+          icon: "bell",
+          to: "/admin/alerts",
+          count: alertsCount,
+          countLabel: `${alertsCount} ${alertsCount === 1 ? "alerta activa" : "alertas activas"}`,
+        },
+      ],
+    },
+    {
+      label: "Administración interna",
+      items: [
+        { label: "Auditoría", icon: "shield", to: "/admin/audit" },
+        ...(user?.role === "SUPERADMIN"
+          ? [
+              { label: "Configuración", icon: "settings" as const, to: "/admin/settings" },
+              { label: "Admins", icon: "admins" as const, to: "/admin/admins" },
+            ]
+          : []),
+      ],
+    },
+  ];
+
   return (
-    <div className="app-shell">
-      <aside className="app-sidebar">
-        <Link to="/admin" className="brand-lockup">
-          <BrandMark subtitle="Panel interno" />
-        </Link>
-
-        <nav className="app-nav" aria-label="Principal">
-          <span className="app-nav__group">Operación diaria</span>
-          <NavLink
-            to="/admin"
-            end
-            className={({ isActive }) => `app-nav__link${isActive ? " app-nav__link--active" : ""}`}
-          >
-            <AppIcon name="home" />
-            <span>Inicio</span>
-          </NavLink>
-          <Link
-            to="/admin/tenants"
-            className={`app-nav__link${isClientsActive ? " app-nav__link--active" : ""}`}
-            aria-current={isClientsActive ? "page" : undefined}
-          >
-            <AppIcon name="clients" />
-            <span>Clientes</span>
-          </Link>
-          <Link
-            to={`/admin/tenants?tab=${ONBOARDING_TAB}`}
-            className={`app-nav__link${isOnboardingTab ? " app-nav__link--active" : ""}`}
-            aria-current={isOnboardingTab ? "page" : undefined}
-          >
-            <AppIcon name="onboarding" />
-            <span>Altas</span>
-          </Link>
-          <NavLink
-            to="/admin/billing"
-            className={({ isActive }) => `app-nav__link${isActive ? " app-nav__link--active" : ""}`}
-          >
-            <AppIcon name="invoice" />
-            <span>Facturación</span>
-          </NavLink>
-          <NavLink
-            to="/admin/integrations"
-            className={({ isActive }) => `app-nav__link${isActive ? " app-nav__link--active" : ""}`}
-          >
-            <AppIcon name="integrations" />
-            <span>Integraciones</span>
-          </NavLink>
-          <NavLink
-            to="/admin/alerts"
-            className={({ isActive }) => `app-nav__link${isActive ? " app-nav__link--active" : ""}`}
-          >
-            <AppIcon name="bell" />
-            <span>Alertas</span>
-            {alertsCount > 0 ? (
-              <small
-                className="app-nav__badge phase1-nav-badge"
-                aria-label={`${alertsCount} ${alertsCount === 1 ? "alerta activa" : "alertas activas"}`}
-              >
-                {alertsCount > 99 ? "99+" : alertsCount}
-              </small>
-            ) : null}
-          </NavLink>
-          <span className="app-nav__group">Administración interna</span>
-          <NavLink
-            to="/admin/audit"
-            className={({ isActive }) => `app-nav__link${isActive ? " app-nav__link--active" : ""}`}
-          >
-            <AppIcon name="shield" />
-            <span>Auditoría</span>
-          </NavLink>
-          {user?.role === "SUPERADMIN" ? (
-            <>
-              <NavLink
-                to="/admin/settings"
-                className={({ isActive }) => `app-nav__link${isActive ? " app-nav__link--active" : ""}`}
-              >
-                <AppIcon name="settings" />
-                <span>Configuración</span>
-              </NavLink>
-              <NavLink
-                to="/admin/admins"
-                className={({ isActive }) => `app-nav__link${isActive ? " app-nav__link--active" : ""}`}
-              >
-                <AppIcon name="admins" />
-                <span>Admins</span>
-              </NavLink>
-            </>
-          ) : null}
-        </nav>
-
-        <Link to="/admin/account" className="sidebar-user-card phase1-user-card" aria-label={`Mi cuenta: ${fullName}`}>
-          <span className="sidebar-user-card__avatar" aria-hidden="true">{initials}</span>
-          <div>
-            <strong>{fullName || "Mi cuenta"}</strong>
-            <small>{roleName}</small>
-          </div>
-        </Link>
-        <button type="button" className="sidebar-logout-button" onClick={logout}>
-          <AppIcon name="logout" />
-          <span>Cerrar sesión</span>
-        </button>
-      </aside>
-
-      <div className="app-main">
-        <header className={`app-topbar${showTopbar ? "" : " app-topbar--section-hidden"}`}>
+    <Shell
+      brandSubtitle="Panel interno"
+      homeTo="/admin"
+      navLabel="Principal"
+      groups={groups}
+      user={{
+        name: fullName || "Mi cuenta",
+        detail: roleName,
+        initials,
+        to: "/admin/account",
+        ariaLabel: `Mi cuenta: ${fullName}`,
+      }}
+      onLogout={logout}
+    >
+      {isDashboard ? (
+        <header className="app-topbar">
           <div>
             <strong className="topbar-greeting">{displayName ? `Hola, ${displayName}` : "Hola"}</strong>
             <span>Panel interno de {BRAND.name}</span>
           </div>
           <div className="app-topbar__actions">
-            <span className="topbar-sync">
-              Última actualización: {lastUpdatedLabel}
-            </span>
+            <span className="topbar-sync">Última actualización: {lastUpdatedLabel}</span>
             <button
               type="button"
               className="secondary-button topbar-refresh-button"
@@ -182,9 +124,9 @@ export function AppShell({ children }: { children: ReactNode }) {
             </button>
           </div>
         </header>
+      ) : null}
 
-        {children}
-      </div>
-    </div>
+      {children}
+    </Shell>
   );
 }

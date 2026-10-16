@@ -204,7 +204,7 @@ export function PaymentDetailPage() {
   }
 
   return (
-    <main className="shell shell--app">
+    <div className="shell shell--app">
       <section className="panel detail-header">
         <div>
           <Link to={payment ? `/admin/tenants/${payment.tenant.slug}` : "/admin/tenants"} className="eyebrow">
@@ -456,6 +456,6 @@ export function PaymentDetailPage() {
           </section>
         </>
       ) : null}
-    </main>
+    </div>
   );
 }

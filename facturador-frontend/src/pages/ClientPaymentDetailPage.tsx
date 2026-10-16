@@ -53,7 +53,7 @@ export function ClientPaymentDetailPage() {
   }
 
   return (
-    <main className="client-main client-payment-detail-page">
+    <div className="client-main client-payment-detail-page">
       <header className="app-topbar">
         <div>
           <Link to="/portal-cliente/pagos" className="eyebrow">Volver a pagos</Link>
@@ -98,6 +98,6 @@ export function ClientPaymentDetailPage() {
               {payment.events.length ? <div className="payment-events-list">{payment.events.map((event) => <article className="payment-event-card" key={event.id}><div className="payment-event-card__header"><strong>{getPaymentEventLabel(event.type)}</strong><span>{formatDateTime(event.createdAt)}</span></div><p>{event.message}</p></article>)}</div> : <div className="panel-state"><strong>Todavía no hay actividad registrada</strong></div>}
             </section>
           </> : null}
-    </main>
+    </div>
   );
 }
