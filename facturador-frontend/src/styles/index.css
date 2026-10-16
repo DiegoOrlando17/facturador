@@ -1,0 +1,22 @@
+/*
+ * Punto de entrada de estilos. El orden de capas define la prioridad: una capa
+ * posterior gana sobre las anteriores sin necesidad de especificidad ni !important.
+ *
+ *  legacy      global.css histórico; se vacía a medida que se migra.
+ *  tokens      variables de diseño.
+ *  base        reset, tipografía, foco, movimiento reducido.
+ *  layout      shell de admin y portal.
+ *  components  componentes compartidos (src/components/ui).
+ *  pages       estilos propios de páginas nuevas.
+ *  utilities   utilidades de una sola responsabilidad.
+ */
+@layer legacy, tokens, base, layout, components, pages, utilities;
+
+@import "./theme.css" layer(legacy);
+@import "./global.css" layer(legacy);
+@import "./tokens.css" layer(tokens);
+@import "./base.css" layer(base);
+@import "./layout/index.css" layer(layout);
+@import "./components/index.css" layer(components);
+@import "./pages/index.css" layer(pages);
+@import "./utilities.css" layer(utilities);

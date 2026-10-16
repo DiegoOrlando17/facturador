@@ -119,6 +119,12 @@ export const router = createBrowserRouter([{
         path: "payments/:id",
         element: <PaymentDetailPage />,
       },
+      {
+        // Catálogo interno del sistema de diseño (solo admins logueados). Carga diferida:
+        // no suma peso al bundle principal.
+        path: "ui",
+        lazy: async () => ({ Component: (await import("@/pages/ComponentCatalogPage")).ComponentCatalogPage }),
+      },
     ],
   },
   { path: "*", element: <NotFoundPage /> },

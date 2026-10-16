@@ -1,0 +1,25 @@
+/* Utilidades de una sola responsabilidad. */
+
+/* Cifras de ancho fijo para montos, CUIT, CAE y contadores. */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Identificadores (CUIT, CAE, números de comprobante) en monoespaciada. */
+.font-mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Oculta visualmente pero mantiene el texto para lectores de pantalla. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}

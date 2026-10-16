@@ -1,5 +1,6 @@
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useTenantAuth } from "@/app/TenantAuthContext";
+import { BrandMark } from "@/components/brand/BrandMark";
 import { AppIcon, type AppIconName } from "@/components/ui/AppIcon";
 
 const navigation: Array<{ label: string; icon: AppIconName; to?: string }> = [
@@ -22,8 +23,7 @@ export function ClientPortalLayout() {
     <div className="client-portal-page">
       <aside className="client-sidebar">
         <div className="brand-lockup">
-          <span className="app-logo"><AppIcon name="invoice" /></span>
-          <div><strong>Facturador</strong><p>Portal del cliente</p></div>
+          <BrandMark subtitle="Portal del cliente" />
         </div>
         <nav className="app-nav" aria-label="Portal cliente">
           {navigation.map((item) => item.to ? (

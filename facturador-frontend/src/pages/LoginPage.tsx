@@ -1,7 +1,9 @@
 import { useState, type FormEvent } from "react";
 import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/app/AuthContext";
+import { BrandMark } from "@/components/brand/BrandMark";
 import { AppIcon } from "@/components/ui/AppIcon";
+import { BRAND } from "@/config/brand";
 
 type LocationState = {
   from?: {
@@ -52,19 +54,7 @@ export function LoginPage() {
       <div className="login-background-mark" aria-hidden="true" />
       <section className="login-content">
         <div className="login-brand-row">
-          <span className="login-logo" aria-hidden="true">
-            <svg viewBox="0 0 48 56" role="img">
-              <path d="M12 4h22l10 10v34a4 4 0 0 1-4 4H12a4 4 0 0 1-4-4V8a4 4 0 0 1 4-4Z" />
-              <path d="M34 4v12h10" />
-              <path d="M17 28h10M17 38h7" />
-              <circle cx="35" cy="36" r="9" />
-              <path d="m31 36 3 3 6-7" />
-            </svg>
-          </span>
-          <div>
-            <strong>Facturador</strong>
-            <span>Portal de gestion fiscal y cobranzas</span>
-          </div>
+          <BrandMark size="lg" subtitle="Panel interno" />
         </div>
 
         <section className="login-hero">
@@ -175,13 +165,13 @@ export function LoginPage() {
             <span aria-hidden="true">
               <AppIcon name="help" />
             </span>
-            <p>Necesitas ayuda para ingresar? <a href="mailto:soporte@dorlando.com">Contacta a soporte.</a></p>
+            <p>¿Necesitás ayuda para ingresar? Escribinos a <a href={`mailto:${BRAND.supportEmail}`}>{BRAND.supportEmail}</a>.</p>
           </div>
         </div>
       </section>
 
       <footer className="login-legal">
-        <span>&copy; 2026 Facturador. Todos los derechos reservados.</span>
+        <span>&copy; 2026 {BRAND.name}. Todos los derechos reservados.</span>
         <Link to="/terminos">Términos y condiciones</Link>
         <Link to="/privacidad">Política de privacidad</Link>
         <Link to="/arrepentimiento">Botón de arrepentimiento</Link>

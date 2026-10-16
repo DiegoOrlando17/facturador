@@ -1,0 +1,61 @@
+/* Money y FiscalNumber: monoespaciada con cifras tabulares. */
+
+.ui-money,
+.ui-fiscal {
+  font-family: var(--font-mono);
+  font-feature-settings: "tnum" 1;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+  white-space: nowrap;
+}
+
+.ui-money {
+  color: inherit;
+  font-weight: var(--weight-medium);
+}
+
+.ui-money--sm {
+  font-size: var(--text-sm);
+}
+
+.ui-money--md {
+  font-size: inherit;
+}
+
+.ui-money--lg {
+  font-size: var(--text-xl);
+  font-weight: var(--weight-medium);
+  letter-spacing: var(--tracking-tight);
+}
+
+.ui-money--xl {
+  font-size: var(--text-3xl);
+  font-weight: var(--weight-medium);
+  letter-spacing: var(--tracking-tight);
+  line-height: var(--leading-tight);
+}
+
+.ui-money__cents {
+  color: var(--color-text-subtle);
+  font-size: 0.72em;
+}
+
+.ui-money--positive {
+  color: var(--color-success-text);
+}
+
+.ui-money--negative {
+  color: var(--color-danger-text);
+}
+
+.ui-money--empty,
+.ui-fiscal--empty {
+  color: var(--color-text-subtle);
+  font-family: var(--font-sans);
+  font-weight: var(--weight-regular);
+}
+
+.ui-fiscal {
+  color: inherit;
+  font-size: 0.95em;
+}

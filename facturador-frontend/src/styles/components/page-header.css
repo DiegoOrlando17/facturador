@@ -1,0 +1,121 @@
+/* PageHeader y migas de pan */
+
+.ui-page-header {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0 0 var(--space-6);
+}
+
+.ui-page-header__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-4) var(--space-6);
+}
+
+.ui-page-header__text {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+  flex: 1 1 24rem;
+}
+
+.ui-page-header__title {
+  margin: 0;
+  color: var(--color-text-brand);
+  font-family: var(--font-sans);
+  font-size: var(--text-2xl);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-tight);
+  line-height: var(--leading-tight);
+}
+
+.ui-page-header__description {
+  max-width: 68ch;
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+}
+
+.ui-page-header__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
+  color: var(--color-text-subtle);
+  font-size: var(--text-sm);
+}
+
+.ui-page-header__meta svg {
+  width: 0.875rem;
+  height: 0.875rem;
+}
+
+.ui-page-header__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.ui-breadcrumb ol {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-sm);
+}
+
+.ui-breadcrumb li {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--color-text-subtle);
+}
+
+.ui-breadcrumb a {
+  border-radius: var(--radius-sm);
+  color: var(--color-text-muted);
+  text-decoration: none;
+}
+
+.ui-breadcrumb a:hover {
+  color: var(--color-link);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.ui-breadcrumb a:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+.ui-breadcrumb [aria-current="page"] {
+  color: var(--color-text);
+  font-weight: var(--weight-medium);
+}
+
+.ui-breadcrumb__sep {
+  width: 0.875rem;
+  height: 0.875rem;
+  color: var(--color-text-subtle);
+}
+
+@media (max-width: 639px) {
+  .ui-page-header {
+    margin-bottom: var(--space-5);
+  }
+
+  .ui-page-header__title {
+    font-size: var(--text-xl);
+  }
+
+  .ui-page-header__actions {
+    width: 100%;
+  }
+}

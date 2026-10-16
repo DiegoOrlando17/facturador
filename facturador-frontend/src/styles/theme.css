@@ -1,30 +1,26 @@
+/*
+ * Alias de compatibilidad (capa legacy). Las variables del prototipo original
+ * ahora apuntan a los tokens semánticos de tokens.css. global.css ya no las usa;
+ * se conservan por si algún estilo inline o código viejo las referencia.
+ * No usar en código nuevo: borrar este archivo cuando se elimine global.css.
+ */
 :root {
-  font-family: "Segoe UI", "Aptos", Arial, sans-serif;
-  line-height: 1.5;
-  font-weight: 400;
-  color: #1f2933;
-  background: #edf1f5;
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-
-  --bg: #edf1f5;
-  --surface: #ffffff;
-  --surface-soft: #f8fafc;
-  --surface-warm: #fffdf8;
-  --border: #dfe6ee;
-  --border-strong: #d2dbe5;
-  --text: #1f2933;
-  --muted: #64707d;
-  --muted-strong: #53616f;
-  --primary: #1d4f91;
-  --primary-soft: #eaf2ff;
-  --success: #13764f;
-  --success-soft: #e5f7ef;
-  --warning: #9a5a00;
-  --warning-soft: #fff1d6;
-  --danger: #b42318;
-  --danger-soft: #fdecea;
-  --shadow: 0 20px 50px rgba(31, 41, 51, 0.1);
+  --bg: var(--color-bg);
+  --surface: var(--color-surface);
+  --surface-soft: var(--color-surface-muted);
+  --surface-warm: var(--color-surface-paper);
+  --border: var(--color-border);
+  --border-strong: var(--color-border-strong);
+  --text: var(--color-text);
+  --muted: var(--color-text-muted);
+  --muted-strong: var(--color-text-muted);
+  --primary: var(--color-action);
+  --primary-soft: var(--color-action-soft);
+  --success: var(--color-success-text);
+  --success-soft: var(--color-success-bg);
+  --warning: var(--color-warning-text);
+  --warning-soft: var(--color-warning-bg);
+  --danger: var(--color-danger-text);
+  --danger-soft: var(--color-danger-bg);
+  --shadow: var(--shadow-lg);
 }

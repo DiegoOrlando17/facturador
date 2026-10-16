@@ -1,0 +1,16 @@
+/* Un @import por componente de src/components/ui. */
+@import "./a11y.css";
+@import "./brand.css";
+@import "./button.css";
+@import "./badge.css";
+@import "./card.css";
+@import "./page-header.css";
+@import "./table.css";
+@import "./pagination.css";
+@import "./tabs.css";
+@import "./dialog.css";
+@import "./toast.css";
+@import "./state.css";
+@import "./field.css";
+@import "./money.css";
+@import "./ticket.css";

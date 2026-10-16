@@ -1,11 +1,5 @@
 export const ARGENTINA_TIMEZONE = "America/Argentina/Buenos_Aires";
 
-const currencyFormatter = new Intl.NumberFormat("es-AR", {
-  style: "currency",
-  currency: "ARS",
-  maximumFractionDigits: 0,
-});
-
 const dateTimeFormatter = new Intl.DateTimeFormat("es-AR", {
   day: "2-digit",
   month: "short",
@@ -22,26 +16,79 @@ const fiscalDateFormatter = new Intl.DateTimeFormat("es-AR", {
   timeZone: "UTC",
 });
 
-const moneyFormatters = new Map<string, Intl.NumberFormat>();
+const numberFormatters = new Map<string, Intl.NumberFormat>();
 
-export function formatCurrency(amount: number | null | undefined) {
-  return currencyFormatter.format(amount || 0);
+type CurrencyFormatOptions = {
+  /** Decimales a mostrar (2 por defecto: los comprobantes tienen centavos). */
+  decimals?: number;
+  /** `"always"` para mostrar el + en importes positivos (diferencias, saldos). */
+  signDisplay?: "auto" | "always" | "exceptZero" | "never";
+};
+
+/** Convierte números, strings decimales del backend (Prisma Decimal) y nulos a número. */
+export function toAmount(value: number | string | null | undefined) {
+  if (value === null || value === undefined || value === "") return 0;
+  const parsed = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
 }
 
-/** Importe con centavos en la moneda indicada (ARS por defecto). */
-export function formatMoney(amount: number | string | null | undefined, currency: string | null | undefined = "ARS") {
+/** Formateador cacheado. Si la moneda no es un código ISO válido, cae a número con 2 decimales. */
+export function getCurrencyFormatter(currency: string | null | undefined = "ARS", options: CurrencyFormatOptions = {}) {
   const code = (currency || "ARS").toUpperCase();
-  let formatter = moneyFormatters.get(code);
+  const decimals = options.decimals ?? 2;
+  const signDisplay = options.signDisplay ?? "auto";
+  const key = `${code}|${decimals}|${signDisplay}`;
+  let formatter = numberFormatters.get(key);
   if (!formatter) {
     try {
-      formatter = new Intl.NumberFormat("es-AR", { style: "currency", currency: code, minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      formatter = new Intl.NumberFormat("es-AR", {
+        style: "currency",
+        currency: code,
+        minimumFractionDigits: decimals,
+        maximumFractionDigits: decimals,
+        signDisplay,
+      });
     } catch {
-      formatter = new Intl.NumberFormat("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      formatter = new Intl.NumberFormat("es-AR", { minimumFractionDigits: decimals, maximumFractionDigits: decimals, signDisplay });
     }
-    moneyFormatters.set(code, formatter);
+    numberFormatters.set(key, formatter);
   }
-  const value = typeof amount === "string" ? Number(amount) : amount;
-  return formatter.format(Number.isFinite(value) ? Number(value) : 0);
+  return formatter;
+}
+
+/**
+ * Importe en la moneda indicada (ARS por defecto) con 2 decimales.
+ * `formatCurrency(1234.5)` → "$ 1.234,50"; `formatCurrency(10, "USD")` → "US$ 10,00".
+ */
+export function formatCurrency(
+  amount: number | string | null | undefined,
+  currency: string | null | undefined = "ARS",
+  options: CurrencyFormatOptions = {},
+) {
+  return getCurrencyFormatter(currency, options).format(toAmount(amount));
+}
+
+/** @deprecated Alias de formatCurrency (se mantiene por compatibilidad). */
+export function formatMoney(amount: number | string | null | undefined, currency: string | null | undefined = "ARS") {
+  return formatCurrency(amount, currency);
+}
+
+/** Número con separadores de es-AR. `formatNumber(1234.5, { decimals: 1 })` → "1.234,5". */
+export function formatNumber(value: number | string | null | undefined, options: { decimals?: number; fallback?: string } = {}) {
+  if (value === null || value === undefined || value === "") return options.fallback ?? "0";
+  const parsed = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(parsed)) return options.fallback ?? "0";
+  const decimals = options.decimals;
+  const key = `number|${decimals ?? "auto"}`;
+  let formatter = numberFormatters.get(key);
+  if (!formatter) {
+    formatter = new Intl.NumberFormat(
+      "es-AR",
+      decimals === undefined ? { maximumFractionDigits: 2 } : { minimumFractionDigits: decimals, maximumFractionDigits: decimals },
+    );
+    numberFormatters.set(key, formatter);
+  }
+  return formatter.format(parsed);
 }
 
 export function formatDateTime(value: string | null | undefined) {

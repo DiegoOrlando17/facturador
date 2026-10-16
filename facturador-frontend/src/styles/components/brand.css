@@ -1,0 +1,119 @@
+/* BrandMark: logo + nombre. Se fija todo explícitamente porque convive con
+   reglas legacy (.brand-lockup strong, .login-brand-row span, ...). */
+
+.ui-brand {
+  --_glyph: 2.25rem;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin: 0;
+  color: var(--color-text-brand);
+  font-family: var(--font-sans);
+  line-height: 1;
+  text-decoration: none;
+  vertical-align: middle;
+}
+
+.ui-brand--sm {
+  --_glyph: 1.75rem;
+  gap: var(--space-2);
+}
+
+.ui-brand--lg {
+  --_glyph: 3rem;
+  gap: var(--space-4);
+}
+
+.ui-brand__glyph {
+  display: block;
+  flex: none;
+  width: var(--_glyph);
+  height: var(--_glyph);
+}
+
+.ui-brand__glyph-bg {
+  fill: var(--color-surface-inverse);
+}
+
+.ui-brand__glyph-paper {
+  fill: var(--color-surface-paper);
+}
+
+.ui-brand__glyph-line {
+  fill: var(--color-text-brand);
+  opacity: 0.45;
+}
+
+.ui-brand__glyph-stamp {
+  fill: var(--color-success-solid);
+  stroke: var(--color-surface-inverse);
+  stroke-width: 1.5;
+}
+
+.ui-brand__glyph-check {
+  fill: none;
+  stroke: var(--color-text-inverse);
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.ui-brand__text {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin: 0;
+  min-width: 0;
+  color: inherit;
+  font-size: inherit;
+}
+
+.ui-brand__name {
+  display: block;
+  margin: 0;
+  color: inherit;
+  font-size: var(--text-md);
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-tight);
+  line-height: var(--leading-tight);
+}
+
+.ui-brand--sm .ui-brand__name {
+  font-size: var(--text-base);
+}
+
+.ui-brand--lg .ui-brand__name {
+  font-size: var(--text-2xl);
+}
+
+.ui-brand__subtitle {
+  display: block;
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  letter-spacing: var(--tracking-caps);
+  line-height: var(--leading-snug);
+  text-transform: uppercase;
+}
+
+.ui-brand--lg .ui-brand__subtitle {
+  font-size: var(--text-sm);
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.ui-brand--inverse {
+  color: var(--color-text-inverse);
+}
+
+.ui-brand--inverse .ui-brand__subtitle {
+  color: var(--color-text-inverse);
+  opacity: 0.72;
+}
+
+.ui-brand--inverse .ui-brand__glyph-bg {
+  stroke: var(--color-text-inverse);
+  stroke-opacity: 0.2;
+  stroke-width: 1;
+}

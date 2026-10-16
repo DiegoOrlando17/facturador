@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link, NavLink, useLocation } from "react-router-dom";
 import { useAuth } from "@/app/AuthContext";
+import { BrandMark } from "@/components/brand/BrandMark";
 import { AppIcon } from "@/components/ui/AppIcon";
+import { BRAND } from "@/config/brand";
 import { useApiResource } from "@/hooks/useApiResource";
 import { getAdminInitials, getAdminRoleName } from "@/lib/adminPermissions";
 
@@ -61,19 +63,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     <div className="app-shell">
       <aside className="app-sidebar">
         <Link to="/admin" className="brand-lockup">
-          <span className="app-logo" aria-hidden="true">
-            <svg viewBox="0 0 48 56">
-              <path d="M12 4h22l10 10v34a4 4 0 0 1-4 4H12a4 4 0 0 1-4-4V8a4 4 0 0 1 4-4Z" />
-              <path d="M34 4v12h10" />
-              <path d="M17 28h10M17 38h7" />
-              <circle cx="35" cy="36" r="9" />
-              <path d="m31 36 3 3 6-7" />
-            </svg>
-          </span>
-          <div>
-            <strong>Facturador</strong>
-            <p>Panel interno</p>
-          </div>
+          <BrandMark subtitle="Panel interno" />
         </Link>
 
         <nav className="app-nav" aria-label="Principal">
@@ -176,7 +166,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <header className={`app-topbar${showTopbar ? "" : " app-topbar--section-hidden"}`}>
           <div>
             <strong className="topbar-greeting">{displayName ? `Hola, ${displayName}` : "Hola"}</strong>
-            <span>Panel interno de Facturador</span>
+            <span>Panel interno de {BRAND.name}</span>
           </div>
           <div className="app-topbar__actions">
             <span className="topbar-sync">

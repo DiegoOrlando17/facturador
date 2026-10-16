@@ -2,7 +2,8 @@ import { useState, type FormEvent } from "react";
 import { Link, Navigate, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useTenantAuth } from "@/app/TenantAuthContext";
 import { ResendVerificationForm } from "@/components/auth/ResendVerificationForm";
-import { AppIcon } from "@/components/ui/AppIcon";
+import { BrandMark } from "@/components/brand/BrandMark";
+import { BRAND } from "@/config/brand";
 
 type LocationState = { from?: { pathname?: string } };
 
@@ -51,13 +52,7 @@ export function ClientLoginPage() {
     <main className="login-page client-login-page">
       <section className="login-content">
         <div className="login-brand-row">
-          <span className="login-logo">
-            <AppIcon name="invoice" />
-          </span>
-          <div>
-            <strong>Facturador</strong>
-            <span>Portal del cliente</span>
-          </div>
+          <BrandMark size="lg" subtitle="Portal del cliente" />
         </div>
         <section className="login-hero">
           <h1>
@@ -135,7 +130,7 @@ export function ClientLoginPage() {
         </div>
       </section>
       <footer className="login-legal">
-        <span>&copy; 2026 Facturador</span>
+        <span>&copy; 2026 {BRAND.name}</span>
         <Link to="/terminos">Términos y condiciones</Link>
         <Link to="/privacidad">Política de privacidad</Link>
         <Link to="/arrepentimiento">Botón de arrepentimiento</Link>

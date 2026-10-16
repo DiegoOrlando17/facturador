@@ -1,0 +1,110 @@
+/*
+ * Reset, tipografía base, foco visible y movimiento reducido.
+ *
+ * OJO con la cascada: la capa `base` va DESPUÉS de `legacy` (ver index.css), así
+ * que cualquier regla de este archivo le gana a global.css sin importar la
+ * especificidad. Por eso acá solo van propiedades que global.css no necesita
+ * sobrescribir. Los defaults que legacy ajusta por contexto (color de enlaces,
+ * márgenes, line-height de títulos, `font: inherit` de controles) siguen en
+ * global.css hasta que se migre esa capa.
+ */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  font-weight: var(--weight-regular);
+  line-height: var(--leading-normal);
+}
+
+/* Títulos: peso firme y tracking apretado en tamaños grandes. */
+h1,
+h2,
+h3 {
+  font-weight: var(--weight-bold);
+  text-wrap: balance;
+}
+
+/* Solo h1: los h2 se usan también como títulos chicos de tarjeta; los h2 grandes
+   aplican el tracking en su propia regla. */
+h1 {
+  letter-spacing: var(--tracking-tight);
+}
+
+h4,
+h5,
+h6 {
+  font-weight: var(--weight-semibold);
+}
+
+p {
+  text-wrap: pretty;
+}
+
+code,
+kbd,
+pre,
+samp {
+  font-family: var(--font-mono);
+}
+
+/* Cifras tabulares en tablas (montos, fechas, CAE alineados). */
+table,
+td,
+th,
+time {
+  font-variant-numeric: tabular-nums;
+}
+
+::placeholder {
+  color: var(--color-text-subtle);
+  opacity: 1;
+}
+
+::selection {
+  background: var(--color-action-soft-hover);
+  color: var(--color-text-brand);
+}
+
+/* Foco visible global. */
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+/* Campos compuestos: el contenedor muestra el foco con :focus-within. */
+:where(.login-input-wrap, .section-search) input:focus-visible {
+  outline: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
