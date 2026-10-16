@@ -1,0 +1,126 @@
+/* Gráfico de columnas (una serie). Marcas finas, extremo redondeado de 4px,
+ * grilla de un pelo y texto siempre en tinta, nunca en el color de la serie. */
+
+.ui-column-chart {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-3);
+  margin: 0;
+}
+
+.ui-column-chart__axis {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  height: var(--_height);
+  color: var(--color-text-subtle);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  text-align: right;
+  transform: translateY(-0.5em);
+}
+
+.ui-column-chart__plot {
+  position: relative;
+  min-width: 0;
+}
+
+.ui-column-chart__grid {
+  position: absolute;
+  inset: 0 0 auto;
+  height: var(--_height);
+  pointer-events: none;
+}
+
+.ui-column-chart__grid span {
+  position: absolute;
+  right: 0;
+  left: 0;
+  border-top: 1px solid var(--color-border);
+}
+
+.ui-column-chart__columns {
+  position: relative;
+  display: flex;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ui-column-chart__slot {
+  position: relative;
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  align-items: center;
+  min-width: 0;
+  border-radius: var(--radius-sm);
+  outline: none;
+  cursor: default;
+}
+
+.ui-column-chart__slot::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: var(--_height);
+  border-radius: var(--radius-sm);
+}
+
+.ui-column-chart__slot.is-active::before {
+  background: var(--color-surface-sunken);
+}
+
+.ui-column-chart__slot:focus-visible::before {
+  box-shadow: 0 0 0 2px var(--color-focus-ring);
+}
+
+.ui-column-chart__slot > .ui-column-chart__bar {
+  position: relative;
+  align-self: center;
+  width: min(100%, 24px);
+  margin-top: auto;
+  border-radius: 4px 4px 0 0;
+  background: var(--color-action);
+}
+
+/* La barra crece desde la base dentro de un área de alto fijo. */
+.ui-column-chart__slot {
+  height: calc(var(--_height) + 1.75rem);
+  justify-content: flex-end;
+  padding-bottom: 1.75rem;
+}
+
+.ui-column-chart__slot > .ui-column-chart__bar {
+  max-height: var(--_height);
+}
+
+.ui-column-chart__label {
+  position: absolute;
+  bottom: 0;
+  color: var(--color-text-subtle);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  white-space: nowrap;
+}
+
+.ui-column-chart__tooltip {
+  position: absolute;
+  z-index: 2;
+  top: 0;
+  min-width: 10rem;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-md);
+  color: var(--color-text);
+  font-size: var(--text-sm);
+  pointer-events: none;
+  transform: translateX(var(--space-3));
+}
+
+.ui-column-chart__tooltip--left {
+  transform: translateX(calc(-100% - var(--space-3)));
+}
