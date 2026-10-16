@@ -261,7 +261,11 @@ async function getRedisHealth() {
     return buildServiceHealth("Redis", "setup_pending", "REDIS_URL no configurado");
   }
 
-  const client = createClient({ url: config.REDIS_URL });
+  // Cliente efímero solo para el chequeo: sin reconexión y con un listener de
+  // "error", porque un error emitido sin listener (p. ej. ECONNRESET después del
+  // timeout) termina el proceso de la API.
+  const client = createClient({ url: config.REDIS_URL, socket: { reconnectStrategy: false } });
+  client.on("error", () => {});
 
   try {
     await withTimeout(client.connect());
