@@ -151,11 +151,10 @@ Query params opcionales:
 
 - `page`
 - `pageSize`
-- `status`
+- `status`: un estado o varios separados por coma (`pdf_pending,complete`); un estado desconocido responde 400
 - `provider`
 - `search`
-- `dateFrom=YYYY-MM-DD`
-- `dateTo=YYYY-MM-DD`
+- `dateFrom=YYYY-MM-DD`, `dateTo=YYYY-MM-DD`: días completos en hora argentina (también en el admin)
 
 Response:
 
@@ -182,6 +181,8 @@ Response:
 ### `GET /portal/payments/export.csv`
 
 Exporta el listado filtrado de pagos/facturas del tenant autenticado.
+
+Formato pensado para Excel en Argentina: BOM UTF-8, separador `;`, coma decimal, fechas `dd/mm/aaaa hh:mm` en hora argentina y encabezados/estados en castellano. Archivo `ventas-<empresa>.csv`. Los headers `X-Export-Max-Rows` y `X-Export-Truncated` están expuestos por CORS para avisar cuando se recorta.
 
 Query params opcionales:
 

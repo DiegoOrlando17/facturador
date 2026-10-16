@@ -152,6 +152,11 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}) 
 }
 
 export async function apiBlobRequest(path: string, options: BlobRequestOptions = {}) {
+  return (await apiFileRequest(path, options)).blob;
+}
+
+/** Igual que apiBlobRequest pero también devuelve los headers (ej.: X-Export-Truncated). */
+export async function apiFileRequest(path: string, options: BlobRequestOptions = {}) {
   const response = await performFetch(path, {
     headers: {
       ...(options.token ? { Authorization: `Bearer ${options.token}` } : {}),
@@ -164,5 +169,5 @@ export async function apiBlobRequest(path: string, options: BlobRequestOptions =
     throw buildApiError(payload, response, options);
   }
 
-  return response.blob();
+  return { blob: await response.blob(), headers: response.headers };
 }

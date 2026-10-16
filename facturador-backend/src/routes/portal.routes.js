@@ -18,7 +18,7 @@ import {
   replaceTenantIntegrationConfig,
   tryGetTenantIntegrationConfig,
 } from "../services/tenantConfig.service.js";
-import { buildPaymentsCsv } from "../services/csvExport.service.js";
+import { buildPortalPaymentsCsv } from "../services/csvExport.service.js";
 import { generateInvoicePdfById, generateInvoicePdfForPayment, getInvoicePdfFilename } from "../services/invoicePdf.service.js";
 import {
   createTenantOnboardingSubmission,
@@ -147,13 +147,14 @@ router.get("/payments/export.csv", async (req, res) => {
       dateTo: req.query.dateTo,
     });
 
-    const csv = buildPaymentsCsv(payload.items, { includeTenant: false });
-    const tenantSlug = req.tenantAuth.tenantUser.tenant?.slug || "tenant";
+    const csv = buildPortalPaymentsCsv(payload.items);
+    const tenantSlug = req.tenantAuth.tenantUser.tenant?.slug || "empresa";
 
     res.setHeader("Content-Type", "text/csv; charset=utf-8");
-    res.setHeader("Content-Disposition", `attachment; filename="payments-${tenantSlug}.csv"`);
+    res.setHeader("Content-Disposition", `attachment; filename="ventas-${tenantSlug}.csv"`);
     res.setHeader("X-Export-Max-Rows", String(payload.exportInfo.maxRows));
     res.setHeader("X-Export-Truncated", String(payload.exportInfo.truncated));
+    res.setHeader("Access-Control-Expose-Headers", "X-Export-Max-Rows, X-Export-Truncated, Content-Disposition");
     return res.status(200).send(csv);
   } catch (error) {
     return res.status(400).json({ error: error.message || "No se pudo exportar CSV" });

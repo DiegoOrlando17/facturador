@@ -1,103 +1,177 @@
-import { useState } from "react";
-import { Link, useParams } from "react-router-dom";
-import { AppIcon } from "@/components/ui/AppIcon";
+import { useState, type ReactNode } from "react";
+import { useParams } from "react-router-dom";
+import { Button, ButtonLink } from "@/components/ui/Button";
+import { Callout } from "@/components/ui/Callout";
+import { Card } from "@/components/ui/Card";
+import { ErrorState } from "@/components/ui/EmptyState";
+import { FiscalNumber, Money } from "@/components/ui/Money";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Skeleton } from "@/components/ui/Skeleton";
+import { StatusBadge } from "@/components/ui/StatusBadge";
+import { useToast } from "@/components/ui/Toast";
+import { BRAND } from "@/config/brand";
 import { getPortalErrorMessage, usePortalApi, usePortalResource } from "@/hooks/usePortalResource";
+import { getComprobanteTypeLabel, getDocumentTypeLabel, getPaymentMethodLabel } from "@/lib/fiscalLabels";
+import { formatArgentinaDateTime, formatFiscalDate } from "@/lib/formatters";
 import { saveBlobAsFile } from "@/lib/portalApi";
-import { formatCurrency, formatDateTime, formatFiscalDate } from "@/lib/formatters";
-import { getPaymentEventLabel, getPaymentStatusLabel } from "@/lib/portalStatusLabels";
+import { getInvoiceNumberLabel } from "@/lib/portalInvoices";
+import { getPaymentGroup, type PortalPayment } from "@/lib/portalPayments";
+import { getPaymentEventLabel } from "@/lib/statusLabels";
 
-type PaymentDetail = {
-  id: string;
-  provider: string;
-  provider_payment_id: string | null;
-  status: string;
-  payment_method_id: string | null;
-  amount: number;
-  customer: string | null;
-  customer_doc_type: string | null;
-  customer_doc_number: string | null;
-  date_approved: string | null;
-  cae: string | null;
-  cae_vto: string | null;
-  cbte_nro: string | null;
-  cbte_tipo: number | null;
-  pto_vta: number | null;
-  error: string | null;
-  createdAt: string;
-  events: Array<{ id: string; type: string; message: string; createdAt: string }>;
-  invoice?: { id: string; status: string } | null;
+type PaymentDetail = PortalPayment & {
+  events: { id: string; type: string; message: string | null; createdAt: string }[];
 };
 
-export function ClientPaymentDetailPage() {
-  const { id } = useParams();
-  const api = usePortalApi();
-  const { data: payment, isLoading, isRefreshing, errorMessage, reload } = usePortalResource<PaymentDetail>(
-    id ? `/portal/payments/${id}` : null,
-    { fallbackErrorMessage: "No pudimos cargar la venta. Reintentá." },
+const BASE = "/portal-cliente/pagos";
+
+function DetailRow({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="portal-detail__row">
+      <dt>{label}</dt>
+      <dd>{children}</dd>
+    </div>
   );
-  const [isLoadingPdf, setIsLoadingPdf] = useState(false);
-  const [pdfErrorMessage, setPdfErrorMessage] = useState("");
+}
+
+export function ClientPaymentDetailPage() {
+  const { id = "" } = useParams();
+  const api = usePortalApi();
+  const toast = useToast();
+  const query = usePortalResource<PaymentDetail>(id ? `/portal/payments/${id}` : null, { fallbackErrorMessage: "No pudimos cargar la venta." });
+  const [downloading, setDownloading] = useState(false);
+  const payment = query.data;
 
   async function downloadPdf() {
-    if (!id) return;
-    setIsLoadingPdf(true);
-    setPdfErrorMessage("");
+    setDownloading(true);
     try {
       const blob = await api.requestBlob(`/portal/payments/${id}/pdf?download=true`);
-      saveBlobAsFile(blob, `comprobante-${payment?.cbte_nro ?? id}.pdf`);
-    } catch (error) {
-      setPdfErrorMessage(getPortalErrorMessage(error, "No pudimos descargar el PDF. Reintentá."));
+      saveBlobAsFile(blob, `factura-${(payment?.cbte_nro ?? id).replace(/[^\d-]/g, "")}.pdf`);
+    } catch (cause) {
+      toast.error("No pudimos descargar el PDF", { description: getPortalErrorMessage(cause, "Reintentá en unos minutos.") });
     } finally {
-      setIsLoadingPdf(false);
+      setDownloading(false);
     }
   }
 
-  return (
-    <div className="client-main client-payment-detail-page">
-      <header className="app-topbar">
-        <div>
-          <Link to="/portal-cliente/pagos" className="eyebrow">Volver a pagos</Link>
-          <strong>{payment?.cbte_nro ?? "Detalle de la venta"}</strong>
-          <span>Información fiscal y trazabilidad de la operación.</span>
-        </div>
-        <button type="button" className="secondary-button topbar-refresh-button" onClick={() => void reload()} disabled={isLoading || isRefreshing}>
-          <AppIcon name="refresh" /><span>{isRefreshing ? "Actualizando…" : "Actualizar"}</span>
-        </button>
-      </header>
+  if (query.errorMessage) {
+    return (
+      <div className="portal-page">
+        <PageHeader title="Venta" breadcrumb={[{ label: "Ventas", to: BASE }, { label: "Venta" }]} />
+        <ErrorState message={query.errorMessage} onRetry={() => void query.reload()} retrying={query.isRefreshing} />
+      </div>
+    );
+  }
 
-      {isLoading ? <section className="panel"><div className="panel-state"><strong>Cargando la venta…</strong></div></section>
-        : errorMessage ? <section className="panel"><div className="panel-state panel-state--danger"><strong>No pudimos cargar la venta</strong><span>{errorMessage}</span><button type="button" className="secondary-button" onClick={() => void reload()}>Reintentar</button></div></section>
-          : payment ? <>
-            <section className="content-grid">
-              <article className="panel payment-detail-card">
-                <span className="eyebrow">Resumen</span><h2>{formatCurrency(payment.amount)}</h2>
-                <div className="payment-detail-list">
-                  <div><span>Estado</span><strong>{payment.cae ? "Comprobante emitido" : getPaymentStatusLabel(payment.status)}</strong></div>
-                  <div><span>Fecha</span><strong>{formatDateTime(payment.date_approved ?? payment.createdAt)}</strong></div>
-                  <div><span>Medio de pago</span><strong>{payment.payment_method_id ?? "Mercado Pago"}</strong></div>
-                  <div><span>Cliente</span><strong>{payment.customer ?? "Consumidor final"}</strong></div>
-                  <div><span>Documento</span><strong>{payment.customer_doc_number ? `${payment.customer_doc_type ?? ""} ${payment.customer_doc_number}`.trim() : "Sin documento"}</strong></div>
-                  <div><span>Operación en Mercado Pago</span><strong>{payment.provider_payment_id ?? "Sin dato"}</strong></div>
-                </div>
-              </article>
-              <article className="panel accent-panel">
-                <span className="eyebrow">Comprobante</span><h2>{payment.cbte_nro ?? "Pendiente"}</h2>
-                <div className="payment-detail-list">
-                  <div><span>CAE</span><strong>{payment.cae ?? "Todavía no emitido"}</strong></div>
-                  <div><span>Vencimiento del CAE</span><strong>{formatFiscalDate(payment.cae_vto)}</strong></div>
-                  <div><span>Punto de venta</span><strong>{payment.pto_vta ?? "Sin dato"}</strong></div>
-                  <div><span>Tipo</span><strong>{payment.cbte_tipo ?? "Sin dato"}</strong></div>
-                </div>
-                {payment.cae ? <button type="button" className="primary-button" disabled={isLoadingPdf} onClick={() => void downloadPdf()}><AppIcon name="download" />{isLoadingPdf ? "Preparando PDF…" : "Descargar PDF"}</button> : <p className="client-empty-state">El PDF va a estar disponible cuando ARCA emita el comprobante.</p>}
-                {pdfErrorMessage ? <p className="form-error" role="alert">{pdfErrorMessage}</p> : null}
-                {payment.error ? <div className="panel-state panel-state--danger"><strong>Error registrado</strong><span>{payment.error}</span></div> : null}
-              </article>
-            </section>
-            <section className="panel payment-events-panel">
-              <div className="panel-heading"><div><span className="eyebrow">Trazabilidad</span><h2>Actividad de la venta</h2></div></div>
-              {payment.events.length ? <div className="payment-events-list">{payment.events.map((event) => <article className="payment-event-card" key={event.id}><div className="payment-event-card__header"><strong>{getPaymentEventLabel(event.type)}</strong><span>{formatDateTime(event.createdAt)}</span></div><p>{event.message}</p></article>)}</div> : <div className="panel-state"><strong>Todavía no hay actividad registrada</strong></div>}
-            </section>
-          </> : null}
+  if (!payment) {
+    return (
+      <div className="portal-page" aria-busy="true">
+        <Skeleton width="12rem" />
+        <Skeleton variant="block" height="20rem" />
+      </div>
+    );
+  }
+
+  const group = getPaymentGroup(payment.status);
+  const number = getInvoiceNumberLabel({ cbteNro: payment.cbte_nro, cbteTipo: payment.cbte_tipo });
+  const when = payment.date_approved ?? payment.createdAt;
+  const voided = payment.invoice?.creditNotes?.some((note) => note.status === "ISSUED");
+
+  return (
+    <div className="portal-page portal-payment-detail">
+      <PageHeader
+        title={`Venta del ${formatArgentinaDateTime(when)}`}
+        breadcrumb={[{ label: "Ventas", to: BASE }, { label: "Venta" }]}
+        meta={<StatusBadge tone={group.tone}>{group.label}</StatusBadge>}
+      />
+
+      {payment.error ? (
+        <Callout tone="danger" title="No pudimos facturar esta venta">
+          {payment.error} Si no sabés cómo resolverlo, escribinos a <a href={`mailto:${BRAND.supportEmail}`}>{BRAND.supportEmail}</a>.
+        </Callout>
+      ) : null}
+
+      <div className="portal-detail-grid">
+        <Card title="La venta">
+          <p className="portal-detail__amount">
+            <Money value={payment.amount} currency={payment.currency ?? "ARS"} size="lg" />
+          </p>
+          <dl className="portal-detail">
+            <DetailRow label="Fecha">{formatArgentinaDateTime(when)}</DetailRow>
+            <DetailRow label="Medio de pago">{getPaymentMethodLabel(payment.payment_method_id, "Mercado Pago")}</DetailRow>
+            <DetailRow label="Cliente">{payment.customer?.trim() || "Consumidor final"}</DetailRow>
+            {payment.customer_doc_number ? (
+              <DetailRow label={getDocumentTypeLabel(payment.customer_doc_type, "Documento")}>
+                <FiscalNumber kind={["CUIT", "CUIL"].includes(getDocumentTypeLabel(payment.customer_doc_type)) ? "cuit" : "plain"} value={payment.customer_doc_number} />
+              </DetailRow>
+            ) : null}
+            <DetailRow label="Operación en Mercado Pago">
+              <FiscalNumber kind="plain" value={payment.provider_payment_id} />
+            </DetailRow>
+          </dl>
+        </Card>
+
+        <Card title="La factura">
+          {number ? (
+            <>
+              <dl className="portal-detail">
+                <DetailRow label="Comprobante">
+                  <FiscalNumber kind="plain" value={number} className={voided ? "portal-voided" : undefined} />
+                </DetailRow>
+                <DetailRow label="Tipo">{getComprobanteTypeLabel(payment.cbte_tipo)}</DetailRow>
+                <DetailRow label="CAE">
+                  <FiscalNumber kind="cae" value={payment.cae} />
+                </DetailRow>
+                <DetailRow label="Vencimiento del CAE">{formatFiscalDate(payment.cae_vto)}</DetailRow>
+              </dl>
+              {voided ? <Callout tone="info">Esta factura se anuló con una nota de crédito.</Callout> : null}
+              <div className="portal-detail__actions">
+                <Button variant="primary" iconLeft="download" onClick={() => void downloadPdf()} loading={downloading} loadingLabel="Preparando PDF…">
+                  Descargar PDF
+                </Button>
+                {payment.invoice ? (
+                  <ButtonLink to={`/portal-cliente/comprobantes/${payment.invoice.id}`} variant="secondary">
+                    Ver factura
+                  </ButtonLink>
+                ) : null}
+              </div>
+            </>
+          ) : (
+            <p className="portal-muted">
+              {group.key === "failed"
+                ? "Esta venta no se facturó. Revisá el motivo arriba."
+                : payment.invoice?.status === "PENDING_CONFIRMATION"
+                  ? "La factura espera tu confirmación."
+                  : "La factura todavía no se emitió. Aparece acá apenas ARCA la autorice."}
+            </p>
+          )}
+          {!number && payment.invoice?.status === "PENDING_CONFIRMATION" ? (
+            <ButtonLink to="/portal-cliente/comprobantes?estado=para-confirmar" variant="primary">
+              Ir a confirmar
+            </ButtonLink>
+          ) : null}
+        </Card>
+      </div>
+
+      <section className="portal-section" aria-labelledby="payment-history-title">
+        <div className="portal-section__header">
+          <h2 id="payment-history-title">Historial</h2>
+        </div>
+        {payment.events.length ? (
+          <ol className="portal-timeline">
+            {payment.events.map((event) => (
+              <li key={event.id}>
+                <span className="portal-mono portal-muted">{formatArgentinaDateTime(event.createdAt)}</span>
+                <span>
+                  <strong>{getPaymentEventLabel(event.type)}</strong>
+                  {event.message ? <span className="portal-muted"> · {event.message}</span> : null}
+                </span>
+              </li>
+            ))}
+          </ol>
+        ) : (
+          <p className="portal-muted">Todavía no hay movimientos registrados.</p>
+        )}
+      </section>
     </div>
   );
 }

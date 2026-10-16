@@ -1,125 +1,202 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { AppIcon } from "@/components/ui/AppIcon";
+import { Button } from "@/components/ui/Button";
+import { DataTable, type DataTableColumn } from "@/components/ui/DataTable";
+import { TextField } from "@/components/ui/Field";
+import { FiscalNumber, Money } from "@/components/ui/Money";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Pagination } from "@/components/ui/Pagination";
+import { StatusBadge } from "@/components/ui/StatusBadge";
+import { useToast } from "@/components/ui/Toast";
 import { getPortalErrorMessage, usePortalApi, usePortalResource } from "@/hooks/usePortalResource";
+import { getPaymentMethodLabel } from "@/lib/fiscalLabels";
+import { toArgentinaDateInput } from "@/lib/formatters";
 import { saveBlobAsFile } from "@/lib/portalApi";
-import { formatCurrency, formatDateTime, toArgentinaDateInput } from "@/lib/formatters";
-import { getPaymentStatusLabel } from "@/lib/portalStatusLabels";
-
-type PortalPayment = {
-  id: string;
-  provider: string;
-  provider_payment_id: string | null;
-  status: string;
-  amount: number;
-  customer: string | null;
-  createdAt: string;
-  error: string | null;
-  cae: string | null;
-  cbte_nro: string | null;
-};
+import { formatShortDateTime, getInvoiceNumberLabel } from "@/lib/portalInvoices";
+import { getPaymentGroup, PAYMENT_GROUPS, type PortalPayment } from "@/lib/portalPayments";
 
 type PaymentsResponse = {
   items: PortalPayment[];
   pagination: { page: number; pageSize: number; total: number; totalPages: number };
 };
 
-const statusOptions = [
-  ["", "Todos los estados"], ["pending", "Pago recibido"], ["processing", "En proceso"],
-  ["afip_pending", "Pendiente ARCA"], ["pdf_pending", "Pendiente PDF"],
-  ["drive_pending", "Pendiente Drive"], ["sheets_pending", "Pendiente Sheets"],
-  ["complete", "Facturado"], ["failed", "Con error"],
-];
+const PAGE_SIZE = 20;
 
-function statusLabel(payment: PortalPayment) {
-  if (payment.cae) return "Comprobante emitido";
-  return getPaymentStatusLabel(payment.status);
-}
+const columns: DataTableColumn<PortalPayment>[] = [
+  { id: "date", header: "Fecha", width: "8rem", cell: (row) => <span className="portal-mono">{formatShortDateTime(row.date_approved ?? row.createdAt)}</span> },
+  { id: "method", header: "Medio de pago", primary: true, cell: (row) => getPaymentMethodLabel(row.payment_method_id, "Mercado Pago") },
+  {
+    id: "invoice",
+    header: "Factura",
+    cell: (row) => {
+      const number = getInvoiceNumberLabel({ cbteNro: row.cbte_nro, cbteTipo: row.cbte_tipo });
+      if (!number) return <span className="portal-muted">Sin emitir</span>;
+      return row.invoice ? (
+        <Link className="portal-link portal-link--plain" to={`/portal-cliente/comprobantes/${row.invoice.id}`} data-row-ignore>
+          <FiscalNumber kind="plain" value={number} />
+        </Link>
+      ) : (
+        <FiscalNumber kind="plain" value={number} />
+      );
+    },
+  },
+  { id: "customer", header: "Cliente", hideBelow: "md", cell: (row) => row.customer?.trim() || "Consumidor final" },
+  { id: "amount", header: "Importe", align: "end", numeric: true, cell: (row) => <Money value={row.amount} currency={row.currency ?? "ARS"} /> },
+  {
+    id: "status",
+    header: "Estado",
+    cell: (row) => {
+      const group = getPaymentGroup(row.status);
+      return <StatusBadge tone={group.tone}>{group.label}</StatusBadge>;
+    },
+  },
+];
 
 export function ClientPaymentsPage() {
   const api = usePortalApi();
-  const [page, setPage] = useState(1);
-  const [search, setSearch] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [status, setStatus] = useState("");
+  const toast = useToast();
+  const [params, setParams] = useSearchParams();
+  const group = PAYMENT_GROUPS.find((item) => item.slug === params.get("estado")) ?? PAYMENT_GROUPS[0];
+  const page = Math.max(1, Number(params.get("pagina")) || 1);
+  const dateFrom = params.get("desde") ?? "";
+  const dateTo = params.get("hasta") ?? "";
+  const query = params.get("q") ?? "";
+  const [search, setSearch] = useState(query);
   const [isExporting, setIsExporting] = useState(false);
-  const [exportErrorMessage, setExportErrorMessage] = useState("");
 
+  /** Cambia filtros en la URL; cualquier filtro nuevo vuelve a la página 1. */
+  function updateParams(changes: Record<string, string | null>, resetPage = true) {
+    const next = new URLSearchParams(params);
+    for (const [key, value] of Object.entries(changes)) {
+      if (value) next.set(key, value);
+      else next.delete(key);
+    }
+    if (resetPage) next.delete("pagina");
+    setParams(next, { replace: true });
+  }
+
+  // La búsqueda se aplica 300 ms después de dejar de escribir.
   useEffect(() => {
-    const timeout = window.setTimeout(() => setDebouncedSearch(search.trim()), 300);
+    const timeout = window.setTimeout(() => {
+      if (search.trim() !== query) updateParams({ q: search.trim() || null });
+    }, 300);
     return () => window.clearTimeout(timeout);
   }, [search]);
 
-  const params = new URLSearchParams({ page: String(page), pageSize: "10" });
-  if (debouncedSearch) params.set("search", debouncedSearch);
-  if (status) params.set("status", status);
-  const { data, isLoading, isRefreshing, errorMessage, reload } = usePortalResource<PaymentsResponse>(
-    `/portal/payments?${params}`,
-    { fallbackErrorMessage: "No pudimos cargar las ventas. Reintentá." },
-  );
-  const isBusy = isLoading || isRefreshing;
+  const filters = new URLSearchParams();
+  if (group.statuses.length) filters.set("status", group.statuses.join(","));
+  if (query) filters.set("search", query);
+  if (dateFrom) filters.set("dateFrom", dateFrom);
+  if (dateTo) filters.set("dateTo", dateTo);
+  const listParams = new URLSearchParams(filters);
+  listParams.set("page", String(page));
+  listParams.set("pageSize", String(PAGE_SIZE));
+
+  const list = usePortalResource<PaymentsResponse>(`/portal/payments?${listParams}`, { fallbackErrorMessage: "No pudimos cargar las ventas." });
+  const hasFilters = Boolean(group.key !== "all" || query || dateFrom || dateTo);
 
   async function exportCsv() {
     setIsExporting(true);
-    setExportErrorMessage("");
-    const exportParams = new URLSearchParams();
-    if (search.trim()) exportParams.set("search", search.trim());
-    if (status) exportParams.set("status", status);
     try {
-      const suffix = exportParams.size ? `?${exportParams}` : "";
-      const blob = await api.requestBlob(`/portal/payments/export.csv${suffix}`);
-      saveBlobAsFile(blob, `pagos-${toArgentinaDateInput(new Date())}.csv`);
-    } catch (error) {
-      setExportErrorMessage(getPortalErrorMessage(error, "No pudimos exportar el CSV. Reintentá."));
+      const suffix = filters.size ? `?${filters}` : "";
+      const { blob, headers } = await api.requestFile(`/portal/payments/export.csv${suffix}`);
+      saveBlobAsFile(blob, `ventas-${toArgentinaDateInput(new Date())}.csv`);
+      if (headers.get("X-Export-Truncated") === "true") {
+        const max = Number(headers.get("X-Export-Max-Rows")) || 10000;
+        toast.info("Exportamos las primeras ventas", { description: `El archivo tiene las ${max.toLocaleString("es-AR")} más recientes. Acotá las fechas para bajar el resto.` });
+      } else {
+        toast.success("Listo, descargamos el archivo", { description: "Se abre directo en Excel." });
+      }
+    } catch (cause) {
+      toast.error("No pudimos exportar las ventas", { description: getPortalErrorMessage(cause, "Reintentá en unos minutos.") });
     } finally {
       setIsExporting(false);
     }
   }
 
   return (
-    <div className="client-main client-payments-page">
-      <header className="app-topbar">
-        <div><strong>Pagos y facturas</strong><span>Consultá los cobros y comprobantes de tu empresa.</span></div>
-        <div className="app-topbar__actions">
-          <button type="button" className="secondary-button" onClick={() => void exportCsv()} disabled={isExporting}><AppIcon name="download" />{isExporting ? "Exportando…" : "Exportar CSV"}</button>
-          <button type="button" className="secondary-button topbar-refresh-button" onClick={() => void reload()} disabled={isBusy}><AppIcon name="refresh" /><span>{isRefreshing ? "Actualizando…" : "Actualizar"}</span></button>
-        </div>
-      </header>
+    <div className="portal-page portal-payments">
+      <PageHeader
+        title="Ventas"
+        description="Los cobros que leemos de Mercado Pago y la factura de cada uno."
+        actions={
+          <Button variant="secondary" iconLeft="download" onClick={() => void exportCsv()} loading={isExporting} loadingLabel="Exportando…">
+            Exportar para Excel
+          </Button>
+        }
+      />
 
-      {exportErrorMessage ? <p className="form-error" role="alert">{exportErrorMessage}</p> : null}
-      <p className="client-export-note">La exportación respeta la búsqueda y el estado seleccionados, con un máximo de 10.000 filas.</p>
-
-      <section className="section-toolbar" aria-label="Filtros de pagos">
-        <label className="section-search"><AppIcon name="search" /><input type="search" aria-label="Buscar pagos" value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} placeholder="Buscar pago, comprobante o cliente" /></label>
-        <select className="section-select" aria-label="Filtrar por estado" value={status} onChange={(event) => { setStatus(event.target.value); setPage(1); }}>
-          {statusOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-        </select>
-        <button type="button" className="section-button section-button--soft" onClick={() => { setSearch(""); setStatus(""); setPage(1); }}>Limpiar</button>
-      </section>
-
-      <section className="section-table-card section-table-card--scrollable" aria-busy={isBusy}>
-        <div className="section-table client-payments-table">
-          <div className="section-table__head"><span>Fecha</span><span>Comprobante</span><span>Cliente</span><span>Monto</span><span>Estado</span><span>Acción</span></div>
-          {isLoading ? <div className="section-table__state">Cargando ventas…</div>
-            : errorMessage ? <div className="section-table__state section-table__state--danger"><span>{errorMessage}</span><button type="button" className="section-button" onClick={() => void reload()}>Reintentar</button></div>
-              : data?.items.length ? data.items.map((payment) => (
-                <div className="section-table__row" key={payment.id}>
-                  <span>{formatDateTime(payment.createdAt)}</span>
-                  <strong>{payment.cbte_nro ?? "Sin comprobante"}</strong>
-                  <span>{payment.customer ?? "Consumidor final"}</span>
-                  <span>{formatCurrency(payment.amount)}</span>
-                  <span><small className={`status-pill status-pill--${payment.error ? "warning" : payment.cae ? "success" : "muted"}`}>{statusLabel(payment)}</small></span>
-                  <Link className="section-mini-button" to={`/portal-cliente/pagos/${payment.id}`}>Abrir</Link>
-                </div>
-              )) : <div className="section-table__state">No hay ventas con esos filtros.</div>}
-        </div>
-      </section>
-
-      <div className="section-pagination">
-        <button type="button" disabled={page <= 1 || isBusy} onClick={() => setPage((current) => current - 1)}>Anterior</button>
-        <span>Página <b>{data?.pagination.page ?? page}</b> de {data?.pagination.totalPages ?? 1}</span>
-        <button type="button" disabled={page >= (data?.pagination.totalPages ?? 1) || isBusy} onClick={() => setPage((current) => current + 1)}>Siguiente</button>
+      <div className="portal-filters" role="search" aria-label="Filtrar ventas">
+        <TextField
+          label="Buscar"
+          hideLabel
+          type="search"
+          leading={<AppIcon name="search" />}
+          placeholder="Operación, factura, cliente o documento"
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+          fieldClassName="portal-filters__search"
+        />
+        <TextField label="Desde" type="date" value={dateFrom} max={dateTo || undefined} onChange={(event) => updateParams({ desde: event.target.value || null })} fieldClassName="portal-filters__date" />
+        <TextField label="Hasta" type="date" value={dateTo} min={dateFrom || undefined} onChange={(event) => updateParams({ hasta: event.target.value || null })} fieldClassName="portal-filters__date" />
+        {hasFilters ? (
+          <Button
+            variant="ghost"
+            onClick={() => {
+              setSearch("");
+              setParams({}, { replace: true });
+            }}
+          >
+            Limpiar filtros
+          </Button>
+        ) : null}
       </div>
+
+      <div className="portal-chips" role="group" aria-label="Filtrar por estado">
+        {PAYMENT_GROUPS.map((item) => (
+          <button
+            key={item.key}
+            type="button"
+            className="portal-chip"
+            aria-pressed={item.key === group.key}
+            onClick={() => updateParams({ estado: item.key === "all" ? null : item.slug })}
+          >
+            {"chip" in item ? item.chip : item.label}
+          </button>
+        ))}
+      </div>
+
+      <DataTable
+        caption="Ventas"
+        columns={columns}
+        rows={list.data?.items}
+        getRowKey={(row) => row.id}
+        getRowHref={(row) => `/portal-cliente/pagos/${row.id}`}
+        getRowLabel={(row) => `Ver venta del ${formatShortDateTime(row.date_approved ?? row.createdAt)}`}
+        isLoading={list.isLoading}
+        isRefreshing={list.isRefreshing}
+        errorMessage={list.errorMessage}
+        onRetry={() => void list.reload()}
+        skeletonRows={8}
+        empty={
+          hasFilters
+            ? { icon: "search-empty", title: "No hay ventas con esos filtros", description: "Probá con otras fechas o limpiá la búsqueda." }
+            : { title: "Todavía no hay ventas", description: "Cuando conectes Mercado Pago, las ventas aparecen acá." }
+        }
+      />
+
+      {list.data && list.data.pagination.totalPages > 1 ? (
+        <Pagination
+          page={list.data.pagination.page}
+          pageCount={list.data.pagination.totalPages}
+          totalItems={list.data.pagination.total}
+          pageSize={list.data.pagination.pageSize}
+          itemLabel="ventas"
+          disabled={list.isRefreshing}
+          onPageChange={(next) => updateParams({ pagina: next > 1 ? String(next) : null }, false)}
+        />
+      ) : null}
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { Prisma } from "@prisma/client";
+import { PaymentStatus, Prisma } from "@prisma/client";
 import { createClient } from "redis";
 import axios from "axios";
 import { execFile } from "child_process";
@@ -14,7 +14,7 @@ import { paymentsQueue } from "../queues/payments.queue.js";
 import { invoicesQueue } from "../queues/invoices.queue.js";
 import { creditNotesQueue } from "../queues/creditNotes.queue.js";
 import { classifyQueueHealth } from "../domain/operationalHealth.js";
-import { REPORT_TIMEZONE, assertReportGranularity, buildReportDateRange } from "../domain/reportPeriods.js";
+import { REPORT_TIMEZONE, assertReportGranularity, buildReportDateRange, parseReportDateBoundary } from "../domain/reportPeriods.js";
 
 const DEFAULT_PAGE = 1;
 const DEFAULT_PAGE_SIZE = 20;
@@ -63,19 +63,23 @@ function normalizePageSize(value) {
   return Math.min(Math.floor(current), MAX_PAGE_SIZE);
 }
 
+// Los filtros de fecha cortan el día en hora argentina, igual que los reportes.
 function parseDateOrNull(value, { endOfDay = false } = {}) {
-  if (!value) return null;
+  return parseReportDateBoundary(value, { endOfDay });
+}
 
-  const date = new Date(String(value));
-  if (Number.isNaN(date.getTime())) return null;
+const PAYMENT_STATUSES = new Set(Object.values(PaymentStatus));
 
-  if (endOfDay) {
-    date.setHours(23, 59, 59, 999);
-  } else {
-    date.setHours(0, 0, 0, 0);
-  }
-
-  return date;
+/** `status` acepta un valor o una lista separada por comas ("pdf_pending,complete"). */
+export function parsePaymentStatusFilter(value) {
+  const statuses = String(value || "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+  if (!statuses.length) return null;
+  const unknown = statuses.filter((item) => !PAYMENT_STATUSES.has(item));
+  if (unknown.length) throw new Error("Elegí un estado válido.");
+  return statuses.length === 1 ? statuses[0] : { in: statuses };
 }
 
 function buildPaymentWhere(filters = {}) {
@@ -85,8 +89,9 @@ function buildPaymentWhere(filters = {}) {
     where.tenantId = filters.tenantId;
   }
 
-  if (filters.status) {
-    where.status = String(filters.status);
+  const status = parsePaymentStatusFilter(filters.status);
+  if (status) {
+    where.status = status;
   }
 
   if (filters.provider) {

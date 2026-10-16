@@ -1,4 +1,4 @@
-import { apiBlobRequest, apiRequest } from "@/lib/api";
+import { apiBlobRequest, apiFileRequest, apiRequest } from "@/lib/api";
 
 type PortalRequestOptions = {
   method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
@@ -17,6 +17,10 @@ export function portalRequest<T>(token: string | null, path: string, options: Po
 
 export function portalBlobRequest(token: string | null, path: string, options: { signal?: AbortSignal } = {}) {
   return apiBlobRequest(path, { ...options, token, authScope: "tenant" });
+}
+
+export function portalFileRequest(token: string | null, path: string, options: { signal?: AbortSignal } = {}) {
+  return apiFileRequest(path, { ...options, token, authScope: "tenant" });
 }
 
 /** Descarga un blob como archivo. El link se agrega al DOM y la URL se revoca después. */

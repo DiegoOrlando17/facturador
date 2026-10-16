@@ -82,3 +82,76 @@ export function buildPaymentsCsv(items, { includeTenant = false } = {}) {
 
   return buildCsv(headers, rows);
 }
+
+// CSV del portal: para abrir directo en Excel en Argentina (";" como separador,
+// coma decimal, BOM UTF-8), con encabezados y estados en castellano.
+
+const PORTAL_PAYMENT_STATUS = {
+  pending: "Venta recibida",
+  processing: "En proceso",
+  afip_pending: "Esperando ARCA",
+  pdf_pending: "Facturada",
+  drive_pending: "Facturada",
+  sheets_pending: "Facturada",
+  complete: "Facturada",
+  failed: "Con error",
+};
+
+const PORTAL_PAYMENT_METHODS = {
+  account_money: "Dinero en cuenta",
+  debit_card: "Tarjeta de débito",
+  credit_card: "Tarjeta de crédito",
+  visa: "Visa",
+  debvisa: "Visa Débito",
+  master: "Mastercard",
+  debmaster: "Mastercard Débito",
+  maestro: "Maestro",
+  amex: "American Express",
+  cabal: "Cabal",
+  debcabal: "Cabal Débito",
+  naranja: "Naranja X",
+  cvu: "Transferencia (CVU)",
+  qr: "QR",
+};
+
+const portalDateFormatter = new Intl.DateTimeFormat("es-AR", {
+  day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZone: "America/Argentina/Buenos_Aires",
+});
+
+function escapePortalCsvValue(value) {
+  if (value === null || value === undefined) return "";
+  const normalized = String(value);
+  return /[";\n\r]/.test(normalized) ? `"${normalized.replace(/"/g, "\"\"")}"` : normalized;
+}
+
+function formatPortalAmount(value) {
+  const amount = Number(value);
+  return Number.isFinite(amount) ? amount.toFixed(2).replace(".", ",") : "";
+}
+
+function formatPortalDate(value) {
+  if (!value) return "";
+  const date = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(date.getTime()) ? "" : portalDateFormatter.format(date).replace(",", "");
+}
+
+export function buildPortalPaymentsCsv(items) {
+  const headers = ["Fecha", "Operación Mercado Pago", "Medio de pago", "Importe", "Moneda", "Cliente", "Tipo de documento", "Documento", "Estado", "Comprobante", "CAE", "Vencimiento CAE", "Detalle del error"];
+  const rows = items.map((payment) => [
+    formatPortalDate(payment.date_approved ?? payment.createdAt),
+    payment.provider_payment_id,
+    PORTAL_PAYMENT_METHODS[String(payment.payment_method_id || "").toLowerCase()] ?? payment.payment_method_id ?? "",
+    formatPortalAmount(payment.amount),
+    payment.currency || "ARS",
+    payment.customer || "Consumidor final",
+    payment.customer_doc_type,
+    payment.customer_doc_number,
+    PORTAL_PAYMENT_STATUS[payment.status] ?? payment.status,
+    payment.cbte_nro,
+    payment.cae,
+    payment.cae_vto,
+    payment.error,
+  ]);
+  const lines = [headers, ...rows].map((row) => row.map(escapePortalCsvValue).join(";"));
+  return `﻿${lines.join("\r\n")}\r\n`;
+}

@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { useTenantAuth } from "@/app/TenantAuthContext";
 import { getApiErrorMessage, isAbortError, isUnauthorizedError } from "@/lib/api";
-import { portalBlobRequest, portalRequest } from "@/lib/portalApi";
+import { portalBlobRequest, portalFileRequest, portalRequest } from "@/lib/portalApi";
 
 export type PortalApi = {
   request: <T>(path: string, options?: Parameters<typeof portalRequest>[2]) => Promise<T>;
   requestBlob: (path: string, options?: { signal?: AbortSignal }) => Promise<Blob>;
+  requestFile: (path: string, options?: { signal?: AbortSignal }) => Promise<{ blob: Blob; headers: Headers }>;
 };
 
 /** Cliente del portal ligado al token del tenant logueado. */
@@ -14,6 +15,7 @@ export function usePortalApi(): PortalApi {
   return useMemo<PortalApi>(() => ({
     request: <T,>(path: string, options?: Parameters<typeof portalRequest>[2]) => portalRequest<T>(token, path, options),
     requestBlob: (path: string, options?: { signal?: AbortSignal }) => portalBlobRequest(token, path, options),
+    requestFile: (path: string, options?: { signal?: AbortSignal }) => portalFileRequest(token, path, options),
   }), [token]);
 }
 

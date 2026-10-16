@@ -13,7 +13,7 @@ import { Stamp, Ticket, TicketDivider, TicketRow, TicketRows } from "@/component
 import { useToast } from "@/components/ui/Toast";
 import { BRAND } from "@/config/brand";
 import { getPortalErrorMessage, usePortalApi, usePortalResource } from "@/hooks/usePortalResource";
-import { getComprobanteTypeLabel, getPaymentMethodLabel } from "@/lib/fiscalLabels";
+import { getComprobanteTypeLabel, getDocumentTypeLabel, getPaymentMethodLabel } from "@/lib/fiscalLabels";
 import { formatArgentinaDateTime, formatFiscalDate } from "@/lib/formatters";
 import { saveBlobAsFile } from "@/lib/portalApi";
 import {
@@ -76,7 +76,7 @@ function InvoiceTicket({ invoice, shopName }: { invoice: PortalInvoice; shopName
       <TicketDivider />
       <TicketRows>
         <TicketRow label="Cliente" value={getInvoiceCustomerLabel(invoice)} />
-        {invoice.customerDocNumber ? <TicketRow label={invoice.customerDocType ?? "Documento"} value={invoice.customerDocNumber} mono /> : null}
+        {invoice.customerDocNumber ? <TicketRow label={getDocumentTypeLabel(invoice.customerDocType, "Documento")} value={invoice.customerDocNumber} mono /> : null}
         {issued ? <TicketRow label="CAE" value={invoice.cae ?? "Sin dato"} mono /> : null}
         {issued ? <TicketRow label="Vencimiento" value={formatFiscalDate(invoice.caeVto)} mono /> : null}
         <TicketRow label="Total" value={<Money value={invoice.amount} currency={invoice.currency ?? "ARS"} />} emphasis />
